@@ -8,11 +8,13 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**Phases 1-6 done** (see `PLAN.md`'s phased plan): `Rope`/`Node`/
-`Rope_Ref` skeleton, refcounting, `Null_Rope`, `Length`, `Is_Empty`,
-`"&"` (short-leaf merge plus depth-triggered auto-rebalance —
-`Balance`/`Balance_Insert`/`Balance_Walk`/`Concat_Forest`, the
-Fibonacci-forest algorithm), `From_String`/`To_String`, `Element`,
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-7, the last
+a stretch phase): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
+`Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
+depth-triggered auto-rebalance — `Balance`/`Balance_Insert`/
+`Balance_Walk`/`Concat_Forest`, the Fibonacci-forest algorithm), plus
+`"&"`'s `Character`/`String` overloads, `From_String`/`From_Character`/
+`To_String`, `From_Unbounded_String`/`To_Unbounded_String`, `Element`,
 `Slice`, `Insert`, `Delete`, the five comparison operators
 (`"="`/`"<"`/`"<="`/`">"`/`">="`), `Index` (`Rope`/`Character`
 patterns, each with a no-`From` and a `From`-bounded overload, both
@@ -20,19 +22,35 @@ directions), `Split` (`Rope`/`String`/`Character`/`Character_Set`
 separators), `Cursor` + the `Iterable` aspect (`for Ch of Some_Rope
 loop`), `Trim` (`Ada.Strings.Maps.Character_Set`-based, collapsing
 `Rope.Mod`'s separate `TrimLeft`/`TrimRight`/`Trim`), `Map`/
-`Map_Indexed`, and `To_Upper`/`To_Lower`/`Capitalize`/`Uncapitalize`.
-`src/ropes.ads`/`.adb` exist and build;
-`test/test_construction.adb` (19), `test_balance.adb` (5),
+`Map_Indexed`, `To_Upper`/`To_Lower`/`Capitalize`/`Uncapitalize`, `"*"`
+(`Natural, Character`/`Rope`, collapsing `Rope.Mod`'s `Make`/`Repeat`
+into `Ada.Strings.Fixed`'s own `"*"` vocabulary — see the "`"*"` is a
+real find" note below), and `Escape`. `src/ropes.ads`/`.adb` exist and
+build; `test/test_construction.adb` (19), `test_balance.adb` (5),
 `test_slice.adb` (8), `test_insert.adb` (8), `test_delete.adb` (9),
 `test_compare.adb` (13), `test_index.adb` (25), `test_split.adb` (15),
-`test_iterator.adb` (12), `test_map.adb` (4), `test_case.adb` (8), and
-`test_trim.adb` (7) — 133 checks total — all pass clean,
-including under valgrind. `Balance`/`Max_Depth`/`Min_Length` are
-internal to `ropes.adb`, not public — `src/ropes-test_support.ads`/
-`.adb` is a small test-only child package (`function Depth`) so tests
-can confirm depth stays bounded without adding `Depth` to the real
-public API. Work through the remaining phases in order — each gets
-its own tests before moving to the next.
+`test_iterator.adb` (12), `test_map.adb` (4), `test_case.adb` (8),
+`test_trim.adb` (7), `test_concat_overloads.adb` (12),
+`test_unbounded.adb` (4), `test_repeat.adb` (8), and `test_escape.adb`
+(5) — 162 checks total — all pass clean, including under valgrind.
+`Balance`/`Max_Depth`/`Min_Length` are internal to `ropes.adb`, not
+public — `src/ropes-test_support.ads`/`.adb` is a small test-only
+child package (`function Depth`) so tests can confirm depth stays
+bounded without adding `Depth` to the real public API.
+
+**`"*"` is a real find, not in the original design sketch**: `Rope.Mod`'s
+`Repeat`/`Make` were originally sketched as functions of those names,
+but `Ada.Strings.Fixed` already has `"*" (Natural, Character)`/`"*"
+(Natural, String)` operators doing exactly this for `String` —
+discovered only at Phase 7 implementation time. Reusing that
+vocabulary (`Natural * Rope`, `Natural * Character`) instead of
+inventing `Repeat`/`Make` names is the same "Reuse `Ada.Strings`
+vocabulary" convention already applied to `Index`/`Trim`/`Slice` in
+earlier phases — it just wasn't noticed until later, since `"*"` is a
+far less obvious place to look for `Ada.Strings.Fixed` precedent.
+**Before assuming a design sketch's names are final, check
+`Ada.Strings` for an operator/function match, not just a function
+name.**
 
 **`Iterable`'s aspect spelling caught a real gotcha** (see `PLAN.md`'s
 "Iteration" section): it must be `with Iterable => (...)` directly on
@@ -62,7 +80,8 @@ true going forward).
 `arg_parser` — see `PLAN.md`'s "Command-line tool (rope_tool)") has
 `cat`/`len`/`fetch`/`slice`/`insert`/`delete`/`cmp`/`index`/`rindex`/
 `indexchar`/`rindexchar`/`split`/`chars`/`trim`/`triml`/`trimr`/
-`upper`/`lower`/`capitalize`/`uncapitalize`, matching Phases 1-6's API
+`upper`/`lower`/`capitalize`/`uncapitalize`/`repeat`/`make`/`bigcat`/
+`contains`/`escaped`, matching all of `Ropes`'s API through Phase 7
 (`cmp` is built from `"="`/`"<"` in `rope_tool_args.adb` itself, since
 `Ropes` has no public `Compare` function to wrap — see PLAN.md's
 "Comparison"; `index`/`rindex` and `indexchar`/`rindexchar` are each
@@ -75,13 +94,18 @@ the untouched side of `Ropes`'s one `Trim` function, since `Ropes`
 collapsed `RopeTool.Mod`'s three separate trim commands; no `map`/
 `map_indexed` subcommand, since `Map`'s `Convert` is a function pointer
 with no CLI-string-argument shape and `RopeTool.Mod` itself has none
-either). Add a `rope_tool` subcommand in the same phase
-that adds its underlying `Ropes` operation — never a stub ahead of the
-operation existing, and don't let `rope_tool` drift behind `Ropes`'s
-current surface from one phase to the next; this includes a phase like
-5 that adds no new `RopeTool.Mod`-sourced command, since the demo
-angle ("does `rope_tool` show off this phase's addition") is separate
-from the porting angle ("does `RopeTool.Mod` have a matching
+either; `bigcat` prints `Length (N1 * CH1 & N2 * CH2)`, exercising
+`"*"`'s binary-doubling sharing and `New_Concat`'s overflow guard the
+same way `RopeTool.Mod`'s own `bigcat` does). **This completes
+`rope_tool`'s port of `RopeTool.Mod`'s entire command set** — every
+`RopeTool.Mod` command now has a `rope_tool` counterpart, plus `chars`,
+which doesn't go the other way. Add a `rope_tool` subcommand in the
+same phase that adds its underlying `Ropes` operation — never a stub
+ahead of the operation existing, and don't let `rope_tool` drift behind
+`Ropes`'s current surface from one phase to the next; this includes a
+phase like 5 that adds no new `RopeTool.Mod`-sourced command, since the
+demo angle ("does `rope_tool` show off this phase's addition") is
+separate from the porting angle ("does `RopeTool.Mod` have a matching
 command").
 
 ## Source material
@@ -193,9 +217,15 @@ exists elsewhere in this tree; `-M132` is passed on the command line.
   `Index (..., Going => Forward | Backward)` instead of separate
   `Find`/`RFind` functions; `Ada.Strings.Maps.Character_Set` for
   `Trim`; `Ada.Characters.Handling.To_Upper`/`To_Lower` underlying
-  `Map`-based case conversion. See `PLAN.md` for the full per-operation
-  mapping before adding anything that duplicates existing `Ada.Strings`
-  vocabulary under a new name.
+  `Map`-based case conversion; `"*" (Natural, Character)`/`(Natural,
+  Rope)` instead of `Rope.Mod`'s `Make`/`Repeat` names, matching
+  `Ada.Strings.Fixed`'s own `"*" (Natural, Character)`/`"*" (Natural,
+  String)` operators exactly (found only at Phase 7 implementation
+  time — check `Ada.Strings` for an operator match, not just a
+  same-shaped function name, before assuming a sketch's own name is
+  final). See `PLAN.md` for the full per-operation mapping before
+  adding anything that duplicates existing `Ada.Strings` vocabulary
+  under a new name.
 - **`with Pre =>` contracts, checked via `-gnata`** (once written) —
   keep `-gnata` in `ropes.gpr`'s `Compiler` switches, same reasoning as
   `alibfyaml`'s `libfyaml_ada.gpr` comment: a precondition violation

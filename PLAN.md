@@ -237,10 +237,15 @@ untouched side) and `upper`/`lower`/`capitalize`/`uncapitalize`
 (`RopeTool.Mod`'s own names, wrapping `To_Upper`/`To_Lower`/
 `Capitalize`/`Uncapitalize` directly) — no `map`/`map_indexed`
 subcommand, since `RopeTool.Mod` has none either (`Map`'s `Convert` is
-a function pointer, with no CLI-string-argument shape). The rest of
-`RopeTool.Mod`'s command set (`repeat`, `escaped`, `make`, `bigcat`,
-`contains`) lands piecemeal as the matching `Ropes` operation lands in
-Phase 7, if it does — see that phase's "stretch" status.
+a function pointer, with no CLI-string-argument shape). Phase 7 added
+`repeat`/`make`/`bigcat`/`contains`/`escaped` (`RopeTool.Mod`'s own
+remaining five commands, all wrapped directly — `repeat`/`make` on
+`Ropes`'s `"*"`, `bigcat` printing `Length (N1 * CH1 & N2 * CH2)`,
+`contains` on `Ropes.Index`'s `Character` overload with `/= 0`, and
+`escaped` on `Ropes.Escape`), which **completes `rope_tool`'s port of
+`RopeTool.Mod`'s entire command set** — every `RopeTool.Mod` command
+now has a `rope_tool` counterpart, plus `chars` (Phase 5's, which
+doesn't have one going the other way).
 
 `~/Repos/Oberon/oberon-tools/tests/rope-*.test` (see "Sources being
 ported" above) are black-box fixtures written against `RopeTool`, run
@@ -416,6 +421,12 @@ counting" section).
 
 ### Construction and concatenation
 
+`"&" (Rope, Rope)`/`From_String`/`To_String` **[Phase 1, done]**; the
+rest of this section (the remaining `"&"` overloads,
+`From_Character`, `From_Unbounded_String`/`To_Unbounded_String`, and
+`"*"`) **[Phase 7, done]** — this section's sketch was never fully
+assigned to a numbered phase until Phase 7 finally closed it out.
+
 ```ada
 function "&" (Left, Right : Rope) return Rope;
 function "&" (Left : Rope; Right : Character) return Rope;
@@ -430,8 +441,8 @@ function To_String (Source : Rope) return String;
 function From_Unbounded_String (Source : Ada.Strings.Unbounded.Unbounded_String) return Rope;
 function To_Unbounded_String (Source : Rope) return Ada.Strings.Unbounded.Unbounded_String;
 
-function Repeat (Source : Rope; Count : Natural) return Rope;  -- O(log Count), binary doubling like Rope.Mod's Repeat
-function Make (Length : Natural; Fill : Character) return Rope;
+function "*" (Left : Natural; Right : Character) return Rope;  -- Rope.Mod's Make
+function "*" (Left : Natural; Right : Rope) return Rope;       -- Rope.Mod's Repeat: O(log Left), binary doubling
 ```
 
 `"&"` replaces `Cat`/`AppendChar`/`FromChar` together — this is *the*
@@ -441,6 +452,19 @@ idiom substitution for a "cheap concatenation" type in Ada (mirrors
 counterpart (Oberon-2 has no unbounded string type) — added because
 Ada does, and a rope library that can't interop with the type most Ada
 code already uses for "a string that grows" would be an odd omission.
+
+**Correction from the sketch above, found at Phase 7 implementation
+time:** `Rope.Mod`'s `Repeat`/`Make` are named `"*"` here instead,
+overloading `Natural * Rope`/`Natural * Character` — because
+`Ada.Strings.Fixed` already has `"*" (Natural, Character)`/`"*"
+(Natural, String)` operators doing exactly this for `String`. Reusing
+that vocabulary instead of inventing `Repeat`/`Make` is the same
+"Reuse `Ada.Strings` vocabulary" convention already applied to
+`Index`'s `Going` parameter (replacing `Find`/`RFind`) and `Trim`'s
+`Character_Set` parameters (replacing `TrimLeft`/`TrimRight`/`Trim`) —
+this one just wasn't noticed until Phase 7's own implementation, since
+`"*"` is a much less obvious place to look for `Ada.Strings.Fixed`
+precedent than `Index`/`Trim`/`Slice` were.
 
 ### Access and slicing
 
@@ -852,6 +876,13 @@ parameter's type.
 
 - `Overwrite`, `Head`, `Tail` (`Unbounded_String` has them, `Rope.Mod`
   doesn't — plausible additions, not required to match scope).
+  **Reviewed at Phase 7 and left out**: `Rope.Mod` has none of the
+  three, so adding them would grow past `Rope.Mod`'s own scope rather
+  than complete it, and `rope_tool` would have no `RopeTool.Mod`
+  command to demonstrate them with either — unlike `"*"`/
+  `From_Unbounded_String`/`Escape`, which either complete `Rope.Mod`'s
+  scope or (for `From_Unbounded_String`) fill a gap `Rope.Mod` can't
+  have by construction (no unbounded string type in Oberon-2).
 - `Escaped` (`Rope.Mod`'s backslash-escape utility) — kept as an idea,
   not committed to a name yet. Needs a clear doc note that Ada string
   *literals* don't use backslash escapes at all (quote-doubling is the
@@ -859,7 +890,13 @@ parameter's type.
   convenience, not anything resembling Ada literal syntax — call it
   something that doesn't imply otherwise (`Escaped` on its own reads
   ambiguously; maybe `To_Display_String` or similar — decide at
-  implementation time).
+  implementation time). **[Phase 7, done, as `Escape`]**: once
+  implementation confirmed the return type is `Rope` (not `String`,
+  since callers still print it via `To_String` same as any other
+  `Rope`), `To_Display_String` was rejected as misleading (a `To_..._
+  String`-shaped name should return a `String`) in favor of `Escape` --
+  a plain verb, matching `Trim`/`Capitalize`'s own naming pattern in
+  this package.
 - A lazy/early-stopping `Split` iterator (see "Splitting" above).
 - Wider-than-`Natural` length type for ropes over ~2×10⁹ characters
   (see the open question below).
@@ -1088,8 +1125,58 @@ parameter's type.
   — confirmed via `RopeTool.Mod` that it has none either, since `Map`'s
   `Convert` parameter is a function pointer with no CLI-string-argument
   shape, unlike every other operation added so far.
-- **Phase 7 (stretch):** `From_Unbounded_String`/`To_Unbounded_String`,
-  whatever "deferred" items above turn out to be worth adding.
+- **Phase 7 (stretch), done.** Rounded out the remaining "Construction
+  and concatenation" design sketch (never assigned to an earlier
+  phase's actual scope) plus one genuinely-worth-adding "Deferred /
+  stretch" item, closing out the rest of `Rope.Mod`'s own scope:
+  `"&" (Rope, Character)`/`(Character, Rope)`/`(Rope, String)`/`(String,
+  Rope)`, `From_Character`, `From_Unbounded_String`/
+  `To_Unbounded_String`, `"*" (Natural, Character)`/`(Natural, Rope)`,
+  and `Escape`. **`"*"` is a real find, not in the original sketch**:
+  `Ada.Strings.Fixed` already has `"*" (Natural, Character)`/`"*"
+  (Natural, String)` operators doing exactly what `Rope.Mod`'s
+  `Make`/`Repeat` do for `String`, discovered only at Phase 7
+  implementation time (PLAN.md's original "Construction and
+  concatenation" sketch had named these `Repeat`/`Make` after
+  `Rope.Mod`'s own names, before this match was found) — reusing that
+  vocabulary instead of inventing separate names is exactly AGENTS.md's
+  "Reuse `Ada.Strings` vocabulary" convention already applied to
+  `Index`/`Slice`/`Trim` in earlier phases. The `Rope` overload is
+  `Rope.Mod`'s `Repeat`: `O(log Left)` by binary doubling (`Piece :=
+  Piece & Piece`), sharing subtrees rather than copying characters, so
+  even `Left` in the billions stays cheap; the `Character` overload is
+  `Rope.Mod`'s `Make`, implemented as `Left * From_Character (Right)`.
+  `Escape` is `Rope.Mod`'s `Escaped`, renamed at implementation time
+  (once its return type was confirmed to be `Rope`, not `String`) away
+  from the `To_Display_String` name floated in "Deferred / stretch"
+  below, since a `To_..._String` shape would misleadingly suggest a
+  `String` result — `Escape` reads as a verb matching
+  `Trim`/`Capitalize`'s own naming instead. `Overwrite`/`Head`/`Tail`
+  (the other "Deferred / stretch" candidates) were **not** added:
+  `Rope.Mod` has no counterpart for any of the three, so adding them
+  would grow past `Rope.Mod`'s own scope rather than complete it — see
+  this file's "port `Rope.Mod`'s scope, not a bigger feature set"
+  framing at the top — and `rope_tool` would have nothing to
+  demonstrate them with either (no `RopeTool.Mod` command for any of
+  the three). New tests: `test_concat_overloads.adb` (12 checks, no
+  direct `RopeTest.Mod` precedent — Oberon-2 has no operator
+  overloading — except `From_Character`'s own content/length check,
+  from `CheckFromCharAndMake`), `test_unbounded.adb` (4 checks, no
+  `Rope.Mod` precedent at all), `test_repeat.adb` (8 checks, from
+  `CheckCompareFindRepeat`'s `Repeat` scenarios, `CheckFromCharAndMake`'s
+  `Make` scenarios, and `CheckOverflowGuard` — its `MAX(LONGINT)`
+  boundary translates to `Natural'Last`; the boundary check builds a
+  `Natural'Last - 1`-character rope via `"*"`'s binary doubling and
+  confirms it costs only ~85 heap allocations total, not anywhere near
+  2×10⁹, proving the sharing is real), `test_escape.adb` (5 checks,
+  from `CheckEscaped`, plus one extra check for the `\NNN` numeric-code
+  form that none of `CheckEscaped`'s own scenarios happen to exercise)
+  — 29 new checks, 162 total, all pass, all valgrind-clean. `examples/
+  rope_tool` gained `repeat`/`make`/`bigcat`/`contains`/`escaped` --
+  `RopeTool.Mod`'s own remaining five commands, all wrapped directly —
+  which completes `rope_tool`'s port of `RopeTool.Mod`'s entire command
+  set (every `RopeTool.Mod` command now has a `rope_tool` counterpart,
+  plus `chars`, which doesn't).
 
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds

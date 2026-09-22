@@ -13,6 +13,10 @@ test/test_iterator
 test/test_map
 test/test_case
 test/test_trim
+test/test_concat_overloads
+test/test_unbounded
+test/test_repeat
+test/test_escape
 examples/obj/
 examples/rope_tool
 

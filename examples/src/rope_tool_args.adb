@@ -472,4 +472,156 @@ package body Rope_Tool_Args is
       return True;
    end Uncapitalize_Argument_Handler;
 
+   --  --- repeat S N ---
+
+   Repeat_Count : Natural := 0;
+   Repeat_S     : Rope;
+
+   function Repeat_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      if Repeat_Count = 0 then
+         Repeat_S := From_String (Arg);
+      elsif Repeat_Count = 1 then
+         Put_Line (To_String (Natural'Value (Arg) * Repeat_S));
+      end if;
+      Repeat_Count := Repeat_Count + 1;
+      return True;
+   exception
+      when Constraint_Error =>
+         Put_Line (Standard_Error, "Error: not a valid count: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+   end Repeat_Argument_Handler;
+
+   --  --- make LEN CH ---
+
+   Make_Count : Natural := 0;
+   Make_Len   : Natural;
+
+   function Make_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Make_Count is
+         when 0 =>
+            Make_Len := Natural'Value (Arg);
+
+         when 1 =>
+            if Arg'Length /= 1 then
+               Put_Line (Standard_Error, "Error: CH must be exactly one character: """ & Arg & """");
+               Set_Exit_Status (Failure);
+               return False;
+            end if;
+            Put_Line (To_String (Make_Len * Arg (Arg'First)));
+
+         when others =>
+            null;
+      end case;
+      Make_Count := Make_Count + 1;
+      return True;
+   exception
+      when Constraint_Error =>
+         Put_Line (Standard_Error, "Error: not a valid length: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+   end Make_Argument_Handler;
+
+   --  --- bigcat N1 CH1 N2 CH2 ---
+   --  Built with "*" so that even huge N1/N2 stay cheap (its binary
+   --  doubling shares subtrees instead of copying characters). Lets
+   --  New_Concat's overflow guard be exercised -- and
+   --  Ada.Strings.Length_Error raised, as designed, instead of
+   --  silently wrapping -- without actually allocating anywhere near
+   --  Natural'Last real characters.
+
+   Bigcat_Count : Natural := 0;
+   Bigcat_N1    : Natural;
+   Bigcat_Ch1   : Character;
+   Bigcat_N2    : Natural;
+
+   function Bigcat_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Bigcat_Count is
+         when 0 =>
+            Bigcat_N1 := Natural'Value (Arg);
+
+         when 1 =>
+            if Arg'Length /= 1 then
+               Put_Line (Standard_Error, "Error: CH1 must be exactly one character: """ & Arg & """");
+               Set_Exit_Status (Failure);
+               return False;
+            end if;
+            Bigcat_Ch1 := Arg (Arg'First);
+
+         when 2 =>
+            Bigcat_N2 := Natural'Value (Arg);
+
+         when 3 =>
+            if Arg'Length /= 1 then
+               Put_Line (Standard_Error, "Error: CH2 must be exactly one character: """ & Arg & """");
+               Set_Exit_Status (Failure);
+               return False;
+            end if;
+            Put_Line
+              (Ada.Strings.Fixed.Trim
+                 (Natural'Image (Length (Bigcat_N1 * Bigcat_Ch1 & Bigcat_N2 * Arg (Arg'First))), Ada.Strings.Both));
+
+         when others =>
+            null;
+      end case;
+      Bigcat_Count := Bigcat_Count + 1;
+      return True;
+   exception
+      when Constraint_Error =>
+         Put_Line (Standard_Error, "Error: not a valid count: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+   end Bigcat_Argument_Handler;
+
+   --  --- contains S CH FROM ---
+
+   Contains_Count : Natural := 0;
+   Contains_S     : Rope;
+   Contains_Ch    : Character;
+
+   function Contains_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Contains_Count is
+         when 0 =>
+            Contains_S := From_String (Arg);
+
+         when 1 =>
+            if Arg'Length /= 1 then
+               Put_Line (Standard_Error, "Error: CH must be exactly one character: """ & Arg & """");
+               Set_Exit_Status (Failure);
+               return False;
+            end if;
+            Contains_Ch := Arg (Arg'First);
+
+         when 2 =>
+            Put_Line (Boolean'Image (Index (Contains_S, Contains_Ch, Positive'Value (Arg), Ada.Strings.Forward) /= 0));
+
+         when others =>
+            null;
+      end case;
+      Contains_Count := Contains_Count + 1;
+      return True;
+   exception
+      when Constraint_Error =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+   end Contains_Argument_Handler;
+
+   --  --- escaped S ---
+
+   function Escaped_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      Put_Line (To_String (Escape (From_String (Arg))));
+      return True;
+   end Escaped_Argument_Handler;
+
 end Rope_Tool_Args;

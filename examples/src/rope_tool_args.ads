@@ -84,6 +84,21 @@ package Rope_Tool_Args is
    --  --- uncapitalize S --- (Ropes.Uncapitalize)
    function Uncapitalize_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
+   --  --- repeat S N --- (Ropes."*", N * S)
+   function Repeat_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- make LEN CH --- (Ropes."*", LEN * CH)
+   function Make_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- bigcat N1 CH1 N2 CH2 --- (prints Length (N1 * CH1 & N2 * CH2); Ropes."*"/"&" share subtrees, so even huge N1/N2 stay cheap)
+   function Bigcat_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- contains S CH FROM --- (Ropes.Index, Character pattern, Going => Forward, /= 0)
+   function Contains_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- escaped S --- (Ropes.Escape)
+   function Escaped_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
    Commands : aliased Command_Array :=
      [Make_Command
        ("cat",
@@ -181,7 +196,32 @@ package Rope_Tool_Args is
        ("uncapitalize",
         Make_Parser
           (Description => "uncapitalize S  Print S with its first character lowercased (ASCII only).",
-           Handler     => Uncapitalize_Argument_Handler'Access, Options => null))];
+           Handler     => Uncapitalize_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("repeat",
+        Make_Parser
+          (Description => "repeat S N  Print N concatenated copies of S.", Handler => Repeat_Argument_Handler'Access,
+           Options     => null)),
+     Make_Command
+       ("make",
+        Make_Parser
+          (Description => "make LEN CH  Print a rope of LEN copies of CH.", Handler => Make_Argument_Handler'Access,
+           Options     => null)),
+     Make_Command
+       ("bigcat",
+        Make_Parser
+          (Description => "bigcat N1 CH1 N2 CH2  Print the length of N1 copies of CH1 concatenated with N2 copies of CH2.",
+           Handler     => Bigcat_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("contains",
+        Make_Parser
+          (Description => "contains S CH FROM  Print TRUE or FALSE: whether CH occurs in S at or after FROM.",
+           Handler     => Contains_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("escaped",
+        Make_Parser
+          (Description => "escaped S  Print S with special and non-printable characters escaped.",
+           Handler     => Escaped_Argument_Handler'Access, Options => null))];
 
    Main_Parser : Parser :=
      Make_Parser

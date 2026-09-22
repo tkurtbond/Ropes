@@ -531,6 +531,11 @@ package body Ropes is
       return Wrap (Result);
    end "&";
 
+   function "&" (Left : Rope; Right : Character) return Rope is (Left & From_Character (Right));
+   function "&" (Left : Character; Right : Rope) return Rope is (From_Character (Left) & Right);
+   function "&" (Left : Rope; Right : String) return Rope is (Left & From_String (Right));
+   function "&" (Left : String; Right : Rope) return Rope is (From_String (Left) & Right);
+
    function From_String (Source : String) return Rope is
    begin
       if Source'Length = 0 then
@@ -538,6 +543,8 @@ package body Ropes is
       end if;
       return Wrap (New_Leaf (Source));
    end From_String;
+
+   function From_Character (Source : Character) return Rope is (Wrap (New_Leaf ([Source])));
 
    function To_String (Source : Rope) return String is
       Result : String (1 .. Length (Source));
@@ -562,6 +569,44 @@ package body Ropes is
       Copy (Data_Of (Source));
       return Result;
    end To_String;
+
+   function From_Unbounded_String (Source : Ada.Strings.Unbounded.Unbounded_String) return Rope is
+     (From_String (Ada.Strings.Unbounded.To_String (Source)));
+
+   function To_Unbounded_String (Source : Rope) return Ada.Strings.Unbounded.Unbounded_String is
+     (Ada.Strings.Unbounded.To_Unbounded_String (To_String (Source)));
+
+   function "*" (Left : Natural; Right : Character) return Rope is (Left * From_Character (Right));
+
+   --  Rope.Mod's Repeat: O(log Left) by binary doubling -- Piece :=
+   --  Piece & Piece repeatedly, accumulating Result & Piece on each odd
+   --  bit of Left (the standard binary-exponentiation shape). Every
+   --  doubling shares Piece's existing tree via "&" (which Incr_Refs
+   --  both operands, so Piece appearing as both Left and Right of the
+   --  same Concat is exactly the acyclic-sharing this is for -- see
+   --  AGENTS.md's acyclic-invariant note), never copies its characters,
+   --  so even Left in the billions stays cheap -- confirmed by
+   --  test_repeat.adb's overflow-guard check, which builds a rope of
+   --  length Natural'Last - 1 this way instantly.
+   function "*" (Left : Natural; Right : Rope) return Rope is
+      Count  : Natural := Left;
+      Piece  : Rope    := Right;
+      Result : Rope    := Null_Rope;
+   begin
+      if Is_Empty (Right) then
+         return Null_Rope;
+      end if;
+      while Count > 0 loop
+         if Count mod 2 = 1 then
+            Result := Result & Piece;
+         end if;
+         Count := Count / 2;
+         if Count > 0 then
+            Piece := Piece & Piece;
+         end if;
+      end loop;
+      return Result;
+   end "*";
 
    function Element (Source : Rope; Index : Positive) return Character is
       D : constant Node_Access := Data_Of (Source);
@@ -1000,5 +1045,49 @@ package body Ropes is
       end if;
       return From_String ([Ada.Characters.Handling.To_Lower (Element (Source, 1))]) & Slice (Source, 2, Length (Source));
    end Uncapitalize;
+
+   --  Rope.Mod's EscapeChar, unrolled into Escape's loop directly
+   --  (Rope.Mod's own separate EscapeChar/Escaped pair exists only
+   --  because Oberon-2 has no local functions inside a loop; a nested
+   --  block here does the same job). Built with "for Ch of Source
+   --  loop" -- Phase 5's Cursor/Iterable -- and the new "&" (Rope,
+   --  Character) overload above, rather than hand-walking Fetch by
+   --  index the way Rope.Mod must.
+   function Escape (Source : Rope) return Rope is
+      Result : Rope := Null_Rope;
+   begin
+      for Ch of Source loop
+         case Ch is
+            when '\' =>
+               Result := Result & '\' & '\';
+
+            when '"' =>
+               Result := Result & '\' & '"';
+
+            when Ada.Characters.Latin_1.LF =>
+               Result := Result & '\' & 'n';
+
+            when Ada.Characters.Latin_1.HT =>
+               Result := Result & '\' & 't';
+
+            when Ada.Characters.Latin_1.CR =>
+               Result := Result & '\' & 'r';
+
+            when others =>
+               if Character'Pos (Ch) < 32 or else Character'Pos (Ch) >= 127 then
+                  declare
+                     V : constant Natural := Character'Pos (Ch);
+                  begin
+                     Result :=
+                       Result & '\' & Character'Val (Character'Pos ('0') + V / 100) &
+                       Character'Val (Character'Pos ('0') + (V / 10) mod 10) & Character'Val (Character'Pos ('0') + V mod 10);
+                  end;
+               else
+                  Result := Result & Ch;
+               end if;
+         end case;
+      end loop;
+      return Result;
+   end Escape;
 
 end Ropes;

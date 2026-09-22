@@ -7,15 +7,17 @@
 --  PLAN.md for the full design rationale and AGENTS.md for house
 --  conventions specific to this codebase.
 --
---  This is Phase 1 through 6 -- the whole of PLAN.md's phased
---  implementation plan (Phase 7 is stretch-only): the Rope/Node
---  skeleton, reference counting, the smallest useful slice of the API
---  (Length, Is_Empty, "&", From_String/To_String, Element), "&"'s
---  automatic depth-bounded rebalancing, Slice/Insert/Delete, the five
---  comparison operators, Index and Split, Cursor-based iteration
---  ("for Ch of Some_Rope loop"), and now Trim, Map/Map_Indexed,
---  To_Upper/To_Lower, and Capitalize/Uncapitalize. See PLAN.md before
---  adding to this package.
+--  This is Phase 1 through 7 -- the whole of PLAN.md's phased
+--  implementation plan: the Rope/Node skeleton, reference counting,
+--  the smallest useful slice of the API (Length, Is_Empty, "&",
+--  From_String/To_String, Element), "&"'s automatic depth-bounded
+--  rebalancing, Slice/Insert/Delete, the five comparison operators,
+--  Index and Split, Cursor-based iteration ("for Ch of Some_Rope
+--  loop"), Trim, Map/Map_Indexed, To_Upper/To_Lower,
+--  Capitalize/Uncapitalize, and now the remaining "&"/From_.../"*"
+--  construction conveniences (From_Character, the Character/String "&"
+--  overloads, From_Unbounded_String/To_Unbounded_String, "*") plus
+--  Escape. See PLAN.md before adding to this package.
 --
 --  A Rope is an immutable value: every operation returns a new Rope
 --  rather than modifying an existing one, so Ropes may be freely
@@ -28,6 +30,7 @@ with Ada.Characters.Latin_1;
 with Ada.Finalization;
 with Ada.Strings;
 with Ada.Strings.Maps;
+with Ada.Strings.Unbounded;
 
 package Ropes is
 
@@ -63,11 +66,49 @@ package Ropes is
    --  PLAN.md's "Balancing" section. Transparent to callers; there is
    --  no public Balance or Depth to call directly (unlike Rope.Mod).
 
+   function "&" (Left : Rope; Right : Character) return Rope;
+   function "&" (Left : Character; Right : Rope) return Rope;
+   function "&" (Left : Rope; Right : String) return Rope;
+   function "&" (Left : String; Right : Rope) return Rope;
+   --  As above, with one side already a plain Character/String --
+   --  Ada.Strings.Unbounded's own "&" suite exactly (Unbounded_String
+   --  "&" Character/String and the mirror-image overloads). Each is
+   --  just Left/Right wrapped with From_Character/From_String and
+   --  passed to the Rope "&" Rope operator above -- convenience, not a
+   --  separate algorithm.
+
    function From_String (Source : String) return Rope;
    --  Null_Rope if Source is empty.
 
+   function From_Character (Source : Character) return Rope;
+   --  A one-character Rope -- Rope.Mod's FromChar.
+
    function To_String (Source : Rope) return String;
    --  "" if Source is Null_Rope.
+
+   function From_Unbounded_String (Source : Ada.Strings.Unbounded.Unbounded_String) return Rope;
+   function To_Unbounded_String (Source : Rope) return Ada.Strings.Unbounded.Unbounded_String;
+   --  No Rope.Mod counterpart (Oberon-2 has no unbounded string type)
+   --  -- added because Ada does, and a rope library that cannot
+   --  interop with the type most Ada code already uses for "a string
+   --  that grows" would be an odd omission.
+
+   function "*" (Left : Natural; Right : Character) return Rope;
+   function "*" (Left : Natural; Right : Rope) return Rope;
+   --  Left copies of Right, concatenated -- Null_Rope if Left = 0 (or
+   --  Right is Null_Rope, for the Rope overload). Mirrors
+   --  Ada.Strings.Fixed's own "*" (Natural, Character) and "*"
+   --  (Natural, String) operators exactly, reusing that vocabulary
+   --  instead of inventing separate Repeat/Make names (see AGENTS.md's
+   --  "Reuse Ada.Strings vocabulary" convention) -- discovered only at
+   --  Phase 7 implementation time; PLAN.md's original design sketch
+   --  had named these Repeat/Make after Rope.Mod's own names, before
+   --  this match was found. The Rope overload is Rope.Mod's Repeat:
+   --  O(log Left) via binary doubling (Piece := Piece & Piece), sharing
+   --  subtrees rather than copying characters, so even Left in the
+   --  billions is cheap -- not Left successive "&" calls. The Character
+   --  overload is Rope.Mod's Make, implemented as Left * From_Character
+   --  (Right).
 
    function Element (Source : Rope; Index : Positive) return Character;
    --  Raises Ada.Strings.Index_Error if Index > Length (Source).
@@ -234,6 +275,21 @@ package Ropes is
    --  No Ada.Strings precedent to match the name against (neither
    --  Ada.Strings.Fixed nor Ada.Characters.Handling has a
    --  "capitalize" operation).
+
+   function Escape (Source : Rope) return Rope;
+   --  Source with backslash, double quote, line feed, tab and carriage
+   --  return replaced by their two-character backslash escapes, and
+   --  any other non-printable character (Character'Pos < 32 or >= 127)
+   --  replaced by a backslash followed by its three-digit decimal code
+   --  -- Rope.Mod's Escaped, renamed: Ada string *literals* have no
+   --  backslash-escape syntax at all (quote-doubling is the only
+   --  escape Ada source has), so this is purely a debug/display
+   --  convenience, not anything resembling Ada literal syntax.
+   --  "Escape" reads as a verb, matching Trim/Capitalize's own naming,
+   --  without "Escaped"'s passive-participle ambiguity or a
+   --  "To_..._String"-shaped name implying a String result -- this
+   --  still returns a Rope, printable as-is via To_String, same as
+   --  Rope.Mod's Escaped before its own caller's PrintRope.
 
 private
 
