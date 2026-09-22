@@ -135,6 +135,19 @@ private
    overriding procedure Adjust (R : in out Rope_Ref);
    overriding procedure Finalize (R : in out Rope_Ref);
 
+   --  Rope is also deliberately NOT limited, for a related but
+   --  separate reason: RM 7.6 defines assignment of a type with a
+   --  controlled component as Finalize the target's old value, copy,
+   --  then Adjust the new value -- exactly Decr_Ref the old Data, copy
+   --  the Node_Access, Incr_Ref the new Data. That is the entire
+   --  refcounting scheme; plain ":=" already does it. Were Rope
+   --  limited private instead, ordinary assignment ("R2 := R1;")
+   --  would not be available to clients at all, defeating the point --
+   --  see the "may be freely shared and copied" claim in this file's
+   --  header comment, and Ada.Strings.Unbounded.Unbounded_String,
+   --  which is likewise a non-limited private type specifically so it
+   --  behaves like an ordinary value everywhere (records, arrays,
+   --  Ada.Containers instantiations, ...).
    type Rope is record
       Ref : Rope_Ref;
    end record;
