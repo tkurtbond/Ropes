@@ -7,13 +7,14 @@
 --  PLAN.md for the full design rationale and AGENTS.md for house
 --  conventions specific to this codebase.
 --
---  This is Phase 1+2+3+4+5 of PLAN.md's phased implementation plan:
---  the Rope/Node skeleton, reference counting, the smallest useful
---  slice of the API (Length, Is_Empty, "&", From_String/To_String,
---  Element), "&"'s automatic depth-bounded rebalancing,
---  Slice/Insert/Delete, the five comparison operators, Index and
---  Split, and now Cursor-based iteration ("for Ch of Some_Rope
---  loop"). Case mapping is the only phase left -- see PLAN.md before
+--  This is Phase 1 through 6 -- the whole of PLAN.md's phased
+--  implementation plan (Phase 7 is stretch-only): the Rope/Node
+--  skeleton, reference counting, the smallest useful slice of the API
+--  (Length, Is_Empty, "&", From_String/To_String, Element), "&"'s
+--  automatic depth-bounded rebalancing, Slice/Insert/Delete, the five
+--  comparison operators, Index and Split, Cursor-based iteration
+--  ("for Ch of Some_Rope loop"), and now Trim, Map/Map_Indexed,
+--  To_Upper/To_Lower, and Capitalize/Uncapitalize. See PLAN.md before
 --  adding to this package.
 --
 --  A Rope is an immutable value: every operation returns a new Rope
@@ -23,6 +24,7 @@
 --  value: "R : Rope;" with no initial expression is already a valid
 --  empty rope, not an uninitialized one.
 
+with Ada.Characters.Latin_1;
 with Ada.Finalization;
 with Ada.Strings;
 with Ada.Strings.Maps;
@@ -181,6 +183,58 @@ package Ropes is
    --  produced functionally instead of by mutating a heap object in
    --  place.
 
+   Whitespace : constant Ada.Strings.Maps.Character_Set;
+   --  Space, tab, line feed, form feed, carriage return -- Rope.Mod's
+   --  IsSpace set.
+
+   function Trim
+     (Source : Rope; Left : Ada.Strings.Maps.Character_Set := Whitespace; Right : Ada.Strings.Maps.Character_Set := Whitespace)
+      return Rope;
+   --  Source with leading characters in Left and trailing characters
+   --  in Right removed. Matches Ada.Strings.Fixed.Trim's two-
+   --  Character_Set overload exactly (not the single-Trim_End-plus-
+   --  blanks-only overload -- that one only trims a literal space,
+   --  and Rope.Mod's IsSpace covers five characters). Rope.Mod's
+   --  TrimLeft/TrimRight/Trim collapse into this one function, the
+   --  same way Index collapsed Find/RFind/IndexChar/RIndexChar: a
+   --  caller who wants only-left or only-right trimming passes
+   --  Ada.Strings.Maps.Null_Set for the side they don't want touched,
+   --  same as any Ada.Strings.Fixed client would.
+
+   function Map (Source : Rope; Convert : not null access function (Ch : Character) return Character) return Rope;
+   function Map_Indexed
+     (Source : Rope; Convert : not null access function (Index : Positive; Ch : Character) return Character) return Rope;
+   --  Source with Convert applied to every character, in increasing
+   --  index order; Null_Rope if Source is Null_Rope. The result has
+   --  the same tree shape as Source (same internal Depth, no
+   --  rebalancing needed) -- Rope.Mod's Map/Mapi, Map_Indexed renamed
+   --  from Mapi for clarity and taking a 1-based Positive index
+   --  (matching this package's indexing convention) instead of
+   --  Mapi's 0-based LONGINT.
+
+   function To_Upper (Source : Rope) return Rope;
+   function To_Lower (Source : Rope) return Rope;
+   --  Source with every ASCII letter (respectively) uppercased or
+   --  lowercased; other characters, including accented letters, are
+   --  left unchanged -- implemented as Map using
+   --  Ada.Characters.Handling.To_Upper/To_Lower (Character) as the
+   --  conversion function, reusing Ada.Characters.Handling's own
+   --  names and behavior instead of Rope.Mod's hand-rolled
+   --  UppercaseAscii/LowercaseAscii (UpperChar/LowerChar's own A..Z/
+   --  a..z range checks).
+
+   function Capitalize (Source : Rope) return Rope;
+   function Uncapitalize (Source : Rope) return Rope;
+   --  Source with its first character (ASCII only) uppercased,
+   --  respectively lowercased; the rest of Source is unchanged.
+   --  Null_Rope if Source is Null_Rope. Rope.Mod's
+   --  CapitalizeAscii/UncapitalizeAscii, renamed to drop the
+   --  redundant "Ascii" suffix -- same reasoning as To_Upper/To_Lower
+   --  above: there is no non-ASCII variant here to disambiguate from.
+   --  No Ada.Strings precedent to match the name against (neither
+   --  Ada.Strings.Fixed nor Ada.Characters.Handling has a
+   --  "capitalize" operation).
+
 private
 
    type Node_Kind is (Leaf_Kind, Concat_Kind);
@@ -259,5 +313,9 @@ private
       Leaf       : Node_Access := null;
       Leaf_Start : Positive    := 1;
    end record;
+
+   Whitespace : constant Ada.Strings.Maps.Character_Set :=
+     Ada.Strings.Maps.To_Set
+       (' ' & Ada.Characters.Latin_1.HT & Ada.Characters.Latin_1.LF & Ada.Characters.Latin_1.FF & Ada.Characters.Latin_1.CR);
 
 end Ropes;

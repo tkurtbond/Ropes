@@ -1,3 +1,4 @@
+with Ada.Characters.Handling;
 with Ada.Unchecked_Deallocation;
 
 package body Ropes is
@@ -425,6 +426,81 @@ package body Ropes is
          return 1;
       end if;
    end Compare;
+
+   --  Rope.Mod's MapHelper: N with Convert applied to every character,
+   --  in increasing index order. Built via New_Concat directly, not
+   --  New_Simple_Cat -- the result must have exactly N's own tree
+   --  shape (same Depth, no rebalancing needed, per Map/Map_Indexed's
+   --  own doc comment), which New_Simple_Cat's short-leaf merge would
+   --  perturb. N is borrowed; the result is a fresh owned reference,
+   --  or null if N is null.
+   function Map_Node (N : Node_Access; Convert : not null access function (Ch : Character) return Character) return Node_Access is
+   begin
+      if N = null then
+         return null;
+      end if;
+      case N.Kind is
+         when Leaf_Kind =>
+            declare
+               Mapped : String (1 .. N.Len);
+            begin
+               for I in Mapped'Range loop
+                  Mapped (I) := Convert (N.Chars (I));
+               end loop;
+               return New_Leaf (Mapped);
+            end;
+
+         when Concat_Kind =>
+            declare
+               Left   : Node_Access          := Map_Node (N.Left, Convert);
+               Right  : Node_Access          := Map_Node (N.Right, Convert);
+               Result : constant Node_Access := New_Concat (Left, Right);
+            begin
+               Decr_Ref (Left);
+               Decr_Ref (Right);
+               return Result;
+            end;
+      end case;
+   end Map_Node;
+
+   --  As Map_Node, but Convert is also passed each character's
+   --  1-based index in the whole rope -- Rope.Mod's MapiHelper, with
+   --  Next_Index threaded through the recursion in place of MapiHelper's
+   --  VAR idx parameter (an in out parameter here for the same reason:
+   --  it must keep counting across the boundary between N.Left and
+   --  N.Right, not restart at each subtree).
+   function Map_Indexed_Node
+     (N          :        Node_Access; Convert : not null access function (Index : Positive; Ch : Character) return Character;
+      Next_Index : in out Positive) return Node_Access
+   is
+   begin
+      if N = null then
+         return null;
+      end if;
+      case N.Kind is
+         when Leaf_Kind =>
+            declare
+               Mapped : String (1 .. N.Len);
+            begin
+               for I in Mapped'Range loop
+                  Mapped (I) := Convert (Next_Index, N.Chars (I));
+                  Next_Index := Next_Index + 1;
+               end loop;
+               return New_Leaf (Mapped);
+            end;
+
+         when Concat_Kind =>
+            declare
+               Left   : Node_Access          := Map_Indexed_Node (N.Left, Convert, Next_Index);
+               Right  : Node_Access          := Map_Indexed_Node (N.Right, Convert, Next_Index);
+               Result : constant Node_Access := New_Concat (Left, Right);
+            begin
+               Decr_Ref (Left);
+               Decr_Ref (Right);
+               return Result;
+            end;
+      end case;
+   end Map_Indexed_Node;
 
    ------------------------------------------------------------------
    --  Public API.
@@ -858,5 +934,71 @@ package body Ropes is
       --  Locate_Leaf call needed here at all.
       return Position.Leaf.Chars (Position.Pos - Position.Leaf_Start + 1);
    end Element;
+
+   ------------------------------------------------------------------
+   --  Whitespace / trimming, Case mapping. See PLAN.md's "Whitespace
+   --  / trimming" and "Case mapping" sections.
+   ------------------------------------------------------------------
+
+   function Trim
+     (Source : Rope; Left : Ada.Strings.Maps.Character_Set := Whitespace; Right : Ada.Strings.Maps.Character_Set := Whitespace)
+      return Rope
+   is
+      Len   : constant Natural := Length (Source);
+      First : Positive         := 1;
+      Last  : Natural          := Len;
+   begin
+      --  First and Last are each found by scanning the *whole* rope
+      --  independently -- First forward from position 1 bounded by
+      --  Left, Last backward from Len bounded by Right, verified
+      --  against GNAT's actual a-strfix.adb rather than assumed (same
+      --  discipline as every earlier phase): Ada.Strings.Fixed.Trim's
+      --  own Low/High are computed the same independent way, each
+      --  scanning the whole original Source, not bounded by the
+      --  other's result. That independence still ends up producing
+      --  the right "entirely trimmed away" answer here without any
+      --  extra special-casing, because Slice's own already-verified
+      --  boundary behavior (Phase 3: High < Low, even at the extremes
+      --  First = Len + 1 or Last = 0, is Null_Rope, never
+      --  Index_Error) already covers every case this can produce.
+      while First <= Len and then Ada.Strings.Maps.Is_In (Element (Source, First), Left) loop
+         First := First + 1;
+      end loop;
+      while Last >= 1 and then Ada.Strings.Maps.Is_In (Element (Source, Last), Right) loop
+         Last := Last - 1;
+      end loop;
+      return Slice (Source, First, Last);
+   end Trim;
+
+   function Map (Source : Rope; Convert : not null access function (Ch : Character) return Character) return Rope is
+     (Wrap (Map_Node (Data_Of (Source), Convert)));
+
+   function Map_Indexed
+     (Source : Rope; Convert : not null access function (Index : Positive; Ch : Character) return Character) return Rope
+   is
+      Next_Index : Positive := 1;
+   begin
+      return Wrap (Map_Indexed_Node (Data_Of (Source), Convert, Next_Index));
+   end Map_Indexed;
+
+   function To_Upper (Source : Rope) return Rope is (Map (Source, Ada.Characters.Handling.To_Upper'Access));
+
+   function To_Lower (Source : Rope) return Rope is (Map (Source, Ada.Characters.Handling.To_Lower'Access));
+
+   function Capitalize (Source : Rope) return Rope is
+   begin
+      if Is_Empty (Source) then
+         return Null_Rope;
+      end if;
+      return From_String ([Ada.Characters.Handling.To_Upper (Element (Source, 1))]) & Slice (Source, 2, Length (Source));
+   end Capitalize;
+
+   function Uncapitalize (Source : Rope) return Rope is
+   begin
+      if Is_Empty (Source) then
+         return Null_Rope;
+      end if;
+      return From_String ([Ada.Characters.Handling.To_Lower (Element (Source, 1))]) & Slice (Source, 2, Length (Source));
+   end Uncapitalize;
 
 end Ropes;

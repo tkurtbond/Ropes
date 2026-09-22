@@ -1,6 +1,7 @@
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Strings;
 with Ada.Strings.Fixed;
+with Ada.Strings.Maps;
 with Ada.Text_IO;      use Ada.Text_IO;
 with Ropes;            use Ropes;
 
@@ -413,5 +414,62 @@ package body Rope_Tool_Args is
       end loop;
       return True;
    end Chars_Argument_Handler;
+
+   --  --- trim / triml / trimr S ---
+   --  Ropes has one Trim function, not RopeTool.Mod's separate
+   --  TrimLeft/TrimRight/Trim -- triml/trimr pass
+   --  Ada.Strings.Maps.Null_Set for the side they don't want touched
+   --  (see ropes.ads's Trim doc comment).
+
+   function Trim_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      Put_Line (To_String (Trim (From_String (Arg))));
+      return True;
+   end Trim_Argument_Handler;
+
+   function Triml_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      Put_Line (To_String (Trim (From_String (Arg), Right => Ada.Strings.Maps.Null_Set)));
+      return True;
+   end Triml_Argument_Handler;
+
+   function Trimr_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      Put_Line (To_String (Trim (From_String (Arg), Left => Ada.Strings.Maps.Null_Set)));
+      return True;
+   end Trimr_Argument_Handler;
+
+   --  --- upper / lower / capitalize / uncapitalize S ---
+
+   function Upper_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      Put_Line (To_String (To_Upper (From_String (Arg))));
+      return True;
+   end Upper_Argument_Handler;
+
+   function Lower_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      Put_Line (To_String (To_Lower (From_String (Arg))));
+      return True;
+   end Lower_Argument_Handler;
+
+   function Capitalize_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      Put_Line (To_String (Capitalize (From_String (Arg))));
+      return True;
+   end Capitalize_Argument_Handler;
+
+   function Uncapitalize_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      Put_Line (To_String (Uncapitalize (From_String (Arg))));
+      return True;
+   end Uncapitalize_Argument_Handler;
 
 end Rope_Tool_Args;

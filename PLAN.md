@@ -223,10 +223,24 @@ fixed-arity accumulator model has no clean way to make a trailing
 positional optional), `indexchar`/`rindexchar` (`RopeTool.Mod`'s own
 names, wrapping `Ropes.Index`'s `Character`-pattern overload), and
 `split` (`RopeTool.Mod`'s `split`, wrapping `Ropes.Split`'s `Rope`
-separator overload, one piece per line). The rest of `RopeTool.Mod`'s
-command set (`repeat`, `trim`/`triml`/`trimr`, `upper`/`lower`/
-`capitalize`/`uncapitalize`, `escaped`, `make`, `bigcat`, `contains`)
-lands piecemeal as the matching `Ropes` operation lands in Phases 5–7.
+separator overload, one piece per line). Phase 5 added `chars` (prints
+each character of `S`, one per line, via `for Ch of S loop`) — this one
+has **no** `RopeTool.Mod` counterpart to port (confirmed: nothing
+"iterate"/"walk"-shaped in its command list), added anyway because
+`rope_tool`'s job is to demonstrate each phase's `Ropes` addition,
+`RopeTool.Mod` precedent or not — see the Phase 5 entry above for how
+this was caught (by the user, not by this checklist) and the standing
+rule that came out of it. Phase 6 added `trim`/`triml`/`trimr`
+(`RopeTool.Mod`'s three separate commands collapsing onto `Ropes`'s one
+`Trim`, `triml`/`trimr` passing `Ada.Strings.Maps.Null_Set` for the
+untouched side) and `upper`/`lower`/`capitalize`/`uncapitalize`
+(`RopeTool.Mod`'s own names, wrapping `To_Upper`/`To_Lower`/
+`Capitalize`/`Uncapitalize` directly) — no `map`/`map_indexed`
+subcommand, since `RopeTool.Mod` has none either (`Map`'s `Convert` is
+a function pointer, with no CLI-string-argument shape). The rest of
+`RopeTool.Mod`'s command set (`repeat`, `escaped`, `make`, `bigcat`,
+`contains`) lands piecemeal as the matching `Ropes` operation lands in
+Phase 7, if it does — see that phase's "stretch" status.
 
 `~/Repos/Oberon/oberon-tools/tests/rope-*.test` (see "Sources being
 ported" above) are black-box fixtures written against `RopeTool`, run
@@ -698,6 +712,8 @@ a huge split up front; not v1.
 
 ### Whitespace / trimming
 
+**[Phase 6, done.]**
+
 ```ada
 Whitespace : constant Ada.Strings.Maps.Character_Set;  -- space, tab, CR, LF, FF -- Rope.Mod's IsSpace set
 
@@ -714,7 +730,23 @@ five characters). A caller who wants only-space trimming passes
 `Ada.Strings.Maps.To_Set (' ')` explicitly, same as they would with
 `Ada.Strings.Fixed`.
 
+Implemented as two independent bounded scans over `Source` — `First`
+forward from 1 while `Element` is `Is_In (..., Left)`, `Last` backward
+from `Length (Source)` while `Element` is `Is_In (..., Right)` — then
+`Slice (Source, First, Last)`. Verified against real GNAT source
+(`a-strfix.adb` lines 884-915, not assumed) that this is exactly
+equivalent to `Ada.Strings.Fixed.Trim`'s own algorithm, which computes
+`Low`/`High` the same independent way, each scanning the whole
+original `Source`, not bounded by the other's result. That
+independence still yields the right "trimmed away to nothing" answer
+even at the extremes (`First = Length (Source) + 1`, or `Last = 0`)
+with no extra special-casing, because `Slice`'s own already-verified
+(Phase 3) `High < Low → Null_Rope` boundary behavior absorbs every
+case the literal algorithm would otherwise need a branch for.
+
 ### Case mapping
+
+**[Phase 6, done.]**
 
 ```ada
 function Map
@@ -1004,8 +1036,58 @@ parameter's type.
   subcommand" checklist, since that checklist had implicitly narrowed
   to "wrap an existing `RopeTool.Mod` command" rather than "demonstrate
   the phase's `Ropes` addition, `RopeTool.Mod` precedent or not".
-- **Phase 6:** `Map`/`Map_Indexed`, `To_Upper`/`To_Lower`,
-  `Capitalize`/`Uncapitalize`, `Trim`.
+- **Phase 6, done.** `Map`/`Map_Indexed` add two internal node-level
+  helpers, `Map_Node`/`Map_Indexed_Node`, shaped exactly like `Node_Slice`'s
+  `Concat_Kind` branch: recurse into (borrowed) `Left`/`Right`, get back
+  owned children, build the result with `New_Concat` — **directly**,
+  not `New_Simple_Cat` — then `Decr_Ref` both children. `New_Concat`
+  rather than `New_Simple_Cat` is load-bearing, not a style choice:
+  `RopeTest.Mod`'s `CheckMap` asserts `Rope.Depth(mapped) = Rope.Depth(r)`,
+  i.e. `Map` must preserve the source's exact tree shape, and
+  `New_Simple_Cat`'s short-leaf merge would perturb it. `Map.Mod`'s
+  `MapHelper`/`MapiHelper` confirm this by also calling `NewConcat`
+  directly. `Map_Indexed` threads a `Next_Index : in out Positive`
+  parameter through the recursion in place of `Rope.Mod`'s `Mapi`'s `VAR
+  idx: LONGINT` — this relies on Ada's guaranteed left-to-right
+  sequential elaboration of a `declare` block's object declarations
+  (`Left := Map_Indexed_Node (N.Left, ...)` must be fully elaborated,
+  including its side effect on `Next_Index`, before `Right :=
+  Map_Indexed_Node (N.Right, ...)` begins) to correctly keep counting
+  across a `Concat_Kind` node's left/right boundary rather than
+  restarting at each subtree; `test_map.adb`'s "index threads correctly
+  across a Concat node" check exercises this against a genuine two-leaf
+  rope. `To_Upper`/`To_Lower` are one-line wrappers around `Map`,
+  reusing `Ada.Characters.Handling.To_Upper`/`To_Lower (Character)`
+  directly via `'Access` rather than hand-rolling `Rope.Mod`'s
+  `UpperChar`/`LowerChar` ASCII-range checks. `Capitalize`/
+  `Uncapitalize` are not built on `Map` (mapping every character would
+  waste work past the first) but as `From_String` of the converted
+  first character `&` `Slice (Source, 2, Length (Source))` — at
+  `Length (Source) = 1`, that slice is `Slice (Source, 2, 1)`, `High <
+  Low`, already-verified-in-Phase-3 `Null_Rope`, not an error, so no
+  extra boundary case is needed (locked in by `test_case.adb`'s two
+  one-character-rope checks). `Trim` collapses `Rope.Mod`'s three
+  separate `TrimLeft`/`TrimRight`/`Trim` into the one function the
+  design sketch below specifies, verified against real GNAT source
+  (`a-strfix.adb`, not assumed) and proven equivalent to it — see the
+  "Whitespace / trimming" section below for the proof. New tests:
+  `test_map.adb` (4 checks, from `RopeTest.Mod`'s `CheckMap`),
+  `test_case.adb` (8 checks, from `CheckAsciiCase`, plus the two
+  one-character-rope boundary checks above), `test_trim.adb` (7 checks,
+  from `CheckTrim`, plus one non-whitespace-`Character_Set` check that
+  `Rope.Mod`'s always-`IsSpace` `TrimLeft`/`TrimRight`/`Trim` can't
+  express at all) — 19 new checks, 133 total, all pass, all valgrind-clean
+  (`Map`/`Map_Indexed` are the only new node-constructing code this
+  phase; `Trim`/`To_Upper`/`To_Lower`/`Capitalize`/`Uncapitalize` build
+  on already-verified `Slice`/`Map`/`From_String`/`"&"`). `examples/
+  rope_tool` gained `trim`/`triml`/`trimr` (`Trim` called with
+  `Ada.Strings.Maps.Null_Set` for the untouched side, the same
+  collapsing-into-one-function shape `index`/`rindex` used for
+  `Ropes.Index`'s `Going` parameter back in Phase 4) and `upper`/
+  `lower`/`capitalize`/`uncapitalize`; no `map`/`map_indexed` subcommand
+  — confirmed via `RopeTool.Mod` that it has none either, since `Map`'s
+  `Convert` parameter is a function pointer with no CLI-string-argument
+  shape, unlike every other operation added so far.
 - **Phase 7 (stretch):** `From_Unbounded_String`/`To_Unbounded_String`,
   whatever "deferred" items above turn out to be worth adding.
 

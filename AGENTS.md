@@ -8,7 +8,7 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**Phases 1-5 done** (see `PLAN.md`'s phased plan): `Rope`/`Node`/
+**Phases 1-6 done** (see `PLAN.md`'s phased plan): `Rope`/`Node`/
 `Rope_Ref` skeleton, refcounting, `Null_Rope`, `Length`, `Is_Empty`,
 `"&"` (short-leaf merge plus depth-triggered auto-rebalance —
 `Balance`/`Balance_Insert`/`Balance_Walk`/`Concat_Forest`, the
@@ -17,12 +17,16 @@ Fibonacci-forest algorithm), `From_String`/`To_String`, `Element`,
 (`"="`/`"<"`/`"<="`/`">"`/`">="`), `Index` (`Rope`/`Character`
 patterns, each with a no-`From` and a `From`-bounded overload, both
 directions), `Split` (`Rope`/`String`/`Character`/`Character_Set`
-separators), and `Cursor` + the `Iterable` aspect (`for Ch of
-Some_Rope loop`). `src/ropes.ads`/`.adb` exist and build;
+separators), `Cursor` + the `Iterable` aspect (`for Ch of Some_Rope
+loop`), `Trim` (`Ada.Strings.Maps.Character_Set`-based, collapsing
+`Rope.Mod`'s separate `TrimLeft`/`TrimRight`/`Trim`), `Map`/
+`Map_Indexed`, and `To_Upper`/`To_Lower`/`Capitalize`/`Uncapitalize`.
+`src/ropes.ads`/`.adb` exist and build;
 `test/test_construction.adb` (19), `test_balance.adb` (5),
 `test_slice.adb` (8), `test_insert.adb` (8), `test_delete.adb` (9),
 `test_compare.adb` (13), `test_index.adb` (25), `test_split.adb` (15),
-and `test_iterator.adb` (12) — 114 checks total — all pass clean,
+`test_iterator.adb` (12), `test_map.adb` (4), `test_case.adb` (8), and
+`test_trim.adb` (7) — 133 checks total — all pass clean,
 including under valgrind. `Balance`/`Max_Depth`/`Min_Length` are
 internal to `ropes.adb`, not public — `src/ropes-test_support.ads`/
 `.adb` is a small test-only child package (`function Depth`) so tests
@@ -57,7 +61,8 @@ true going forward).
 `examples/rope_tool` (the Ada port of `RopeTool.Mod`, built on
 `arg_parser` — see `PLAN.md`'s "Command-line tool (rope_tool)") has
 `cat`/`len`/`fetch`/`slice`/`insert`/`delete`/`cmp`/`index`/`rindex`/
-`indexchar`/`rindexchar`/`split`/`chars`, matching Phases 1-5's API
+`indexchar`/`rindexchar`/`split`/`chars`/`trim`/`triml`/`trimr`/
+`upper`/`lower`/`capitalize`/`uncapitalize`, matching Phases 1-6's API
 (`cmp` is built from `"="`/`"<"` in `rope_tool_args.adb` itself, since
 `Ropes` has no public `Compare` function to wrap — see PLAN.md's
 "Comparison"; `index`/`rindex` and `indexchar`/`rindexchar` are each
@@ -65,7 +70,12 @@ one `Ropes.Index` overload called with a fixed `Going`, split into two
 commands since `Arg_Parser`'s fixed-arity model can't make a trailing
 argument optional; `chars` demonstrates `Cursor`/`Iterable` via `for
 Ch of S loop` and has no `RopeTool.Mod` counterpart at all — see the
-gotcha note above). Add a `rope_tool` subcommand in the same phase
+gotcha note above; `triml`/`trimr` pass `Ada.Strings.Maps.Null_Set` for
+the untouched side of `Ropes`'s one `Trim` function, since `Ropes`
+collapsed `RopeTool.Mod`'s three separate trim commands; no `map`/
+`map_indexed` subcommand, since `Map`'s `Convert` is a function pointer
+with no CLI-string-argument shape and `RopeTool.Mod` itself has none
+either). Add a `rope_tool` subcommand in the same phase
 that adds its underlying `Ropes` operation — never a stub ahead of the
 operation existing, and don't let `rope_tool` drift behind `Ropes`'s
 current surface from one phase to the next; this includes a phase like

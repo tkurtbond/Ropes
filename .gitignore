@@ -10,6 +10,9 @@ test/test_compare
 test/test_index
 test/test_split
 test/test_iterator
+test/test_map
+test/test_case
+test/test_trim
 examples/obj/
 examples/rope_tool
 

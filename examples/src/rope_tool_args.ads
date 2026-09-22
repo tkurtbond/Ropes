@@ -63,6 +63,27 @@ package Rope_Tool_Args is
    --  --- chars S --- (Ropes.Cursor/Iterable, via "for Ch of S loop"; one character per line)
    function Chars_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
+   --  --- trim S --- (Ropes.Trim, default Whitespace both sides)
+   function Trim_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- triml S --- (Ropes.Trim, Right => Ada.Strings.Maps.Null_Set)
+   function Triml_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- trimr S --- (Ropes.Trim, Left => Ada.Strings.Maps.Null_Set)
+   function Trimr_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- upper S --- (Ropes.To_Upper)
+   function Upper_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- lower S --- (Ropes.To_Lower)
+   function Lower_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- capitalize S --- (Ropes.Capitalize)
+   function Capitalize_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- uncapitalize S --- (Ropes.Uncapitalize)
+   function Uncapitalize_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
    Commands : aliased Command_Array :=
      [Make_Command
        ("cat",
@@ -125,7 +146,42 @@ package Rope_Tool_Args is
        ("chars",
         Make_Parser
           (Description => "chars S  Print each character of S, one per line (""for Ch of S loop"").",
-           Handler     => Chars_Argument_Handler'Access, Options => null))];
+           Handler     => Chars_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("trim",
+        Make_Parser
+          (Description => "trim S  Print S with leading and trailing whitespace removed.", Handler => Trim_Argument_Handler'Access,
+           Options     => null)),
+     Make_Command
+       ("triml",
+        Make_Parser
+          (Description => "triml S  Print S with leading whitespace removed.", Handler => Triml_Argument_Handler'Access,
+           Options     => null)),
+     Make_Command
+       ("trimr",
+        Make_Parser
+          (Description => "trimr S  Print S with trailing whitespace removed.", Handler => Trimr_Argument_Handler'Access,
+           Options     => null)),
+     Make_Command
+       ("upper",
+        Make_Parser
+          (Description => "upper S  Print S with ASCII letters uppercased.", Handler => Upper_Argument_Handler'Access,
+           Options     => null)),
+     Make_Command
+       ("lower",
+        Make_Parser
+          (Description => "lower S  Print S with ASCII letters lowercased.", Handler => Lower_Argument_Handler'Access,
+           Options     => null)),
+     Make_Command
+       ("capitalize",
+        Make_Parser
+          (Description => "capitalize S  Print S with its first character uppercased (ASCII only).",
+           Handler     => Capitalize_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("uncapitalize",
+        Make_Parser
+          (Description => "uncapitalize S  Print S with its first character lowercased (ASCII only).",
+           Handler     => Uncapitalize_Argument_Handler'Access, Options => null))];
 
    Main_Parser : Parser :=
      Make_Parser
