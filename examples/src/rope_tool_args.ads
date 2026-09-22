@@ -45,6 +45,21 @@ package Rope_Tool_Args is
    --  --- cmp A B --- (built from "="/"<" -- Ropes has no public Compare function; see PLAN.md's "Comparison")
    function Cmp_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
+   --  --- index S PATTERN FROM --- (1-based; Ropes.Index, Rope pattern, Going => Forward -- RopeTool.Mod's find)
+   function Index_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- rindex S PATTERN FROM --- (1-based; Ropes.Index, Rope pattern, Going => Backward -- RopeTool.Mod's rfind)
+   function Rindex_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- indexchar S CH FROM --- (1-based; Ropes.Index, Character pattern, Going => Forward)
+   function Indexchar_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- rindexchar S CH FROM --- (1-based; Ropes.Index, Character pattern, Going => Backward)
+   function Rindexchar_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- split S SEP --- (Ropes.Split, Rope separator; one piece per line)
+   function Split_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
    Commands : aliased Command_Array :=
      [Make_Command
        ("cat",
@@ -77,7 +92,32 @@ package Rope_Tool_Args is
        ("cmp",
         Make_Parser
           (Description => "cmp A B  Print -1, 0 or 1: how A compares to B.", Handler => Cmp_Argument_Handler'Access,
-           Options     => null))];
+           Options     => null)),
+     Make_Command
+       ("index",
+        Make_Parser
+          (Description => "index S PATTERN FROM  Print the index of PATTERN in S at or after FROM (1-based), or 0.",
+           Handler     => Index_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("rindex",
+        Make_Parser
+          (Description => "rindex S PATTERN FROM  Print the index of the last PATTERN in S at or before FROM (1-based), or 0.",
+           Handler     => Rindex_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("indexchar",
+        Make_Parser
+          (Description => "indexchar S CH FROM  Print the index of CH in S at or after FROM (1-based), or 0.",
+           Handler     => Indexchar_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("rindexchar",
+        Make_Parser
+          (Description => "rindexchar S CH FROM  Print the index of CH in S at or before FROM (1-based), or 0.",
+           Handler     => Rindexchar_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("split",
+        Make_Parser
+          (Description => "split S SEP  Print each piece of S split on SEP, one per line.",
+           Handler     => Split_Argument_Handler'Access, Options => null))];
 
    Main_Parser : Parser :=
      Make_Parser

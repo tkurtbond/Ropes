@@ -1,4 +1,3 @@
-with Ada.Strings;
 with Ada.Unchecked_Deallocation;
 
 package body Ropes is
@@ -515,5 +514,265 @@ package body Ropes is
    function ">" (Left, Right : Rope) return Boolean is (Compare (Data_Of (Left), Data_Of (Right)) > 0);
 
    function ">=" (Left, Right : Rope) return Boolean is (Compare (Data_Of (Left), Data_Of (Right)) >= 0);
+
+   ------------------------------------------------------------------
+   --  Search.
+   ------------------------------------------------------------------
+
+   function Index
+     (Source : Rope; Pattern : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural
+   is
+      S_D   : constant Node_Access := Data_Of (Source);
+      P_D   : constant Node_Access := Data_Of (Pattern);
+      S_Len : constant Natural     := (if S_D = null then 0 else S_D.Len);
+      P_Len : constant Natural     := (if P_D = null then 0 else P_D.Len);
+
+      --  Whether Pattern matches Source starting at the 1-based
+      --  position Start.
+      function Match_At (Start : Positive) return Boolean is
+      begin
+         for K in 0 .. P_Len - 1 loop
+            if Fetch (S_D, Start + K) /= Fetch (P_D, K + 1) then
+               return False;
+            end if;
+         end loop;
+         return True;
+      end Match_At;
+   begin
+      --  Source's emptiness is checked, and short-circuits, before
+      --  Pattern's -- verified against GNAT's a-strsea.adb: the
+      --  From-bounded Ada.Strings.Search.Index returns 0 immediately
+      --  for an empty Source, even when Pattern is also empty (the
+      --  Pattern_Error check lives in the *other*, no-From overload,
+      --  reached only once Source is known non-empty).
+      if S_Len = 0 then
+         return 0;
+      end if;
+      if P_Len = 0 then
+         raise Ada.Strings.Pattern_Error;
+      end if;
+
+      case Going is
+         when Ada.Strings.Forward =>
+            --  From < Source'First can't happen (From is Positive,
+            --  Source'First is always 1), so Forward never raises --
+            --  it just searches the possibly-empty tail Source (From
+            --  .. S_Len) and returns 0 if nothing matches, exactly
+            --  like the real Ada.Strings.Search.Index.
+            for Start in From .. S_Len - P_Len + 1 loop
+               if Match_At (Start) then
+                  return Start;
+               end if;
+            end loop;
+            return 0;
+
+         when Ada.Strings.Backward =>
+            if From > S_Len then
+               raise Ada.Strings.Index_Error;
+            end if;
+            for Start in reverse 1 .. From - P_Len + 1 loop
+               if Match_At (Start) then
+                  return Start;
+               end if;
+            end loop;
+            return 0;
+      end case;
+   end Index;
+
+   function Index (Source : Rope; Pattern : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural is
+   begin
+      --  Pattern's emptiness is checked first here -- the mirror image
+      --  of the From-bounded overload above, matching the real
+      --  no-From Ada.Strings.Search.Index, whose Pattern_Error check
+      --  runs unconditionally, before it ever looks at Source.
+      if Is_Empty (Pattern) then
+         raise Ada.Strings.Pattern_Error;
+      end if;
+      if Is_Empty (Source) then
+         return 0;
+      end if;
+      case Going is
+         when Ada.Strings.Forward =>
+            return Index (Source, Pattern, 1, Going);
+         when Ada.Strings.Backward =>
+            return Index (Source, Pattern, Length (Source), Going);
+      end case;
+   end Index;
+
+   function Index
+     (Source : Rope; Pattern : Character; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural
+   is
+      S_D   : constant Node_Access := Data_Of (Source);
+      S_Len : constant Natural     := (if S_D = null then 0 else S_D.Len);
+   begin
+      if S_Len = 0 then
+         return 0;
+      end if;
+      case Going is
+         when Ada.Strings.Forward =>
+            for I in From .. S_Len loop
+               if Fetch (S_D, I) = Pattern then
+                  return I;
+               end if;
+            end loop;
+            return 0;
+
+         when Ada.Strings.Backward =>
+            if From > S_Len then
+               raise Ada.Strings.Index_Error;
+            end if;
+            for I in reverse 1 .. From loop
+               if Fetch (S_D, I) = Pattern then
+                  return I;
+               end if;
+            end loop;
+            return 0;
+      end case;
+   end Index;
+
+   function Index (Source : Rope; Pattern : Character; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural is
+   begin
+      if Is_Empty (Source) then
+         return 0;
+      end if;
+      case Going is
+         when Ada.Strings.Forward =>
+            return Index (Source, Pattern, 1, Going);
+         when Ada.Strings.Backward =>
+            return Index (Source, Pattern, Length (Source), Going);
+      end case;
+   end Index;
+
+   ------------------------------------------------------------------
+   --  Splitting.
+   --
+   --  Rope.Mod's CountPieces/NextPiece, done as one two-pass walk per
+   --  overload below (count, then build) instead of a single dynamic
+   --  pass, matching Rope.Mod's own two-pass CountPieces + SplitArray
+   --  shape. Each overload supplies its own "find the next occurrence
+   --  at or after position P" search (Index above for the Rope and
+   --  Character separators; a small local scan for Character_Set);
+   --  the walk itself -- advance past the match, repeat, Slice out
+   --  what's left over at the end -- is the same shape in all three,
+   --  by construction of how Slice's own boundary behavior (empty for
+   --  High < Low, valid at Low = Length + 1) already produces the
+   --  right empty-piece results at the start, middle, and end without
+   --  any special-casing here.
+   ------------------------------------------------------------------
+
+   function Split (Source : Rope; Separator : Rope) return Rope_Array is
+      Sep_Len : constant Natural := Length (Separator);
+   begin
+      if Sep_Len = 0 then
+         return [1 => Source];
+      end if;
+      declare
+         Count : Positive := 1;
+         Pos   : Positive := 1;
+         Found : Natural;
+      begin
+         loop
+            Found := Index (Source, Separator, Pos, Ada.Strings.Forward);
+            exit when Found = 0;
+            Count := Count + 1;
+            Pos   := Found + Sep_Len;
+         end loop;
+
+         declare
+            Result : Rope_Array (1 .. Count);
+            Start  : Positive := 1;
+         begin
+            for I in 1 .. Count - 1 loop
+               Found      := Index (Source, Separator, Start, Ada.Strings.Forward);
+               Result (I) := Slice (Source, Start, Found - 1);
+               Start      := Found + Sep_Len;
+            end loop;
+            Result (Count) := Slice (Source, Start, Length (Source));
+            return Result;
+         end;
+      end;
+   end Split;
+
+   function Split (Source : Rope; Separator : String) return Rope_Array is (Split (Source, From_String (Separator)));
+
+   function Split (Source : Rope; Separator : Character) return Rope_Array is
+      S_Len : constant Natural := Length (Source);
+
+      function Find_Next (From : Positive) return Natural is
+      begin
+         for I in From .. S_Len loop
+            if Element (Source, I) = Separator then
+               return I;
+            end if;
+         end loop;
+         return 0;
+      end Find_Next;
+
+      Count : Positive := 1;
+      Pos   : Positive := 1;
+      Found : Natural;
+   begin
+      loop
+         Found := Find_Next (Pos);
+         exit when Found = 0;
+         Count := Count + 1;
+         Pos   := Found + 1;
+      end loop;
+
+      declare
+         Result : Rope_Array (1 .. Count);
+         Start  : Positive := 1;
+      begin
+         for I in 1 .. Count - 1 loop
+            Found      := Find_Next (Start);
+            Result (I) := Slice (Source, Start, Found - 1);
+            Start      := Found + 1;
+         end loop;
+         Result (Count) := Slice (Source, Start, S_Len);
+         return Result;
+      end;
+   end Split;
+
+   function Split (Source : Rope; Separator : Ada.Strings.Maps.Character_Set) return Rope_Array is
+      S_Len : constant Natural := Length (Source);
+
+      function Find_Next (From : Positive) return Natural is
+      begin
+         for I in From .. S_Len loop
+            if Ada.Strings.Maps.Is_In (Element (Source, I), Separator) then
+               return I;
+            end if;
+         end loop;
+         return 0;
+      end Find_Next;
+
+      Count : Positive := 1;
+      Pos   : Positive := 1;
+      Found : Natural;
+   begin
+      if Ada.Strings.Maps."=" (Separator, Ada.Strings.Maps.Null_Set) then
+         return [1 => Source];
+      end if;
+
+      loop
+         Found := Find_Next (Pos);
+         exit when Found = 0;
+         Count := Count + 1;
+         Pos   := Found + 1;
+      end loop;
+
+      declare
+         Result : Rope_Array (1 .. Count);
+         Start  : Positive := 1;
+      begin
+         for I in 1 .. Count - 1 loop
+            Found      := Find_Next (Start);
+            Result (I) := Slice (Source, Start, Found - 1);
+            Start      := Found + 1;
+         end loop;
+         Result (Count) := Slice (Source, Start, S_Len);
+         return Result;
+      end;
+   end Split;
 
 end Ropes;

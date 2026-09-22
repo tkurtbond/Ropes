@@ -8,32 +8,40 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**Phases 1-3 done** (see `PLAN.md`'s phased plan): `Rope`/`Node`/
+**Phases 1-4 done** (see `PLAN.md`'s phased plan): `Rope`/`Node`/
 `Rope_Ref` skeleton, refcounting, `Null_Rope`, `Length`, `Is_Empty`,
 `"&"` (short-leaf merge plus depth-triggered auto-rebalance —
 `Balance`/`Balance_Insert`/`Balance_Walk`/`Concat_Forest`, the
 Fibonacci-forest algorithm), `From_String`/`To_String`, `Element`,
-`Slice`, `Insert`, `Delete`, and the five comparison operators
-(`"="`/`"<"`/`"<="`/`">"`/`">="`). `src/ropes.ads`/`.adb` exist and
-build; `test/test_construction.adb` (19), `test_balance.adb` (5),
+`Slice`, `Insert`, `Delete`, the five comparison operators
+(`"="`/`"<"`/`"<="`/`">"`/`">="`), `Index` (`Rope`/`Character`
+patterns, each with a no-`From` and a `From`-bounded overload, both
+directions), and `Split` (`Rope`/`String`/`Character`/`Character_Set`
+separators). `src/ropes.ads`/`.adb` exist and build;
+`test/test_construction.adb` (19), `test_balance.adb` (5),
 `test_slice.adb` (8), `test_insert.adb` (8), `test_delete.adb` (9),
-and `test_compare.adb` (13) — 62 checks total — all pass clean,
-including under valgrind. `Balance`/`Max_Depth`/`Min_Length` are
-internal to `ropes.adb`, not public — `src/ropes-test_support.ads`/
-`.adb` is a small test-only child package (`function Depth`) so tests
-can confirm depth stays bounded without adding `Depth` to the real
-public API. Work through the remaining phases in order — each gets
-its own tests before moving to the next.
+`test_compare.adb` (13), `test_index.adb` (25), and `test_split.adb`
+(15) — 102 checks total — all pass clean, including under valgrind.
+`Balance`/`Max_Depth`/`Min_Length` are internal to `ropes.adb`, not
+public — `src/ropes-test_support.ads`/`.adb` is a small test-only
+child package (`function Depth`) so tests can confirm depth stays
+bounded without adding `Depth` to the real public API. Work through
+the remaining phases in order — each gets its own tests before moving
+to the next.
 
 `examples/rope_tool` (the Ada port of `RopeTool.Mod`, built on
 `arg_parser` — see `PLAN.md`'s "Command-line tool (rope_tool)") has
-`cat`/`len`/`fetch`/`slice`/`insert`/`delete`/`cmp`, matching Phases
-1-3's API (`cmp` is built from `"="`/`"<"` in `rope_tool_args.adb`
-itself, since `Ropes` has no public `Compare` function to wrap — see
-PLAN.md's "Comparison"). Add a `rope_tool` subcommand in the same
-phase that adds its underlying `Ropes` operation — never a stub ahead
-of the operation existing, and don't let `rope_tool` drift behind
-`Ropes`'s current surface from one phase to the next.
+`cat`/`len`/`fetch`/`slice`/`insert`/`delete`/`cmp`/`index`/`rindex`/
+`indexchar`/`rindexchar`/`split`, matching Phases 1-4's API (`cmp` is
+built from `"="`/`"<"` in `rope_tool_args.adb` itself, since `Ropes`
+has no public `Compare` function to wrap — see PLAN.md's
+"Comparison"; `index`/`rindex` and `indexchar`/`rindexchar` are each
+one `Ropes.Index` overload called with a fixed `Going`, split into two
+commands since `Arg_Parser`'s fixed-arity model can't make a trailing
+argument optional). Add a `rope_tool` subcommand in the same phase
+that adds its underlying `Ropes` operation — never a stub ahead of the
+operation existing, and don't let `rope_tool` drift behind `Ropes`'s
+current surface from one phase to the next.
 
 ## Source material
 

@@ -7,12 +7,12 @@
 --  PLAN.md for the full design rationale and AGENTS.md for house
 --  conventions specific to this codebase.
 --
---  This is Phase 1+2+3 of PLAN.md's phased implementation plan: the
+--  This is Phase 1+2+3+4 of PLAN.md's phased implementation plan: the
 --  Rope/Node skeleton, reference counting, the smallest useful slice
 --  of the API (Length, Is_Empty, "&", From_String/To_String,
---  Element), "&"'s automatic depth-bounded rebalancing, and now
---  Slice/Insert/Delete plus the five comparison operators. Search,
---  split, iteration, and case mapping are later phases -- see
+--  Element), "&"'s automatic depth-bounded rebalancing,
+--  Slice/Insert/Delete, the five comparison operators, and now Index
+--  and Split. Iteration and case mapping are later phases -- see
 --  PLAN.md before adding to this package.
 --
 --  A Rope is an immutable value: every operation returns a new Rope
@@ -23,6 +23,8 @@
 --  empty rope, not an uninitialized one.
 
 with Ada.Finalization;
+with Ada.Strings;
+with Ada.Strings.Maps;
 
 package Ropes is
 
@@ -94,6 +96,50 @@ package Ropes is
    --  standard operators instead of a -1/0/1 function. "=" replaces
    --  the predefined (pointer-identity-based) equality that a private
    --  type wrapping a Controlled component would otherwise get.
+
+   function Index (Source : Rope; Pattern : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+   function Index
+     (Source : Rope; Pattern : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+   --  The 1-based starting index of Pattern's first (Going => Forward)
+   --  or last (Going => Backward) occurrence in Source, or 0 if
+   --  Pattern does not occur. Raises Ada.Strings.Pattern_Error if
+   --  Pattern is Null_Rope, matching Ada.Strings.Fixed.Index exactly
+   --  -- NOT Rope.Mod's Find, which instead treats an empty pattern as
+   --  matching at "from". The From overload matches
+   --  Ada.Strings.Fixed.Index's own From-bounded overload exactly,
+   --  including its asymmetry: Forward never raises for an
+   --  out-of-range From (Source (From .. Length (Source)) is simply
+   --  empty, so the search just finds nothing), but Backward raises
+   --  Ada.Strings.Index_Error if From > Length (Source); and if Source
+   --  itself is Null_Rope, both overloads return 0 immediately, even
+   --  when Pattern is also Null_Rope (Source's emptiness is checked
+   --  before Pattern's) -- see PLAN.md's "Search" section.
+
+   function Index (Source : Rope; Pattern : Character; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+   function Index
+     (Source : Rope; Pattern : Character; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+   --  As above, searching for a single Character instead -- Rope.Mod's
+   --  IndexChar/RIndexChar. No empty-pattern case; the same From/Going
+   --  boundary rules apply.
+
+   type Rope_Array is array (Positive range <>) of Rope;
+
+   function Split (Source : Rope; Separator : Rope) return Rope_Array;
+   function Split (Source : Rope; Separator : String) return Rope_Array;
+   function Split (Source : Rope; Separator : Character) return Rope_Array;
+   function Split (Source : Rope; Separator : Ada.Strings.Maps.Character_Set) return Rope_Array;
+   --  Source split at each non-overlapping occurrence of Separator,
+   --  Python str.split's convention: always exactly one more piece
+   --  than the number of occurrences, so a leading, trailing, or
+   --  doubled separator yields an empty piece (Rope.Mod's Split, but
+   --  returning the pieces instead of visiting them through a
+   --  callback). An empty Separator (Null_Rope or "") never splits --
+   --  Source is the array's one element -- matching Rope.Mod exactly;
+   --  the Character overload has no empty case; the Character_Set
+   --  overload's empty case is Ada.Strings.Maps.Null_Set. The
+   --  Character_Set overload does not collapse adjacent matches: N
+   --  consecutive separator characters produce N - 1 empty pieces
+   --  between them, one split per character.
 
 private
 

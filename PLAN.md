@@ -215,11 +215,18 @@ inclusive `LOW HIGH` instead of 0-based `START LEN`), `insert`
 `cmp` (`RopeTool.Mod`'s `cmp`, but built in `rope_tool_args.adb` from
 the public `"="`/`"<"` operators rather than wrapping a public
 `Compare` — `Ropes` doesn't have one, by design; see "Comparison"
-above). The rest of `RopeTool.Mod`'s command set (`find`, `repeat`,
-`rfind`, `split`, `trim`/`triml`/`trimr`, `upper`/`lower`/
-`capitalize`/`uncapitalize`, `escaped`, `make`, `bigcat`, `indexchar`,
-`rindexchar`, `contains`) lands piecemeal as the matching `Ropes`
-operation lands in Phases 4–7.
+above). Phase 4 added `index`/`rindex` (`RopeTool.Mod`'s `find`/
+`rfind`, both wrapping `Ropes.Index`'s `Rope`-pattern overload with
+`Going => Forward`/`Backward` respectively — kept as two commands, not
+one with an optional direction argument, since `Arg_Parser`'s
+fixed-arity accumulator model has no clean way to make a trailing
+positional optional), `indexchar`/`rindexchar` (`RopeTool.Mod`'s own
+names, wrapping `Ropes.Index`'s `Character`-pattern overload), and
+`split` (`RopeTool.Mod`'s `split`, wrapping `Ropes.Split`'s `Rope`
+separator overload, one piece per line). The rest of `RopeTool.Mod`'s
+command set (`repeat`, `trim`/`triml`/`trimr`, `upper`/`lower`/
+`capitalize`/`uncapitalize`, `escaped`, `make`, `bigcat`, `contains`)
+lands piecemeal as the matching `Ropes` operation lands in Phases 5–7.
 
 `~/Repos/Oberon/oberon-tools/tests/rope-*.test` (see "Sources being
 ported" above) are black-box fixtures written against `RopeTool`, run
@@ -482,25 +489,95 @@ six standard operators instead of a `-1/0/1` function plus a derived
 
 ```ada
 function Index
-  (Source  : Rope;
-   Pattern : Rope;
-   From    : Positive             := 1;
-   Going   : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+  (Source : Rope; Pattern : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+function Index
+  (Source : Rope; Pattern : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward)
+   return Natural;
 
 function Index
-  (Source  : Rope;
-   Pattern : Character;
-   From    : Positive             := 1;
-   Going   : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+  (Source : Rope; Pattern : Character; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+function Index
+  (Source : Rope; Pattern : Character; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward)
+   return Natural;
 ```
 
 Collapses `Rope.Mod`'s four functions (`Find`, `RFind`, `IndexChar`,
 `RIndexChar`) into two, reusing `Ada.Strings.Direction` the same way
 `Ada.Strings.Fixed.Index` does. **Returns `0` for "not found", not
 `-1`** — `Ada.Strings.Fixed.Index`'s own convention, not `Rope.Mod`'s.
-`Contains (Source, Pattern) return Boolean` may or may not be worth
-adding as a thin wrapper over `Index (...) /= 0`; low-stakes,
-decide during implementation.
+**`[Phase 4, done.]`**
+
+**Correction from the sketch above** (caught while verifying against
+GNAT's actual `a-strsea.adb`, the same discipline used for `Slice`/
+`Insert`/`Delete` in Phase 3): a single overload with `From : Positive
+:= 1` as one shared default can't work for both directions — `From =>
+1` is a sensible "search the whole rope" default for `Forward`, but
+for `Backward` it would mean "search only within position 1", not
+"search the whole rope from the end". `Ada.Strings.Fixed.Index` itself
+solves this with **two separate overloads per pattern kind**, not one
+overload with a default: a no-`From` version that searches the entire
+source (first match for `Forward`, last for `Backward`), and a
+`From`-bounded version with `From` as a required parameter. `Ropes`
+does the same — four `Index` functions total (two pattern kinds ×
+with/without `From`), matching `Ada.Strings.Fixed.Index`'s own shape
+exactly rather than approximating it with a single default.
+
+The no-`From` overload is a thin wrapper: `Forward` delegates to the
+`From`-bounded overload with `From => 1`; `Backward` delegates with
+`From => Length (Source)` — mathematically equivalent to searching the
+unbounded whole source in each direction, confirmed against
+`a-strsea.adb`'s own no-`From` `Index`.
+
+**Empty-pattern decision** (the discrepancy flagged as an open
+question in an earlier draft of this section): `Ropes.Index` raises
+`Ada.Strings.Pattern_Error` for a `Null_Rope` `Pattern`, exactly
+matching real `Ada.Strings.Search.Index` — **not** `Rope.Mod`'s
+`Find`/`RFind`, which instead treat an empty pattern as always
+matching at `from`/`before` (clamped into `[0, Length (r)]`). This
+follows the house rule (`AGENTS.md`) of reusing `Ada.Strings`
+vocabulary and behavior precisely rather than preserving `Rope.Mod`'s
+own convention where the two diverge. The `Character` overload has no
+analogous case (a `Character` is never "empty").
+
+A further subtlety, also verified against `a-strsea.adb` rather than
+assumed, and locked in by `test_index.adb`'s "Both Source and Pattern
+empty" checks: the *order* of the empty-Source and empty-Pattern
+checks differs between the two overloads. The `From`-bounded overload
+checks `Source`'s emptiness **first** and returns `0` immediately,
+even when `Pattern` is also empty (so `Index (Null_Rope, Null_Rope,
+From => 1, Going => Forward) = 0`, no exception). The no-`From`
+overload checks `Pattern`'s emptiness **first**, unconditionally, so
+`Index (Null_Rope, Null_Rope)` (no `From`) raises `Pattern_Error` even
+though `Source` is also `Null_Rope`. This is exactly what real
+`Ada.Strings.Search.Index` does — the `From`-bounded version's
+`Source'Length = 0` short-circuit runs before it would ever delegate
+to (and hit the `Pattern = ""` check inside) the base function; a bare
+call with no `From` goes straight to the base function, whose `Pattern
+= ""` check has no such short-circuit.
+
+Also verified rather than assumed: the `From`/`Going` boundary
+asymmetry. `Forward` never raises for an out-of-range `From` — `Source
+(From .. Length (Source))` is simply empty if `From` is too large, so
+the search just finds nothing (`From < Source'First` can't happen
+here since `From : Positive` and `Source'First` is always `1`).
+`Backward` raises `Ada.Strings.Index_Error` if `From > Length
+(Source)`.
+
+`Rope.Mod`'s `RFind`'s own bound convention does **not** carry over
+unchanged: `RFind`'s `before` clamps so that a match's *start*
+position is `<= before`; `Ada.Strings.Fixed.Index`'s `Backward`
+requires a match to fit **entirely** within `Source (First .. From)`,
+i.e. start `<= From - Pattern'Length + 1` — one stricter by `Pattern'
+Length - 1`. These coincide for a length-1 pattern (so `IndexChar`/
+`RIndexChar`'s test scenarios translate to the `Character` overload
+directly, 0-based → 1-based only) but genuinely differ for a longer
+one, so `RFind`'s own multi-character scenarios in `test_index.adb`
+use different `From`/expected values, chosen under the real formula,
+not copied from `Rope.Mod`'s numbers.
+
+`Contains (Source, Pattern) return Boolean` remains undecided —
+still not added; still low-stakes, still a plausible thin wrapper over
+`Index (...) /= 0` if a future phase wants it.
 
 ### Splitting
 
@@ -552,6 +629,64 @@ it" — a substring search for the two literal forms, a single-character
 equality test for `Character`, a single-character
 `Ada.Strings.Maps.Is_In` test for `Character_Set`. Write this as one
 shared private function/generic, not four independent copies.
+**`[Phase 4, done]`**, but not quite as sketched — see below.
+
+**What actually got built**: a local generic function,
+
+```ada
+generic
+   Sep_Width : Positive;
+   with function Find_Next (Source : Rope; From : Positive) return Natural;
+function Split_Generic (Source : Rope) return Rope_Array;
+```
+
+holding the two-pass count-then-build walk (`Rope.Mod`'s
+`CountPieces` + `NextPiece`/`SplitArray` shape, kept as two passes
+rather than a single dynamic-array pass, for the same reason —
+faithful to the source, not a scope change). Each `Split` overload
+instantiates it **locally**, inside its own body, with `Sep_Width` and
+a nested `Find_Next` function that closes over that overload's own
+`Separator` parameter by ordinary lexical scoping:
+
+- `Separator : Rope` — `Find_Next` calls the `Index` (`Pattern :
+  Rope`) overload above; `Sep_Width => Length (Separator)`. The empty
+  case (`Is_Empty (Separator)`) is checked *before* instantiating (a
+  generic formal `Positive` can't be `0`), returning `(1 => Source)`
+  directly.
+- `Separator : String` — a one-line expression function, `Split
+  (Source, From_String (Separator))`: this literally *is* the "share
+  the Rope overload's implementation" the sketch called for, simpler
+  than giving it its own instantiation.
+- `Separator : Character` — `Find_Next` calls the `Index` (`Pattern :
+  Character`) overload; `Sep_Width => 1`. No empty case.
+- `Separator : Ada.Strings.Maps.Character_Set` — `Find_Next` is a
+  small nested linear scan using `Ada.Strings.Maps.Is_In` (there is no
+  public `Character_Set`-based `Index` to call — `Ropes`'s public
+  `Index` only has `Rope`/`Character` pattern overloads, so this one
+  case doesn't reuse `Index` the way the other three reuse either
+  `Index` or the `Rope` `Split` overload); `Sep_Width => 1`. Empty case
+  is `Ada.Strings.Maps.Null_Set`.
+
+Binding `Find_Next` as a **generic formal subprogram** (not an
+access-to-subprogram value) was a deliberate choice made during
+implementation: a nested function closing over a local `Separator`
+can't safely be turned into an `access function ...` value pointing
+out of a package-level type without hitting Ada's accessibility rules
+(the classic reason to reach for `Unrestricted_Access`, which this
+codebase avoids elsewhere). A **local** generic instantiation sidesteps
+that entirely — the formal subprogram is bound by name at compile
+time, not through a runtime access value, so ordinary lexical closure
+over `Separator` just works, no accessibility question ever arises.
+Local (subprogram-nested) generic instantiation is ordinary, legal
+Ada, re-elaborated each call, at the cost of paying that elaboration
+once per `Split` call — irrelevant next to the search itself.
+
+Non-collapsing behavior for the `Character_Set` overload requires no
+special-casing: the shared walk always resumes searching starting
+exactly at the position just past the previous match (`Found +
+Sep_Width`), so if that position itself matches again, it's found
+immediately, producing the empty piece in between — this falls out of
+the walk's own structure, not an extra check.
 
 Only the array form is ported (`Rope.Mod`'s `SplitArray`); the
 push-based early-stopping `Visitor` form (`Split` in `Rope.Mod`) and
@@ -763,8 +898,41 @@ parameter's type.
   a representable call; each test file's header comment says so.
   `examples/rope_tool` gained `slice`/`insert`/`delete`/`cmp` in this
   phase too — see "Command-line tool (rope_tool)" above.
-- **Phase 4:** `Index` (both overloads, both directions), all four
-  `Split` overloads (`Rope`/`String`/`Character`/`Character_Set`).
+- **Phase 4 [done]:** `Index` (`Rope`/`Character` patterns, each with a
+  no-`From` and a `From`-bounded overload, both directions — four
+  functions total, not the two-with-a-default originally sketched; see
+  "Search" above for why), all four `Split` overloads (`Rope`/`String`/
+  `Character`/`Character_Set`, via a local generic `Split_Generic`
+  instantiated per overload — see "Splitting" above). Both `Index`'s
+  empty-pattern behavior (`Ada.Strings.Pattern_Error`, not `Rope.Mod`'s
+  clamp-and-match) and its `Backward` bound convention (a match must
+  fit entirely within `Source (1 .. From)`, not `Rope.Mod`'s `RFind`
+  looser "start `<= before`") were resolved by reading GNAT's actual
+  `a-strsea.adb` rather than assumed — same discipline as Phase 3's
+  `Slice`/`Insert`/`Delete` verification against `a-strunb.ads`/`.adb`.
+  `test/test_index.adb` (25 checks, translated from `RopeTest.Mod`'s
+  `CheckCompareFindRepeat`'s `Find` cases and `CheckIndexCharAndRFind`,
+  plus new checks locking in the empty-Source/empty-Pattern check
+  ordering and the `Forward`-never-raises/`Backward`-raises-past-the-
+  end asymmetry — none of which `Rope.Mod` had reason to test, since
+  its own `Find`/`RFind` don't have these behaviors) and
+  `test/test_split.adb` (15 checks, translated from `RopeTest.Mod`'s
+  `CheckSplit`, minus its visitor-early-stop and `SplitList` cases,
+  which don't translate — no visitor/list API exists here) — 40 checks
+  total, all pass, valgrind-clean across every test binary (0 errors,
+  0 definite/indirect leaks). `Rope.Mod`'s `Contains` has no `Ropes`
+  counterpart yet (see "Search" above — still optional/undecided).
+  `examples/rope_tool` gained `index`/`rindex` (`Rope` pattern, the
+  `Going => Forward`/`Backward` split into two commands since
+  `Arg_Parser`'s fixed-arity accumulator model doesn't have a clean way
+  to make a trailing positional argument optional — `RopeTool.Mod`'s
+  own `find`/`rfind` split the same way, for an unrelated reason: it
+  never had a unified `Index`), `indexchar`/`rindexchar` (`Character`
+  pattern, `RopeTool.Mod`'s own names carried over unchanged — there's
+  no better `Ada.Strings`-vocabulary name for a CLI subcommand
+  distinguishing "search for one character" from `index`), and `split`
+  (`Rope` separator overload, one piece per line, matching
+  `RopeTool.Mod`'s own `split` description) in this phase.
 - **Phase 5:** `Cursor` + `Iterable` aspect; confirm `for Ch of R loop`
   works and that stepping through a large rope is amortized O(1) (not
   just correct) — e.g. time a full traversal and confirm it's linear

@@ -215,4 +215,187 @@ package body Rope_Tool_Args is
       return True;
    end Cmp_Argument_Handler;
 
+   --  --- index S PATTERN FROM ---
+
+   Index_Count   : Natural := 0;
+   Index_S       : Rope;
+   Index_Pattern : Rope;
+
+   function Index_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Index_Count is
+         when 0 =>
+            Index_S := From_String (Arg);
+
+         when 1 =>
+            Index_Pattern := From_String (Arg);
+
+         when 2 =>
+            Put_Line
+              (Ada.Strings.Fixed.Trim
+                 (Natural'Image (Index (Index_S, Index_Pattern, Positive'Value (Arg), Ada.Strings.Forward)), Ada.Strings.Both));
+
+         when others =>
+            null;
+      end case;
+      Index_Count := Index_Count + 1;
+      return True;
+   exception
+      when Constraint_Error          =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Pattern_Error =>
+         Put_Line (Standard_Error, "Error: PATTERN must not be empty");
+         Set_Exit_Status (Failure);
+         return False;
+   end Index_Argument_Handler;
+
+   --  --- rindex S PATTERN FROM ---
+
+   Rindex_Count   : Natural := 0;
+   Rindex_S       : Rope;
+   Rindex_Pattern : Rope;
+
+   function Rindex_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Rindex_Count is
+         when 0 =>
+            Rindex_S := From_String (Arg);
+
+         when 1 =>
+            Rindex_Pattern := From_String (Arg);
+
+         when 2 =>
+            Put_Line
+              (Ada.Strings.Fixed.Trim
+                 (Natural'Image (Index (Rindex_S, Rindex_Pattern, Positive'Value (Arg), Ada.Strings.Backward)), Ada.Strings.Both));
+
+         when others =>
+            null;
+      end case;
+      Rindex_Count := Rindex_Count + 1;
+      return True;
+   exception
+      when Constraint_Error          =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Pattern_Error =>
+         Put_Line (Standard_Error, "Error: PATTERN must not be empty");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Index_Error   =>
+         Put_Line (Standard_Error, "Error: FROM out of range");
+         Set_Exit_Status (Failure);
+         return False;
+   end Rindex_Argument_Handler;
+
+   --  --- indexchar S CH FROM ---
+
+   Indexchar_Count : Natural := 0;
+   Indexchar_S     : Rope;
+   Indexchar_Ch    : Character;
+
+   function Indexchar_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Indexchar_Count is
+         when 0 =>
+            Indexchar_S := From_String (Arg);
+
+         when 1 =>
+            if Arg'Length /= 1 then
+               Put_Line (Standard_Error, "Error: CH must be exactly one character: """ & Arg & """");
+               Set_Exit_Status (Failure);
+               return False;
+            end if;
+            Indexchar_Ch := Arg (Arg'First);
+
+         when 2 =>
+            Put_Line
+              (Ada.Strings.Fixed.Trim
+                 (Natural'Image (Index (Indexchar_S, Indexchar_Ch, Positive'Value (Arg), Ada.Strings.Forward)), Ada.Strings.Both));
+
+         when others =>
+            null;
+      end case;
+      Indexchar_Count := Indexchar_Count + 1;
+      return True;
+   exception
+      when Constraint_Error =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+   end Indexchar_Argument_Handler;
+
+   --  --- rindexchar S CH FROM ---
+
+   Rindexchar_Count : Natural := 0;
+   Rindexchar_S     : Rope;
+   Rindexchar_Ch    : Character;
+
+   function Rindexchar_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Rindexchar_Count is
+         when 0 =>
+            Rindexchar_S := From_String (Arg);
+
+         when 1 =>
+            if Arg'Length /= 1 then
+               Put_Line (Standard_Error, "Error: CH must be exactly one character: """ & Arg & """");
+               Set_Exit_Status (Failure);
+               return False;
+            end if;
+            Rindexchar_Ch := Arg (Arg'First);
+
+         when 2 =>
+            Put_Line
+              (Ada.Strings.Fixed.Trim
+                 (Natural'Image (Index (Rindexchar_S, Rindexchar_Ch, Positive'Value (Arg), Ada.Strings.Backward)),
+                  Ada.Strings.Both));
+
+         when others =>
+            null;
+      end case;
+      Rindexchar_Count := Rindexchar_Count + 1;
+      return True;
+   exception
+      when Constraint_Error        =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Index_Error =>
+         Put_Line (Standard_Error, "Error: FROM out of range");
+         Set_Exit_Status (Failure);
+         return False;
+   end Rindexchar_Argument_Handler;
+
+   --  --- split S SEP ---
+
+   Split_Count : Natural := 0;
+   Split_S     : Rope;
+
+   function Split_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Split_Count is
+         when 0 =>
+            Split_S := From_String (Arg);
+
+         when 1 =>
+            for Piece of Split (Split_S, From_String (Arg)) loop
+               Put_Line (To_String (Piece));
+            end loop;
+
+         when others =>
+            null;
+      end case;
+      Split_Count := Split_Count + 1;
+      return True;
+   end Split_Argument_Handler;
+
 end Rope_Tool_Args;
