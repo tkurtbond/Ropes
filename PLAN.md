@@ -990,11 +990,20 @@ parameter's type.
   chosen because "amortized O(1) stepping, not just correctness" is
   explicitly this phase's own stated goal above and a depth-style
   structural proxy doesn't exist for traversal *speed* the way it does
-  for balance. All pass, valgrind-clean. No `rope_tool` subcommand
-  added this phase — `RopeTool.Mod` itself has no iterator-related
-  subcommand to port (confirmed: no "iterate"/"walk"/etc. in its
-  command list), and "for Ch of R loop" is a language construct, not a
-  `Ropes` operation with a natural one-shot CLI shape to wrap.
+  for balance. All pass, valgrind-clean. `examples/rope_tool` gained
+  `chars` (`chars S` — prints each character of `S`, one per line,
+  via `for Ch of S loop`) — this one has no `RopeTool.Mod` counterpart
+  to port at all (confirmed: no "iterate"/"walk"/etc. in its command
+  list), unlike every other `rope_tool` subcommand so far, which wraps
+  an existing `RopeTool.Mod` command. `for Ch of R loop` is a language
+  construct, not a `Ropes` operation in the usual sense, but leaving
+  the new `Iterable` aspect with no `rope_tool` demonstration at all
+  would have been a real gap in what `rope_tool` is *for* (see this
+  file's "Command-line tool (rope_tool)" section) — a first miss,
+  caught by the user rather than by this phase's own "add the matching
+  subcommand" checklist, since that checklist had implicitly narrowed
+  to "wrap an existing `RopeTool.Mod` command" rather than "demonstrate
+  the phase's `Ropes` addition, `RopeTool.Mod` precedent or not".
 - **Phase 6:** `Map`/`Map_Indexed`, `To_Upper`/`To_Lower`,
   `Capitalize`/`Uncapitalize`, `Trim`.
 - **Phase 7 (stretch):** `From_Unbounded_String`/`To_Unbounded_String`,

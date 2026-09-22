@@ -39,19 +39,40 @@ the latter ("invalid representation clause") since only the
 Ada gives this aspect. Confirmed against every real `Iterable` user on
 this machine before fixing, not guessed.
 
+**A `rope_tool` subcommand isn't only "wrap the matching `RopeTool.Mod`
+command"** — Phase 5 initially shipped with no `rope_tool` addition at
+all, reasoning that `RopeTool.Mod` has no iterator subcommand to port.
+The user pushed back: `rope_tool` exists to demonstrate `Ropes`'s
+surface, and leaving a whole phase's addition (`Cursor`/`Iterable`)
+with zero CLI demonstration was a real gap even with no
+`RopeTool.Mod` precedent to point to. Fixed by adding `chars` (`for Ch
+of S loop`, one character per line) — the first `rope_tool` command
+with no `RopeTool.Mod` counterpart at all. **Every future phase should
+ask "does `rope_tool` demonstrate this phase's addition?" as its own
+question**, separate from "does `RopeTool.Mod` have a command to
+port" — the two only coincide when `Ropes` doesn't add capability
+`RopeTool.Mod` itself lacked (true for Phases 1–4, not automatically
+true going forward).
+
 `examples/rope_tool` (the Ada port of `RopeTool.Mod`, built on
 `arg_parser` — see `PLAN.md`'s "Command-line tool (rope_tool)") has
 `cat`/`len`/`fetch`/`slice`/`insert`/`delete`/`cmp`/`index`/`rindex`/
-`indexchar`/`rindexchar`/`split`, matching Phases 1-4's API (`cmp` is
-built from `"="`/`"<"` in `rope_tool_args.adb` itself, since `Ropes`
-has no public `Compare` function to wrap — see PLAN.md's
+`indexchar`/`rindexchar`/`split`/`chars`, matching Phases 1-5's API
+(`cmp` is built from `"="`/`"<"` in `rope_tool_args.adb` itself, since
+`Ropes` has no public `Compare` function to wrap — see PLAN.md's
 "Comparison"; `index`/`rindex` and `indexchar`/`rindexchar` are each
 one `Ropes.Index` overload called with a fixed `Going`, split into two
 commands since `Arg_Parser`'s fixed-arity model can't make a trailing
-argument optional). Add a `rope_tool` subcommand in the same phase
+argument optional; `chars` demonstrates `Cursor`/`Iterable` via `for
+Ch of S loop` and has no `RopeTool.Mod` counterpart at all — see the
+gotcha note above). Add a `rope_tool` subcommand in the same phase
 that adds its underlying `Ropes` operation — never a stub ahead of the
 operation existing, and don't let `rope_tool` drift behind `Ropes`'s
-current surface from one phase to the next.
+current surface from one phase to the next; this includes a phase like
+5 that adds no new `RopeTool.Mod`-sourced command, since the demo
+angle ("does `rope_tool` show off this phase's addition") is separate
+from the porting angle ("does `RopeTool.Mod` have a matching
+command").
 
 ## Source material
 

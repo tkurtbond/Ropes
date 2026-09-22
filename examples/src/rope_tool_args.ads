@@ -60,6 +60,9 @@ package Rope_Tool_Args is
    --  --- split S SEP --- (Ropes.Split, Rope separator; one piece per line)
    function Split_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
+   --  --- chars S --- (Ropes.Cursor/Iterable, via "for Ch of S loop"; one character per line)
+   function Chars_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
    Commands : aliased Command_Array :=
      [Make_Command
        ("cat",
@@ -117,7 +120,12 @@ package Rope_Tool_Args is
        ("split",
         Make_Parser
           (Description => "split S SEP  Print each piece of S split on SEP, one per line.",
-           Handler     => Split_Argument_Handler'Access, Options => null))];
+           Handler     => Split_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("chars",
+        Make_Parser
+          (Description => "chars S  Print each character of S, one per line (""for Ch of S loop"").",
+           Handler     => Chars_Argument_Handler'Access, Options => null))];
 
    Main_Parser : Parser :=
      Make_Parser

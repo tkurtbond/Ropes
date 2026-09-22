@@ -398,4 +398,20 @@ package body Rope_Tool_Args is
       return True;
    end Split_Argument_Handler;
 
+   --  --- chars S ---
+   --  The one rope_tool command with no RopeTool.Mod counterpart (it
+   --  has no iterator-related subcommand at all): a direct demo of
+   --  Ropes.Cursor and the Iterable aspect (see PLAN.md's "Iteration"
+   --  section), rather than a wrapped operation like every other
+   --  command here.
+
+   function Chars_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      for Ch of From_String (Arg) loop
+         Put_Line ([Ch]);
+      end loop;
+      return True;
+   end Chars_Argument_Handler;
+
 end Rope_Tool_Args;
