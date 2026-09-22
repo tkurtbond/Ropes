@@ -153,10 +153,13 @@ gprbuild -P test.gpr -p
 ```
 
 `test/test.gpr`'s `for Main use (...)` lists every `test_*.adb` by
-name (currently `test_construction.adb`, `test_balance.adb`) —
-**adding a new `test_*.adb` requires adding it there too**, the same
-easy-to-miss two-edit rule `alibfyaml`'s `AGENTS.md` documents for its
-own `test.gpr`.
+name (see `test.gpr` itself for the current list, rather than a
+snapshot here that would only go stale again as phases add more files
+— it drifted out of date exactly this way once already, listing just
+`test_construction.adb`/`test_balance.adb` long after later phases had
+added a dozen more) — **adding a new `test_*.adb` requires adding it
+there too**, the same easy-to-miss two-edit rule `alibfyaml`'s
+`AGENTS.md` documents for its own `test.gpr`.
 
 ```sh
 cd examples
