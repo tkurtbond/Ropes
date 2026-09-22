@@ -7,12 +7,13 @@
 --  PLAN.md for the full design rationale and AGENTS.md for house
 --  conventions specific to this codebase.
 --
---  This is Phase 1 of PLAN.md's phased implementation plan: the
---  Rope/Node skeleton, reference counting, and the smallest useful
---  slice of the API (Length, Is_Empty, "&", From_String/To_String,
---  Element). Balancing, Slice/Insert/Delete, comparison, search,
---  split, iteration, and case mapping are later phases -- see
---  PLAN.md before adding to this package.
+--  This is Phase 1+2 of PLAN.md's phased implementation plan: the
+--  Rope/Node skeleton, reference counting, the smallest useful slice
+--  of the API (Length, Is_Empty, "&", From_String/To_String,
+--  Element), and "&"'s automatic depth-bounded rebalancing.
+--  Slice/Insert/Delete, comparison, search, split, iteration, and
+--  case mapping are later phases -- see PLAN.md before adding to this
+--  package.
 --
 --  A Rope is an immutable value: every operation returns a new Rope
 --  rather than modifying an existing one, so Ropes may be freely
@@ -34,15 +35,19 @@ package Ropes is
    function Is_Empty (Source : Rope) return Boolean;
 
    function "&" (Left, Right : Rope) return Rope;
-   --  Concatenation. O(1), except when both operands are short flat
-   --  leaves (Rope.Mod's short-leaf merge, ported as-is): then the
-   --  result is copied into one new leaf instead of adding a tree
-   --  level, so that repeated single-character "&" does not grow an
-   --  ever-deeper skinny tree. Raises Ada.Strings.Length_Error if the
-   --  combined length would exceed Natural'Last.
+   --  Concatenation. O(1) amortized, except when both operands are
+   --  short flat leaves (Rope.Mod's short-leaf merge, ported as-is):
+   --  then the result is copied into one new leaf instead of adding a
+   --  tree level, so that repeated single-character "&" does not grow
+   --  an ever-deeper skinny tree. Raises Ada.Strings.Length_Error if
+   --  the combined length would exceed Natural'Last.
    --
-   --  Rebalancing (Rope.Mod's Cat, layered on top of this operation's
-   --  SimpleCat semantics) is Phase 2 -- see PLAN.md.
+   --  If the result's tree depth would reach an internal bound, it is
+   --  automatically rebalanced (Rope.Mod's Cat/Balance, the
+   --  Fibonacci-forest algorithm) so that Element/Slice/etc. stay
+   --  logarithmic even after many incremental "&" calls -- see
+   --  PLAN.md's "Balancing" section. Transparent to callers; there is
+   --  no public Balance or Depth to call directly (unlike Rope.Mod).
 
    function From_String (Source : String) return Rope;
    --  Null_Rope if Source is empty.

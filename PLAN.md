@@ -160,6 +160,7 @@ Ropes/
   src/
     ropes.ads / .adb      -- the whole public API; one package, matching
                               Rope.Mod's own single-MODULE scope
+    ropes-test_support.ads / .adb  -- test-only internals accessor (Depth); see Phase 2
   test/
     test.gpr
     test_*.adb            -- one standalone program per concern (see Testing)
@@ -374,7 +375,15 @@ literal `44` would.
 The Fibonacci-forest rebalance itself (`BalanceInsert`/`BalanceWalk`/
 `ConcatForest` in `Rope.Mod`) ports essentially as-is — it's index-free
 tree-shape logic, not string-index arithmetic, so it isn't one of the
-0-vs-1-based-indexing risk spots above.
+0-vs-1-based-indexing risk spots above. **[Phase 2, done.]** The one
+real port-time difference is refcounting: `Rope.Mod`'s forest is a
+plain `ARRAY OF Rope` under a tracing collector, so `forest[i] := NIL`
+just drops a GC reference; `Ropes.Balance_Insert`/`Concat_Forest`
+explicitly `Decr_Ref` a forest slot at the same point `Rope.Mod` nulls
+it out, immediately after folding its content into the running `Sum`
+via `New_Simple_Cat` (which borrows both operands, per the usual
+`Node_Access` contract — see `ropes.adb`'s "Node-level reference
+counting" section).
 
 ### Construction and concatenation
 
@@ -688,10 +697,31 @@ parameter's type.
   correct, the single trickiest refcounting spot in this phase.
   `examples/rope_tool` also gained its `cat`/`len`/`fetch` subcommands
   in this phase — see "Command-line tool (rope_tool)" above.
-- **Phase 2:** `Max_Depth`/`Min_Length` elaboration-time computation,
-  `Cat`'s depth check, `Balance` (Fibonacci forest). Stress test: many
-  single-character `"&"` appends, confirm depth stays bounded and
-  `To_String` still round-trips.
+- **Phase 2 [done]:** `Max_Depth`/`Min_Length` elaboration-time
+  computation (`Compute_Max_Depth`/`Compute_Min_Length`, growing the
+  Fibonacci-like sequence until the next term would exceed
+  `Natural'Last` — 44 on a 32-bit `Natural`, matching `Rope.Mod`'s
+  hardcoded value), `"&"`'s depth check, `Balance` (`Balance_Insert`/
+  `Balance_Walk`/`Concat_Forest`, the Fibonacci-forest algorithm,
+  ported directly from `Rope.Mod`'s `BalanceInsert`/`BalanceWalk`/
+  `ConcatForest` with explicit `Incr_Ref`/`Decr_Ref` bookkeeping in
+  place of what GC handles implicitly there). `Balance`/`Min_Length`/
+  `Max_Depth` stay internal to `ropes.adb` — not exposed publicly, per
+  "Core design" above never listing `Depth`/`IsBalanced`/`Balance` as
+  public `Ropes` operations. A new child package,
+  `Ropes.Test_Support` (`function Depth (Source : Rope) return
+  Natural`), exists solely so tests can confirm depth stays bounded
+  without exposing `Depth` on the real public API — documented as
+  test-only in its own header comment. `test/test_balance.adb` (5
+  checks, translated from `RopeTest.Mod`'s `CheckStressAndBalance`
+  content/depth assertions) confirms a 2000-character
+  one-character-at-a-time `"&"`-loop round-trips correctly and stays
+  at `Depth < 60` (well below the ~125 a short-leaf-merge-only,
+  never-rebalanced tree would reach) — all pass, valgrind-clean (0
+  errors, 0 definite/indirect leaks; 5,952 allocs / 5,951 frees, the
+  1-block difference being the same pre-existing GNAT-runtime
+  "still reachable" block `test_construction` also shows, not a leak
+  in `Ropes` itself).
 - **Phase 3:** `Slice`, `Insert`, `Delete`, comparison operators.
 - **Phase 4:** `Index` (both overloads, both directions), all four
   `Split` overloads (`Rope`/`String`/`Character`/`Character_Set`).

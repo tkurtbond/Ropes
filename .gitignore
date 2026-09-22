@@ -2,6 +2,7 @@ obj/
 lib/
 test/obj/
 test/test_construction
+test/test_balance
 examples/obj/
 examples/rope_tool
 

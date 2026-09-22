@@ -153,6 +153,169 @@ package body Ropes is
    end New_Simple_Cat;
 
    ------------------------------------------------------------------
+   --  Balancing: Rope.Mod's Fibonacci-forest rebalance (itself ported
+   --  from cord's cordbscs.c), triggered from "&" whenever a
+   --  concatenation's result gets too deep. See PLAN.md's "Balancing"
+   --  section. Every Node_Access parameter below follows the same
+   --  borrowed/owned contract documented at the top of this file.
+   ------------------------------------------------------------------
+
+   --  Grows the same Fibonacci-like sequence as Min_Length below (A =
+   --  Min_Length (D - 1), B = Min_Length (D)) until the next term
+   --  would exceed Natural'Last, and returns the last index
+   --  successfully computed -- Rope.Mod's InitMinLength/MaxDepth, but
+   --  sized to Standard.Natural's actual range instead of a hardcoded
+   --  44 assuming a 32-bit LONGINT.
+   function Compute_Max_Depth return Natural is
+      A : Natural := 1;  --  Min_Length (0)
+      B : Natural := 2;  --  Min_Length (1)
+      D : Natural := 1;
+   begin
+      loop
+         exit when A > Natural'Last - B;  --  A + B would overflow
+         declare
+            Next : constant Natural := A + B;
+         begin
+            A := B;
+            B := Next;
+            D := D + 1;
+         end;
+      end loop;
+      return D;
+   end Compute_Max_Depth;
+
+   Max_Depth : constant Natural := Compute_Max_Depth;
+
+   subtype Depth_Range is Natural range 0 .. Max_Depth;
+   type Min_Length_Array is array (Depth_Range) of Positive;
+   type Node_Array is array (Depth_Range) of Node_Access;
+   type Length_Array is array (Depth_Range) of Natural;
+
+   --  Min_Length (D) is the least total length a rope balanced (per
+   --  the paper's definition: Length (R) >= Min_Length (Depth (R)))
+   --  at depth D may have.
+   function Compute_Min_Length return Min_Length_Array is
+      Result : Min_Length_Array;
+   begin
+      Result (0) := 1;
+      Result (1) := 2;  --  Max_Depth >= 1 always -- see Compute_Max_Depth.
+      for D in 2 .. Max_Depth loop
+         Result (D) := Result (D - 1) + Result (D - 2);
+      end loop;
+      return Result;
+   end Compute_Min_Length;
+
+   Min_Length : constant Min_Length_Array := Compute_Min_Length;
+
+   --  Inserts the leaf or already-balanced subtree X (of known length
+   --  X_Len) into Forest, maintaining the invariant that Forest (I),
+   --  if not null, has depth <= I and length >= Min_Length (I), and
+   --  that concatenating the occupied slots (see Concat_Forest)
+   --  reproduces what has been inserted so far, left to right. X is
+   --  borrowed.
+   procedure Balance_Insert (X : Node_Access; X_Len : Positive; Forest : in out Node_Array; Forest_Len : in out Length_Array) is
+      I       : Natural     := 0;
+      Sum     : Node_Access := null;
+      Sum_Len : Natural     := 0;
+
+      --  Folds Forest slot Slot (of known length Slot_Len) into Sum,
+      --  then clears the slot -- Slot's ownership moves into Sum (or
+      --  is dropped, if New_Simple_Cat only needed to read it).
+      procedure Absorb (Slot : in out Node_Access; Slot_Len : Natural) is
+         New_Sum : constant Node_Access := New_Simple_Cat (Slot, Sum);
+      begin
+         Decr_Ref (Sum);
+         Decr_Ref (Slot);
+         Slot    := null;
+         Sum     := New_Sum;
+         Sum_Len := Sum_Len + Slot_Len;
+      end Absorb;
+   begin
+      while I < Max_Depth and then X_Len > Min_Length (I + 1) loop
+         if Forest (I) /= null then
+            Absorb (Forest (I), Forest_Len (I));
+         end if;
+         I := I + 1;
+      end loop;
+
+      declare
+         New_Sum : constant Node_Access := New_Simple_Cat (Sum, X);
+      begin
+         Decr_Ref (Sum);
+         Sum := New_Sum;
+      end;
+      Sum_Len := Sum_Len + X_Len;
+
+      while I <= Max_Depth and then Sum_Len >= Min_Length (I) loop
+         if Forest (I) /= null then
+            Absorb (Forest (I), Forest_Len (I));
+         end if;
+         I := I + 1;
+      end loop;
+
+      --  I > 0 here: Sum_Len >= X_Len >= 1 = Min_Length (0), so the
+      --  loop just above always runs at least once.
+      I              := I - 1;
+      Forest (I)     := Sum;
+      Forest_Len (I) := Sum_Len;
+   end Balance_Insert;
+
+   --  Walks X left to right, inserting each leaf into Forest. A
+   --  Concat node that is already balanced for its own depth is
+   --  treated as atomic (inserted whole) instead of being torn apart;
+   --  only genuinely unbalanced Concat nodes are recursed into. X is
+   --  borrowed throughout.
+   procedure Balance_Walk (X : Node_Access; Forest : in out Node_Array; Forest_Len : in out Length_Array) is
+   begin
+      if X = null then
+         return;
+      end if;
+      if X.Kind = Concat_Kind and then not (X.Depth < Max_Depth and then X.Len >= Min_Length (X.Depth)) then
+         Balance_Walk (X.Left, Forest, Forest_Len);
+         Balance_Walk (X.Right, Forest, Forest_Len);
+      else
+         Balance_Insert (X, X.Len, Forest, Forest_Len);
+      end if;
+   end Balance_Walk;
+
+   --  Reassembles Forest into one rope: slots low to high, each
+   --  prepended to what has been assembled from the lower slots so
+   --  far. Forest is left all-null; every slot's ownership is
+   --  transferred into the returned tree (or dropped, by the interior
+   --  Decr_Ref calls below).
+   function Concat_Forest (Forest : in out Node_Array) return Node_Access is
+      Result : Node_Access := null;
+   begin
+      for I in Forest'Range loop
+         if Forest (I) /= null then
+            declare
+               New_Result : constant Node_Access := New_Simple_Cat (Forest (I), Result);
+            begin
+               Decr_Ref (Result);
+               Decr_Ref (Forest (I));
+               Forest (I) := null;
+               Result     := New_Result;
+            end;
+         end if;
+      end loop;
+      return Result;
+   end Concat_Forest;
+
+   --  Rebalances X into a rope with the same content but Depth
+   --  bounded well below Max_Depth. X is borrowed; the result is a
+   --  fresh owned reference.
+   function Balance (X : Node_Access) return Node_Access is
+      Forest     : Node_Array   := [others => null];
+      Forest_Len : Length_Array := [others => 0];
+   begin
+      if X = null then
+         return null;
+      end if;
+      Balance_Walk (X, Forest, Forest_Len);
+      return Concat_Forest (Forest);
+   end Balance;
+
+   ------------------------------------------------------------------
    --  Public API.
    ------------------------------------------------------------------
 
@@ -167,7 +330,19 @@ package body Ropes is
 
    function Is_Empty (Source : Rope) return Boolean is (Data_Of (Source) = null);
 
-   function "&" (Left, Right : Rope) return Rope is (Wrap (New_Simple_Cat (Data_Of (Left), Data_Of (Right))));
+   function "&" (Left, Right : Rope) return Rope is
+      Result : Node_Access := New_Simple_Cat (Data_Of (Left), Data_Of (Right));
+   begin
+      if Result /= null and then Result.Depth >= Max_Depth then
+         declare
+            Balanced : constant Node_Access := Balance (Result);
+         begin
+            Decr_Ref (Result);
+            Result := Balanced;
+         end;
+      end if;
+      return Wrap (Result);
+   end "&";
 
    function From_String (Source : String) return Rope is
    begin

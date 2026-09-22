@@ -7,7 +7,7 @@ project Test is
    for Object_Dir use "obj";
    for Exec_Dir use ".";
 
-   for Main use ("test_construction.adb");
+   for Main use ("test_construction.adb", "test_balance.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use

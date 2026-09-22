@@ -8,22 +8,31 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**Phase 1 done** (see `PLAN.md`'s phased plan): `Rope`/`Node`/
+**Phase 1 and 2 done** (see `PLAN.md`'s phased plan): `Rope`/`Node`/
 `Rope_Ref` skeleton, refcounting, `Null_Rope`, `Length`, `Is_Empty`,
-plain `"&"` (short-leaf merge only, no rebalancing), `From_String`/
-`To_String`, `Element`. `src/ropes.ads`/`.adb` exist and build;
-`test/test_construction.adb` (19 checks) passes clean, including under
-valgrind. Work through the remaining phases in order — each gets its
-own tests before moving to the next. Don't skip ahead to a later
-phase's API surface (e.g. `Index`/`Split`/iteration) before Phase 2's
-balancing is in place and tested — everything later depends on
-`Cat`/`Balance` actually bounding tree depth.
+`"&"` (short-leaf merge plus depth-triggered auto-rebalance —
+`Balance`/`Balance_Insert`/`Balance_Walk`/`Concat_Forest`, the
+Fibonacci-forest algorithm), `From_String`/`To_String`, `Element`.
+`src/ropes.ads`/`.adb` exist and build; `test/test_construction.adb`
+(19 checks) and `test/test_balance.adb` (5 checks) both pass clean,
+including under valgrind. `Balance`/`Max_Depth`/`Min_Length` are
+internal to `ropes.adb`, not public — `src/ropes-test_support.ads`/
+`.adb` is a small test-only child package (`function Depth`) so tests
+can confirm depth stays bounded without adding `Depth` to the real
+public API. Work through the remaining phases in order — each gets
+its own tests before moving to the next. Don't skip ahead to a later
+phase's API surface (`Slice`/`Index`/`Split`/iteration/etc.) — Phase
+2's balancing is what makes all of it safe to build on (`Cat`/
+`Balance` actually bounding tree depth).
 
 `examples/rope_tool` (the Ada port of `RopeTool.Mod`, built on
 `arg_parser` — see `PLAN.md`'s "Command-line tool (rope_tool)")
-currently has `cat`/`len`/`fetch`, matching Phase 1's API. Add a
-`rope_tool` subcommand in the same phase that adds its underlying
-`Ropes` operation — never a stub ahead of the operation existing.
+currently has `cat`/`len`/`fetch`, matching Phase 1's API — Phase 2
+added no new public `Ropes` operation, so `rope_tool` didn't grow this
+phase either (`"&"`'s rebalancing is transparent to `cat`, already
+exercised). Add a `rope_tool` subcommand in the same phase that adds
+its underlying `Ropes` operation — never a stub ahead of the operation
+existing.
 
 ## Source material
 
@@ -69,10 +78,11 @@ gprbuild -P test.gpr -p
 ./test_<name>          # run individually; see PLAN.md's Testing section
 ```
 
-`test/test.gpr`'s `for Main use (...)` currently lists only
-`test_construction.adb` — **adding a new `test_*.adb` requires adding
-it there too**, the same easy-to-miss two-edit rule `alibfyaml`'s
-`AGENTS.md` documents for its own `test.gpr`.
+`test/test.gpr`'s `for Main use (...)` lists every `test_*.adb` by
+name (currently `test_construction.adb`, `test_balance.adb`) —
+**adding a new `test_*.adb` requires adding it there too**, the same
+easy-to-miss two-edit rule `alibfyaml`'s `AGENTS.md` documents for its
+own `test.gpr`.
 
 ```sh
 cd examples
@@ -145,3 +155,9 @@ exists elsewhere in this tree; `-M132` is passed on the command line.
   Testing section for why (the exact bug class `alibfyaml` documents
   hitting for real: a lifetime/refcount bug that passes its own
   pass/fail logic while quietly touching freed memory).
+- **`Ropes.Test_Support`** (`src/ropes-test_support.ads`/`.adb`) is the
+  pattern for when a test genuinely needs to see something `Ropes`
+  deliberately doesn't expose publicly (currently just `Depth`, for
+  Phase 2's balance-stays-bounded check) — a small child package, not
+  a change to `Ropes`'s own public API. Add to it, don't grow the real
+  API to satisfy a test.
