@@ -2,6 +2,8 @@ obj/
 lib/
 test/obj/
 test/test_construction
+examples/obj/
+examples/rope_tool
 
 *~
 .\#*

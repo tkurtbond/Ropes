@@ -47,9 +47,8 @@
   clamp-and-succeed behavior this plan deliberately replaces with
   `Ada.Strings.Index_Error`/`Length_Error` (see below), so the
   *expected outcome* changes even where the *scenario* carries over
-  unchanged. `RopeTool` itself (the CLI) is not being ported — `Ropes`
-  is a library, and a demo CLI wrapping it isn't part of this plan; if
-  one is wanted later it's a separate, follow-on decision.
+  unchanged. **`RopeTool` itself is being ported too**, as `examples/
+  rope_tool` — see "Command-line tool (rope_tool)" below.
 
 ## Why this is a real port, not a transliteration
 
@@ -164,6 +163,11 @@ Ropes/
   test/
     test.gpr
     test_*.adb            -- one standalone program per concern (see Testing)
+  examples/
+    rope_tool.gpr
+    src/
+      rope_tool.adb              -- main procedure
+      rope_tool_args.ads / .adb  -- command definitions (see below)
 ```
 
 One flat package, not a `Ropes.*` hierarchy — `Rope.Mod` is a single
@@ -171,6 +175,56 @@ module and the API is small enough (on the order of `Ada.Strings.Unbounded`)
 that splitting it up front would just add navigation overhead with no
 present payoff. Revisit if it grows unwieldy, same policy `alibfyaml`'s
 `PLAN.md` states for `Libfyaml.Nodes`.
+
+## Command-line tool (rope_tool)
+
+`examples/rope_tool` is the Ada port of `RopeTool.Mod` — a git-style
+CLI exposing each `Ropes` operation as a subcommand (`rope_tool cat A
+B`, `rope_tool len S`, ...), built on
+[`arg_parser`](~/Repos/Ada/arg_parser) (installed under
+`/usr/local/sw/versions/ada/`, referenced with a bare `with
+"arg_parser.gpr";` — it's on `GPR_PROJECT_PATH`, the same way
+`besm2_fmt`/`ova_fmt` reference it, not a relative path into the
+source checkout) instead of Oberon-2's `ArgParser`. Modeled directly
+on `arg_parser`'s own multi-command example
+(`~/Repos/Ada/arg_parser/examples/src/compound_args.ads`, the
+"commands like git" pattern): each subcommand is its own sub-parser
+whose `Argument_Handler` is called once per positional argument and
+accumulates them until it has enough to act — the exact shape
+`RopeTool.Mod`'s own handlers already use, just re-based onto
+`Arg_Parser` instead of the Oberon-2 `ArgParser`.
+
+**Built incrementally, in lockstep with the phased plan below, not all
+at once**: a `rope_tool` subcommand is added in the same phase that
+adds its underlying `Ropes` operation, never before (no stub
+subcommands for operations that don't exist yet) and never left
+behind once one does. Phase 1 gave `rope_tool` three subcommands —
+`cat` (`"&"`), `len` (`Length`), `fetch` (`Element`, 1-based per
+`Ropes`'s own indexing convention, unlike `RopeTool.Mod`'s 0-based
+`Fetch`) — matching `RopeTool.Mod`'s `cat`/`len`/`fetch` commands
+exactly in shape, differing only where `Ropes` itself already differs
+from `Rope.Mod` (1-based indexing, `Ada.Strings.Index_Error` on a bad
+`fetch` index instead of `HALT`, `Positive'Value` instead of
+`ArgParser.StrToInt`/`ParseInt`). The rest of `RopeTool.Mod`'s command
+set (`sub`, `cmp`, `find`, `repeat`, `insert`, `remove`, `rfind`,
+`split`, `trim`/`triml`/`trimr`, `upper`/`lower`/`capitalize`/
+`uncapitalize`, `escaped`, `make`, `bigcat`, `indexchar`,
+`rindexchar`, `contains`) lands piecemeal as the matching `Ropes`
+operation lands in Phases 2–7.
+
+`~/Repos/Oberon/oberon-tools/tests/rope-*.test` (see "Sources being
+ported" above) are black-box fixtures written against `RopeTool`, run
+via `tests/run-tests.sh`'s `program`/`arg`/`status`/`output` format.
+Once `rope_tool` covers enough of the command set to make it
+worthwhile, these are a plausible source for a `examples/tests/
+run-tests.sh`-style black-box test suite for `rope_tool` itself — same
+"translate the scenario, not the expected outcome" caveat as
+`Ropes`'s own tests (0-based → 1-based indices, `HALT`/clamp →
+`Ada.Strings.Index_Error`, `rope-unknown-command.test`'s and
+`rope-help.test`'s exact wording will differ since it's `Arg_Parser`'s
+`Usage`/error text, not `ArgParser`'s). Not committed to for any
+specific phase yet — revisit once there's enough surface to make a
+black-box suite worth the setup.
 
 ## Core design
 
@@ -632,6 +686,8 @@ parameter's type.
   `New_Simple_Cat` absorb-branch's `Decr_Ref (Merged)` (dropping the
   local temporary's reference after `New_Concat` takes its own) is
   correct, the single trickiest refcounting spot in this phase.
+  `examples/rope_tool` also gained its `cat`/`len`/`fetch` subcommands
+  in this phase — see "Command-line tool (rope_tool)" above.
 - **Phase 2:** `Max_Depth`/`Min_Length` elaboration-time computation,
   `Cat`'s depth check, `Balance` (Fibonacci forest). Stress test: many
   single-character `"&"` appends, confirm depth stays bounded and
@@ -649,7 +705,9 @@ parameter's type.
   whatever "deferred" items above turn out to be worth adding.
 
 Each phase gets its own `test_*.adb`(s) before moving to the next,
-rather than one big test file added at the end.
+rather than one big test file added at the end. Each phase also adds
+the matching `rope_tool` subcommand(s) — see "Command-line tool
+(rope_tool)" above for the current/planned mapping.
 
 ## Testing approach
 

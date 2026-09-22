@@ -19,6 +19,12 @@ phase's API surface (e.g. `Index`/`Split`/iteration) before Phase 2's
 balancing is in place and tested — everything later depends on
 `Cat`/`Balance` actually bounding tree depth.
 
+`examples/rope_tool` (the Ada port of `RopeTool.Mod`, built on
+`arg_parser` — see `PLAN.md`'s "Command-line tool (rope_tool)")
+currently has `cat`/`len`/`fetch`, matching Phase 1's API. Add a
+`rope_tool` subcommand in the same phase that adds its underlying
+`Ropes` operation — never a stub ahead of the operation existing.
+
 ## Source material
 
 - The paper: `~/Reference/Computer/Libraries/Ropes/rope-paper.pdf`
@@ -42,14 +48,17 @@ balancing is in place and tested — everything later depends on
 - `Rope.Mod`'s own test suite: `~/Repos/Oberon/oberon-tools/RopeTest.Mod`
   (internal `ok`/`not ok` check battery) and
   `~/Repos/Oberon/oberon-tools/RopeTool.Mod` (a CLI demo exposing each
-  operation as a subcommand — **not** being ported; `Ropes` is a
-  library, no CLI tool is in this plan), plus the black-box fixtures at
+  operation as a subcommand — **being ported**, as `examples/
+  rope_tool`, built on `~/Repos/Ada/arg_parser`; see `PLAN.md`'s
+  "Command-line tool (rope_tool)"), plus the black-box fixtures at
   `~/Repos/Oberon/oberon-tools/tests/rope-*.test`. This is where
   `Ropes`'s own test cases come from — see `PLAN.md`'s "Testing
   approach". **Do not copy an expected outcome verbatim** where
   `PLAN.md` changed the behavior (clamping → `Index_Error`, 0-based →
   1-based, `(start, len)` `Substring` → inclusive `Slice (Low, High)`)
-  — translate the scenario, not the assertion.
+  — translate the scenario, not the assertion. This applies to the
+  `tests/rope-*.test` fixtures too if/when they become the source for
+  a black-box `rope_tool` test suite later.
 
 ## Build / test
 
@@ -64,6 +73,18 @@ gprbuild -P test.gpr -p
 `test_construction.adb` — **adding a new `test_*.adb` requires adding
 it there too**, the same easy-to-miss two-edit rule `alibfyaml`'s
 `AGENTS.md` documents for its own `test.gpr`.
+
+```sh
+cd examples
+gprbuild -P rope_tool.gpr -p
+./rope_tool <command> arguments...   # e.g. ./rope_tool cat foo bar
+```
+
+`rope_tool.gpr` depends on the installed `arg_parser.gpr` via a bare
+`with "arg_parser.gpr";` (resolved through `GPR_PROJECT_PATH`, already
+set to `/usr/local/sw/versions/ada/share/gpr` — same pattern
+`besm2_fmt`/`ova_fmt` use for `arg_parser.gpr`/`libfyaml_ada.gpr`), not
+a relative path into `~/Repos/Ada/arg_parser`'s source checkout.
 
 Run anything touching `Adjust`/`Finalize`/node-freeing under valgrind
 before considering a change done, not just via the test's own ok/FAIL
