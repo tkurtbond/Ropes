@@ -9,6 +9,7 @@ test/test_delete
 test/test_compare
 test/test_index
 test/test_split
+test/test_iterator
 examples/obj/
 examples/rope_tool
 

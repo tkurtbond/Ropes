@@ -7,13 +7,14 @@
 --  PLAN.md for the full design rationale and AGENTS.md for house
 --  conventions specific to this codebase.
 --
---  This is Phase 1+2+3+4 of PLAN.md's phased implementation plan: the
---  Rope/Node skeleton, reference counting, the smallest useful slice
---  of the API (Length, Is_Empty, "&", From_String/To_String,
+--  This is Phase 1+2+3+4+5 of PLAN.md's phased implementation plan:
+--  the Rope/Node skeleton, reference counting, the smallest useful
+--  slice of the API (Length, Is_Empty, "&", From_String/To_String,
 --  Element), "&"'s automatic depth-bounded rebalancing,
---  Slice/Insert/Delete, the five comparison operators, and now Index
---  and Split. Iteration and case mapping are later phases -- see
---  PLAN.md before adding to this package.
+--  Slice/Insert/Delete, the five comparison operators, Index and
+--  Split, and now Cursor-based iteration ("for Ch of Some_Rope
+--  loop"). Case mapping is the only phase left -- see PLAN.md before
+--  adding to this package.
 --
 --  A Rope is an immutable value: every operation returns a new Rope
 --  rather than modifying an existing one, so Ropes may be freely
@@ -28,7 +29,16 @@ with Ada.Strings.Maps;
 
 package Ropes is
 
-   type Rope is private;
+   type Rope is private with
+     Iterable => (First => First, Next => Next, Has_Element => Has_Element, Element => Element);
+   --  First/Next/Has_Element/Element are declared further down (see
+   --  "Cursor-based traversal" below) -- Ada resolves this forward
+   --  reference at Rope's freeze point, the standard idiom for the
+   --  Iterable aspect (every GNAT-provided Iterable container gives
+   --  the aspect this way, directly on the type declaration, not via
+   --  a separate "for Rope use Iterable => (...)" clause -- the
+   --  latter rejects this forward reference with "invalid
+   --  representation clause").
 
    Null_Rope : constant Rope;
 
@@ -141,6 +151,36 @@ package Ropes is
    --  consecutive separator characters produce N - 1 empty pieces
    --  between them, one split per character.
 
+   type Cursor is private;
+
+   function First (Source : Rope) return Cursor;
+   function Next (Source : Rope; Position : Cursor) return Cursor;
+   function Has_Element (Source : Rope; Position : Cursor) return Boolean;
+   function Element (Source : Rope; Position : Cursor) return Character;
+   --  Cursor-based traversal, giving "for Ch of Some_Rope loop ...
+   --  end loop;" via the Iterable aspect on Rope's own declaration
+   --  above -- Rope.Mod's
+   --  heap-allocated Iterator object and its Get/Incr/Decr/Goto/Move/
+   --  Peek/Source methods, replaced with the functional shape the
+   --  Iterable aspect requires: Next returns a new Cursor rather than
+   --  mutating one in place, and every operation takes Source
+   --  explicitly, so a Cursor never needs to carry its own reference
+   --  back to the rope or keep anything alive by itself -- it is only
+   --  ever valid for use with the Rope it came from, same as any
+   --  Ada.Containers Cursor. Rope.Mod's arbitrary-position Peek/Goto/
+   --  Move/Decr/Source have no counterpart here; this is forward-only
+   --  traversal, the Iterable aspect's whole scope.
+   --
+   --  First and Next each locate and cache the leaf covering the
+   --  Cursor's position (Rope.Mod's Iterator.Locate) as part of
+   --  producing their result, so Element/Has_Element are O(1) reads of
+   --  an already-valid cache; Next itself is O(1) when the new
+   --  position is still within the same leaf as the old one, and only
+   --  pays Locate's O(log n) descent from the root on a leaf crossing
+   --  -- the same amortized behavior Rope.Mod's Iterator has, just
+   --  produced functionally instead of by mutating a heap object in
+   --  place.
+
 private
 
    type Node_Kind is (Leaf_Kind, Concat_Kind);
@@ -199,5 +239,25 @@ private
    end record;
 
    Null_Rope : constant Rope := (Ref => (Ada.Finalization.Controlled with Data => null));
+
+   --  Position, plus a cache of the leaf node covering it and that
+   --  leaf's own 1-based starting index within the whole rope (Leaf =
+   --  null and Leaf_Start = 1 together mean "not located" -- true for
+   --  a Cursor produced by First/Next only when Pos is already past
+   --  the rope's end, i.e. whenever Has_Element would be False).
+   --  Deliberately NOT tagged, NOT Controlled -- see this file's
+   --  header comment on Cursor, and AGENTS.md/PLAN.md's RM 3.9.3(10)
+   --  note on why Cursor must stay untagged alongside a tagged Rope.
+   --  Holds a borrowed Node_Access, not an owned one: safe only
+   --  because every Cursor-consuming operation also takes Source
+   --  explicitly, so the rope value the caller is iterating keeps the
+   --  underlying nodes alive for as long as the Cursor is actually
+   --  used, the same lifetime assumption any Ada.Containers Cursor
+   --  makes about its own container.
+   type Cursor is record
+      Pos        : Positive    := 1;
+      Leaf       : Node_Access := null;
+      Leaf_Start : Positive    := 1;
+   end record;
 
 end Ropes;

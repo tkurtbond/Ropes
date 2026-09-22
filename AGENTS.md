@@ -8,7 +8,7 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**Phases 1-4 done** (see `PLAN.md`'s phased plan): `Rope`/`Node`/
+**Phases 1-5 done** (see `PLAN.md`'s phased plan): `Rope`/`Node`/
 `Rope_Ref` skeleton, refcounting, `Null_Rope`, `Length`, `Is_Empty`,
 `"&"` (short-leaf merge plus depth-triggered auto-rebalance —
 `Balance`/`Balance_Insert`/`Balance_Walk`/`Concat_Forest`, the
@@ -16,18 +16,28 @@ Fibonacci-forest algorithm), `From_String`/`To_String`, `Element`,
 `Slice`, `Insert`, `Delete`, the five comparison operators
 (`"="`/`"<"`/`"<="`/`">"`/`">="`), `Index` (`Rope`/`Character`
 patterns, each with a no-`From` and a `From`-bounded overload, both
-directions), and `Split` (`Rope`/`String`/`Character`/`Character_Set`
-separators). `src/ropes.ads`/`.adb` exist and build;
+directions), `Split` (`Rope`/`String`/`Character`/`Character_Set`
+separators), and `Cursor` + the `Iterable` aspect (`for Ch of
+Some_Rope loop`). `src/ropes.ads`/`.adb` exist and build;
 `test/test_construction.adb` (19), `test_balance.adb` (5),
 `test_slice.adb` (8), `test_insert.adb` (8), `test_delete.adb` (9),
-`test_compare.adb` (13), `test_index.adb` (25), and `test_split.adb`
-(15) — 102 checks total — all pass clean, including under valgrind.
-`Balance`/`Max_Depth`/`Min_Length` are internal to `ropes.adb`, not
-public — `src/ropes-test_support.ads`/`.adb` is a small test-only
-child package (`function Depth`) so tests can confirm depth stays
-bounded without adding `Depth` to the real public API. Work through
-the remaining phases in order — each gets its own tests before moving
-to the next.
+`test_compare.adb` (13), `test_index.adb` (25), `test_split.adb` (15),
+and `test_iterator.adb` (12) — 114 checks total — all pass clean,
+including under valgrind. `Balance`/`Max_Depth`/`Min_Length` are
+internal to `ropes.adb`, not public — `src/ropes-test_support.ads`/
+`.adb` is a small test-only child package (`function Depth`) so tests
+can confirm depth stays bounded without adding `Depth` to the real
+public API. Work through the remaining phases in order — each gets
+its own tests before moving to the next.
+
+**`Iterable`'s aspect spelling caught a real gotcha** (see `PLAN.md`'s
+"Iteration" section): it must be `with Iterable => (...)` directly on
+`type Rope is private`, not a separate `for Rope use Iterable =>
+(...)` clause after `First`/`Next`/etc. are declared — GNAT rejects
+the latter ("invalid representation clause") since only the
+`with`-on-the-declaration form gets the forward-reference allowance
+Ada gives this aspect. Confirmed against every real `Iterable` user on
+this machine before fixing, not guessed.
 
 `examples/rope_tool` (the Ada port of `RopeTool.Mod`, built on
 `arg_parser` — see `PLAN.md`'s "Command-line tool (rope_tool)") has

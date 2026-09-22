@@ -757,19 +757,35 @@ names close to `Rope.Mod`'s own, just Ada-cased.
 
 ### Iteration
 
+**`[Phase 5, done.]`**
+
 ```ada
+type Rope is private with
+  Iterable => (First => First, Next => Next, Has_Element => Has_Element, Element => Element);
+
 type Cursor is private;  -- plain record: position + cached leaf + leaf-start offset; NOT tagged, NOT Controlled
 
 function First (Source : Rope) return Cursor;
 function Next (Source : Rope; Position : Cursor) return Cursor;
 function Has_Element (Source : Rope; Position : Cursor) return Boolean;
 function Element (Source : Rope; Position : Cursor) return Character;
-
-for Rope use Iterable => (First       => First,
-                           Next        => Next,
-                           Has_Element => Has_Element,
-                           Element     => Element);
 ```
+
+**Correction from the sketch this section originally had**: the
+`Iterable` aspect must be spelled `with Iterable => (...)` directly on
+`type Rope is private`, not as a separate `for Rope use Iterable =>
+(...)` clause given later (after `First`/`Next`/`Has_Element`/
+`Element` are declared) — GNAT rejects the latter with "invalid
+representation clause", tried both in the visible part and in the
+private part (same error either place). `with`-on-the-declaration
+works because Ada resolves the aspect's forward references to
+`First`/`Next`/etc. at `Rope`'s freeze point, by which time they're
+declared; `for ... use` is ordinary representation-clause syntax and
+doesn't get that forward-reference allowance. Confirmed against every
+actual `Iterable`-using type on this machine (GNAT's own
+`g-lists.ads`/`g-sets.ads`/etc., and third-party code under
+`/usr/local/sw/src/lang/Ada/alire/`) — all of them use `with
+Iterable => (...)` on the type declaration; none use `for ... use`.
 
 Gives `for Ch of Some_Rope loop ... end loop;` directly — the Ada
 replacement for `Rope.Mod`'s heap-allocated `Iterator` object and its
@@ -933,10 +949,52 @@ parameter's type.
   distinguishing "search for one character" from `index`), and `split`
   (`Rope` separator overload, one piece per line, matching
   `RopeTool.Mod`'s own `split` description) in this phase.
-- **Phase 5:** `Cursor` + `Iterable` aspect; confirm `for Ch of R loop`
-  works and that stepping through a large rope is amortized O(1) (not
-  just correct) — e.g. time a full traversal and confirm it's linear
-  in length, not `length × log(length)`.
+- **Phase 5 [done]:** `Cursor` + `Iterable` aspect. `Cursor` is a plain
+  (non-tagged, non-`Controlled`) private record — `Pos`, plus a cached
+  `Leaf`/`Leaf_Start` (`Rope.Mod`'s `Iterator.Locate`, ported
+  functionally: `First`/`Next` each *produce* a `Cursor` whose cache
+  already covers its own `Pos`, rather than mutating a heap object in
+  place the way `Rope.Mod`'s `Iterator.Get`/`Incr`/`Decr` do). The
+  `Iterable` aspect itself had to be given as `with Iterable => (...)`
+  directly on `type Rope is private`, not as a separate `for Rope use
+  Iterable => (...)` clause the way `PLAN.md`'s original sketch showed
+  — GNAT rejects the latter ("invalid representation clause") because
+  `First`/`Next`/`Has_Element`/`Element` are declared *after* `Rope`
+  in the same package, and only the `with`-on-the-declaration form
+  resolves that forward reference (confirmed against every
+  `Iterable`-using type actually in this machine's GNAT/Alire tree —
+  none use `for ... use`). A new private helper, `Locate_Leaf`
+  (`Fetch`'s descent shape, threading an extra `Base` accumulator to
+  recover the covering leaf's absolute start position), backs both
+  `First` and `Next`; `Next` only re-descends from the root
+  (`Locate_Leaf`, O(log n)) when the new position has left the old
+  `Cursor`'s cached leaf, otherwise it's O(1) — `Element` and
+  `Has_Element` never call `Locate_Leaf` at all, just read the
+  already-valid cache. `Rope.Mod`'s arbitrary-position `Peek`/`Goto`/
+  `Move`/`Decr`/`Source` have no counterpart — the `Iterable` aspect's
+  scope is forward-only `First`/`Next`/`Has_Element`/`Element`, so
+  there is nothing to port them to; `test/test_iterator.adb`'s header
+  comment says so rather than silently dropping them.
+  `test/test_iterator.adb` (12 checks, translated from `RopeTest.Mod`'s
+  `CheckIterator` — its `Get`/`Incr` stepping and its "walking forward
+  matches `Fetch` at every position" loop, both against the same
+  two-leaf test rope shape so the leaf-boundary crossing at position
+  16/17 is actually exercised) confirms `for Ch of R loop` itself
+  (empty rope, short rope, content order), `Has_Element` at both ends,
+  and a `First`/`Next` walk matching `Element (Rope, Positive)`
+  everywhere. It also has one generously-tolerant wall-clock check (a
+  10×-larger rope's full traversal takes under 25× as long) —
+  the first timing-based check in this test suite, a deliberate
+  departure from every earlier phase's purely structural/deterministic
+  style (Phase 2's `Depth`-bound check being the closest precedent),
+  chosen because "amortized O(1) stepping, not just correctness" is
+  explicitly this phase's own stated goal above and a depth-style
+  structural proxy doesn't exist for traversal *speed* the way it does
+  for balance. All pass, valgrind-clean. No `rope_tool` subcommand
+  added this phase — `RopeTool.Mod` itself has no iterator-related
+  subcommand to port (confirmed: no "iterate"/"walk"/etc. in its
+  command list), and "for Ch of R loop" is a language construct, not a
+  `Ropes` operation with a natural one-shot CLI shape to wrap.
 - **Phase 6:** `Map`/`Map_Indexed`, `To_Upper`/`To_Lower`,
   `Capitalize`/`Uncapitalize`, `Trim`.
 - **Phase 7 (stretch):** `From_Unbounded_String`/`To_Unbounded_String`,

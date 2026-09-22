@@ -334,6 +334,31 @@ package body Ropes is
       end case;
    end Fetch;
 
+   --  Rope.Mod's Iterator.Locate, minus its leaf-cache short-circuit
+   --  (callers -- First/Next below -- check that themselves, since
+   --  only they have the old Cursor's cache to check against): the
+   --  leaf node covering the 1-based position I of the subtree rooted
+   --  at N, and that leaf's own 1-based starting index within the
+   --  *whole* rope N was originally called with (Base accumulates the
+   --  count of characters skipped over so far, the same way Fetch's
+   --  own descent skips N.Left.Len without tracking it). Precondition:
+   --  N /= null, I in 1 .. N.Len.
+   procedure Locate_Leaf (N : Node_Access; I : Positive; Base : Natural; Leaf : out Node_Access; Leaf_Start : out Positive) is
+   begin
+      case N.Kind is
+         when Leaf_Kind =>
+            Leaf       := N;
+            Leaf_Start := Base + 1;
+
+         when Concat_Kind =>
+            if I <= N.Left.Len then
+               Locate_Leaf (N.Left, I, Base, Leaf, Leaf_Start);
+            else
+               Locate_Leaf (N.Right, I - N.Left.Len, Base + N.Left.Len, Leaf, Leaf_Start);
+            end if;
+      end case;
+   end Locate_Leaf;
+
    --  Rope.Mod's SubstrHelper: the (0-based) slice N (Start .. Start +
    --  Len - 1). Precondition: N /= null, Len > 0, Start + Len <=
    --  N.Len. N is borrowed; the result is a fresh owned reference --
@@ -774,5 +799,64 @@ package body Ropes is
          return Result;
       end;
    end Split;
+
+   ------------------------------------------------------------------
+   --  Iteration: Cursor and the four Iterable-aspect operations. See
+   --  ropes.ads's Cursor doc comment and PLAN.md's "Iteration"
+   --  section.
+   ------------------------------------------------------------------
+
+   function First (Source : Rope) return Cursor is
+      D      : constant Node_Access := Data_Of (Source);
+      Result : Cursor;
+   begin
+      Result.Pos := 1;
+      if D /= null then
+         Locate_Leaf (D, 1, 0, Result.Leaf, Result.Leaf_Start);
+      end if;
+      return Result;
+   end First;
+
+   function Next (Source : Rope; Position : Cursor) return Cursor is
+      New_Pos : constant Positive := Position.Pos + 1;
+      Result  : Cursor;
+   begin
+      Result.Pos := New_Pos;
+      if Position.Leaf /= null and then New_Pos >= Position.Leaf_Start and then New_Pos < Position.Leaf_Start + Position.Leaf.Len
+      then
+         --  New_Pos is still covered by the same leaf as Position --
+         --  O(1), no descent needed, Rope.Mod's Locate's own
+         --  cache-hit shortcut.
+         Result.Leaf       := Position.Leaf;
+         Result.Leaf_Start := Position.Leaf_Start;
+      elsif New_Pos <= Length (Source) then
+         --  Crossing into a new leaf (or this is Next's first call
+         --  after a Cursor built some other way) -- an O(log n)
+         --  descent from the root, same as a cache miss in Rope.Mod's
+         --  Locate.
+         Locate_Leaf (Data_Of (Source), New_Pos, 0, Result.Leaf, Result.Leaf_Start);
+      end if;
+      --  Else New_Pos is past the end: Result.Leaf stays null (its
+      --  default), matching Has_Element (Source, Result) = False.
+      return Result;
+   end Next;
+
+   function Has_Element (Source : Rope; Position : Cursor) return Boolean is
+     (Position.Leaf /= null and then Position.Pos <= Length (Source));
+   --  The Leaf /= null check is defensive, not load-bearing for a
+   --  Cursor produced by First/Next (there, Leaf is null exactly when
+   --  Pos > Length (Source) already) -- it only matters for a
+   --  hand-built Cursor (e.g. a default-initialized one), the same
+   --  misuse class Ada.Containers Cursors don't guard against either;
+   --  cheap enough to check anyway.
+
+   function Element (Source : Rope; Position : Cursor) return Character is
+      pragma Unreferenced (Source);
+   begin
+      --  Position.Leaf already covers Position.Pos -- First/Next's
+      --  invariant -- so this is an O(1) read of the cache, no
+      --  Locate_Leaf call needed here at all.
+      return Position.Leaf.Chars (Position.Pos - Position.Leaf_Start + 1);
+   end Element;
 
 end Ropes;
