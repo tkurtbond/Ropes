@@ -206,12 +206,20 @@ behind once one does. Phase 1 gave `rope_tool` three subcommands —
 exactly in shape, differing only where `Ropes` itself already differs
 from `Rope.Mod` (1-based indexing, `Ada.Strings.Index_Error` on a bad
 `fetch` index instead of `HALT`, `Positive'Value` instead of
-`ArgParser.StrToInt`/`ParseInt`). The rest of `RopeTool.Mod`'s command
-set (`sub`, `cmp`, `find`, `repeat`, `insert`, `remove`, `rfind`,
-`split`, `trim`/`triml`/`trimr`, `upper`/`lower`/`capitalize`/
-`uncapitalize`, `escaped`, `make`, `bigcat`, `indexchar`,
+`ArgParser.StrToInt`/`ParseInt`). Phase 3 added `slice`
+(`RopeTool.Mod`'s `sub`, renamed to match `Slice`'s own name, 1-based
+inclusive `LOW HIGH` instead of 0-based `START LEN`), `insert`
+(`RopeTool.Mod`'s `insert`, 1-based `BEFORE`), `delete`
+(`RopeTool.Mod`'s `remove`, renamed to match `Delete`'s own name,
+1-based inclusive `FROM THROUGH` instead of 0-based `POS LEN`), and
+`cmp` (`RopeTool.Mod`'s `cmp`, but built in `rope_tool_args.adb` from
+the public `"="`/`"<"` operators rather than wrapping a public
+`Compare` — `Ropes` doesn't have one, by design; see "Comparison"
+above). The rest of `RopeTool.Mod`'s command set (`find`, `repeat`,
+`rfind`, `split`, `trim`/`triml`/`trimr`, `upper`/`lower`/
+`capitalize`/`uncapitalize`, `escaped`, `make`, `bigcat`, `indexchar`,
 `rindexchar`, `contains`) lands piecemeal as the matching `Ropes`
-operation lands in Phases 2–7.
+operation lands in Phases 4–7.
 
 `~/Repos/Oberon/oberon-tools/tests/rope-*.test` (see "Sources being
 ported" above) are black-box fixtures written against `RopeTool`, run
@@ -418,21 +426,29 @@ code already uses for "a string that grows" would be an odd omission.
 ```ada
 function Element (Source : Rope; Index : Positive) return Character;   -- Ada.Strings.Unbounded naming; Rope.Mod's Fetch
 function Is_Empty (Source : Rope) return Boolean;
-function Slice (Source : Rope; Low, High : Natural) return Rope;       -- inclusive bounds, Unbounded_String's own Slice convention; Rope.Mod's Substring(start, len)
+function Slice (Source : Rope; Low : Positive; High : Natural) return Rope;  -- inclusive bounds, Unbounded_String's own Slice convention/signature exactly; Rope.Mod's Substring(start, len)
 ```
 
 `Slice` takes **inclusive `Low`/`High`**, matching
-`Ada.Strings.Unbounded.Slice` exactly — not `Rope.Mod`'s
-`(start, len)` pair. This is a real shape change, not just a rename;
-every call site doing `Substring (R, Start, Len)` becomes `Slice (R,
-Start + 1, Start + Len)` (plus the 0-to-1-based shift), not a
-find-and-replace.
+`Ada.Strings.Unbounded.Slice` exactly (including its exact signature —
+`Low : Positive`, not `Natural`, confirmed against GNAT's
+`a-strunb.ads`) — not `Rope.Mod`'s `(start, len)` pair. This is a real
+shape change, not just a rename; every call site doing `Substring (R,
+Start, Len)` becomes `Slice (R, Start + 1, Start + Len)` (plus the
+0-to-1-based shift), not a find-and-replace.
 
 `Rope.Mod`'s permissive clamping (`Substring`/`Insert`/`Remove` all
 silently clamp an out-of-range `start`/`len`/`pos`) is **not** carried
-over: `Slice`/`Insert`/`Delete` raise `Ada.Strings.Index_Error` on a
-bad bound, matching `Ada.Strings.Unbounded`'s own behavior for the
-same operations.
+over wholesale: `Slice`/`Insert`/`Delete` raise `Ada.Strings.Index_Error`
+on a bad bound, matching `Ada.Strings.Unbounded`'s own behavior for the
+same operations exactly — which is not *uniformly* "never clamp,
+always raise". `Ada.Strings.Unbounded.Delete` itself still clamps a
+too-large `Through` to `Length (Source)` (only `From` is
+strictly checked, and only when `From <= Through`); `Slice`'s `High`
+has no such clamp and always raises past the end. `Ropes` matches each
+one precisely rather than picking one rule and applying it everywhere
+— see each function's own doc comment in `ropes.ads` for its exact
+boundary behavior. `[Phase 3, done.]`
 
 ### Modification (still non-destructive — every operation returns a new `Rope`)
 
@@ -722,7 +738,31 @@ parameter's type.
   1-block difference being the same pre-existing GNAT-runtime
   "still reachable" block `test_construction` also shows, not a leak
   in `Ropes` itself).
-- **Phase 3:** `Slice`, `Insert`, `Delete`, comparison operators.
+- **Phase 3 [done]:** `Slice`, `Insert`, `Delete`, the five comparison
+  operators. Implementation shares two new internal helpers with each
+  other and with `Element`: `Fetch` (extracted from `Element`'s
+  former nested function, now also used by `Compare`) and
+  `Node_Slice` (Rope.Mod's `SubstrHelper`, 0-based internally, with a
+  whole-node sharing shortcut extended to leaves too — a strict
+  improvement over `Rope.Mod`, which only takes that shortcut for a
+  `Concat`). `Insert`/`Delete` are themselves both implemented as one-
+  or two-line compositions of `Slice` and `"&"` (matching `Rope.Mod`'s
+  own `Insert`/`Remove`, which are `Substring` + `Cat` compositions),
+  not hand-rolled tree surgery. `Delete`'s `Through`-past-the-end
+  clamp and `Slice`'s `High`-past-the-end `Index_Error` are
+  deliberately different (see "Access and slicing"/`ropes.ads`'s
+  `Delete` comment for why — `Ada.Strings.Unbounded.Delete` and
+  `.Slice` themselves differ the same way). `test/test_slice.adb` (8
+  checks), `test_insert.adb` (8), `test_delete.adb` (9), and
+  `test_compare.adb` (13) — 38 checks total, translated from
+  `RopeTest.Mod`'s `CheckSubstring`/`CheckInsert`/`CheckRemove`/the
+  `Compare`/`Equal` half of `CheckCompareFindRepeat` — all pass,
+  valgrind-clean. Several `Rope.Mod` clamp-cases had no direct
+  translation at all (a negative `Low`/`Before`/`From`), since those
+  parameters are `Positive` — not a differently-handled case, just not
+  a representable call; each test file's header comment says so.
+  `examples/rope_tool` gained `slice`/`insert`/`delete`/`cmp` in this
+  phase too — see "Command-line tool (rope_tool)" above.
 - **Phase 4:** `Index` (both overloads, both directions), all four
   `Split` overloads (`Rope`/`String`/`Character`/`Character_Set`).
 - **Phase 5:** `Cursor` + `Iterable` aspect; confirm `for Ch of R loop`

@@ -74,4 +74,145 @@ package body Rope_Tool_Args is
          return False;
    end Fetch_Argument_Handler;
 
+   --  --- slice S LOW HIGH ---
+
+   Slice_Count : Natural := 0;
+   Slice_S     : Rope;
+   Slice_Low   : Positive;
+
+   function Slice_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Slice_Count is
+         when 0 =>
+            Slice_S := From_String (Arg);
+
+         when 1 =>
+            Slice_Low := Positive'Value (Arg);
+
+         when 2 =>
+            Put_Line (To_String (Slice (Slice_S, Slice_Low, Natural'Value (Arg))));
+
+         when others =>
+            null;
+      end case;
+      Slice_Count := Slice_Count + 1;
+      return True;
+   exception
+      when Constraint_Error        =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Index_Error =>
+         --  Not necessarily Arg itself at fault -- LOW or HIGH, set on
+         --  an earlier call, could be the one out of range.
+         Put_Line (Standard_Error, "Error: LOW/HIGH out of range");
+         Set_Exit_Status (Failure);
+         return False;
+   end Slice_Argument_Handler;
+
+   --  --- insert S BEFORE INS ---
+
+   Insert_Count  : Natural := 0;
+   Insert_S      : Rope;
+   Insert_Before : Positive;
+
+   function Insert_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Insert_Count is
+         when 0 =>
+            Insert_S := From_String (Arg);
+
+         when 1 =>
+            Insert_Before := Positive'Value (Arg);
+
+         when 2 =>
+            Put_Line (To_String (Insert (Insert_S, Insert_Before, From_String (Arg))));
+
+         when others =>
+            null;
+      end case;
+      Insert_Count := Insert_Count + 1;
+      return True;
+   exception
+      when Constraint_Error        =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Index_Error =>
+         --  Not necessarily Arg itself at fault -- BEFORE, set on an
+         --  earlier call, could be the one out of range.
+         Put_Line (Standard_Error, "Error: BEFORE out of range");
+         Set_Exit_Status (Failure);
+         return False;
+   end Insert_Argument_Handler;
+
+   --  --- delete S FROM THROUGH ---
+
+   Delete_Count : Natural := 0;
+   Delete_S     : Rope;
+   Delete_From  : Positive;
+
+   function Delete_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Delete_Count is
+         when 0 =>
+            Delete_S := From_String (Arg);
+
+         when 1 =>
+            Delete_From := Positive'Value (Arg);
+
+         when 2 =>
+            Put_Line (To_String (Delete (Delete_S, Delete_From, Natural'Value (Arg))));
+
+         when others =>
+            null;
+      end case;
+      Delete_Count := Delete_Count + 1;
+      return True;
+   exception
+      when Constraint_Error        =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Index_Error =>
+         --  Not necessarily Arg itself at fault -- FROM, set on an
+         --  earlier call, could be the one out of range.
+         Put_Line (Standard_Error, "Error: FROM out of range");
+         Set_Exit_Status (Failure);
+         return False;
+   end Delete_Argument_Handler;
+
+   --  --- cmp A B ---
+   --  Ropes has no public Compare function (see PLAN.md's
+   --  "Comparison"): built here from "="/"<" instead, same as any
+   --  other Ropes client would have to.
+
+   Cmp_Count : Natural := 0;
+   Cmp_A     : Rope;
+
+   function Cmp_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      if Cmp_Count = 0 then
+         Cmp_A := From_String (Arg);
+      elsif Cmp_Count = 1 then
+         declare
+            Cmp_B : constant Rope := From_String (Arg);
+         begin
+            if Cmp_A = Cmp_B then
+               Put_Line ("0");
+            elsif Cmp_A < Cmp_B then
+               Put_Line ("-1");
+            else
+               Put_Line ("1");
+            end if;
+         end;
+      end if;
+      Cmp_Count := Cmp_Count + 1;
+      return True;
+   end Cmp_Argument_Handler;
+
 end Rope_Tool_Args;

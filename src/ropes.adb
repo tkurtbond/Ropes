@@ -316,6 +316,93 @@ package body Ropes is
    end Balance;
 
    ------------------------------------------------------------------
+   --  Node-level helpers shared by several public operations below.
+   ------------------------------------------------------------------
+
+   --  N must be non-null and I in 1 .. N.Len.
+   function Fetch (N : Node_Access; I : Positive) return Character is
+   begin
+      case N.Kind is
+         when Leaf_Kind =>
+            return N.Chars (I);
+
+         when Concat_Kind =>
+            if I <= N.Left.Len then
+               return Fetch (N.Left, I);
+            else
+               return Fetch (N.Right, I - N.Left.Len);
+            end if;
+      end case;
+   end Fetch;
+
+   --  Rope.Mod's SubstrHelper: the (0-based) slice N (Start .. Start +
+   --  Len - 1). Precondition: N /= null, Len > 0, Start + Len <=
+   --  N.Len. N is borrowed; the result is a fresh owned reference --
+   --  sharing N itself (via Incr_Ref, no copy) when the requested
+   --  range is the whole of N, at any node kind (Rope.Mod only takes
+   --  this shortcut for a Concat node, always copying a Leaf even for
+   --  its own full range; sharing it too is a strict improvement, not
+   --  a scope change, since a Rope leaf is just as immutable).
+   function Node_Slice (N : Node_Access; Start, Len : Natural) return Node_Access is
+   begin
+      if Start = 0 and then Len = N.Len then
+         Incr_Ref (N);
+         return N;
+      end if;
+      case N.Kind is
+         when Leaf_Kind =>
+            return New_Leaf (N.Chars (N.Chars'First + Start .. N.Chars'First + Start + Len - 1));
+
+         when Concat_Kind =>
+            if Start >= N.Left.Len then
+               return Node_Slice (N.Right, Start - N.Left.Len, Len);
+            elsif Start + Len <= N.Left.Len then
+               return Node_Slice (N.Left, Start, Len);
+            else
+               declare
+                  Left_Part  : Node_Access          := Node_Slice (N.Left, Start, N.Left.Len - Start);
+                  Right_Part : Node_Access          := Node_Slice (N.Right, 0, Start + Len - N.Left.Len);
+                  Result     : constant Node_Access := New_Simple_Cat (Left_Part, Right_Part);
+               begin
+                  Decr_Ref (Left_Part);
+                  Decr_Ref (Right_Part);
+                  return Result;
+               end;
+            end if;
+      end case;
+   end Node_Slice;
+
+   --  Rope.Mod's Compare: <0, 0 or >0, like strcmp -- lexicographic by
+   --  character, then by length. Left and Right are borrowed
+   --  (possibly null).
+   function Compare (Left, Right : Node_Access) return Integer is
+      L_Len : constant Natural := (if Left = null then 0 else Left.Len);
+      R_Len : constant Natural := (if Right = null then 0 else Right.Len);
+   begin
+      for I in 1 .. Natural'Min (L_Len, R_Len) loop
+         declare
+            LC : constant Character := Fetch (Left, I);
+            RC : constant Character := Fetch (Right, I);
+         begin
+            if LC /= RC then
+               if LC < RC then
+                  return -1;
+               else
+                  return 1;
+               end if;
+            end if;
+         end;
+      end loop;
+      if L_Len = R_Len then
+         return 0;
+      elsif L_Len < R_Len then
+         return -1;
+      else
+         return 1;
+      end if;
+   end Compare;
+
+   ------------------------------------------------------------------
    --  Public API.
    ------------------------------------------------------------------
 
@@ -377,21 +464,6 @@ package body Ropes is
    end To_String;
 
    function Element (Source : Rope; Index : Positive) return Character is
-      function Fetch (N : Node_Access; I : Positive) return Character is
-      begin
-         case N.Kind is
-            when Leaf_Kind =>
-               return N.Chars (I);
-
-            when Concat_Kind =>
-               if I <= N.Left.Len then
-                  return Fetch (N.Left, I);
-               else
-                  return Fetch (N.Right, I - N.Left.Len);
-               end if;
-         end case;
-      end Fetch;
-
       D : constant Node_Access := Data_Of (Source);
    begin
       if D = null or else Index > D.Len then
@@ -399,5 +471,49 @@ package body Ropes is
       end if;
       return Fetch (D, Index);
    end Element;
+
+   function Slice (Source : Rope; Low : Positive; High : Natural) return Rope is
+      D   : constant Node_Access := Data_Of (Source);
+      Len : constant Natural     := (if D = null then 0 else D.Len);
+   begin
+      if Low - 1 > Len or else High > Len then
+         raise Ada.Strings.Index_Error;
+      end if;
+      if High < Low then
+         return Null_Rope;
+      end if;
+      return Wrap (Node_Slice (D, Low - 1, High - Low + 1));
+   end Slice;
+
+   function Insert (Source : Rope; Before : Positive; New_Item : Rope) return Rope is
+      Len : constant Natural := Length (Source);
+   begin
+      if Before - 1 > Len then
+         raise Ada.Strings.Index_Error;
+      end if;
+      return Slice (Source, 1, Before - 1) & New_Item & Slice (Source, Before, Len);
+   end Insert;
+
+   function Delete (Source : Rope; From : Positive; Through : Natural) return Rope is
+      Len : constant Natural := Length (Source);
+   begin
+      if From > Through then
+         return Source;
+      end if;
+      if From - 1 > Len then
+         raise Ada.Strings.Index_Error;
+      end if;
+      return Slice (Source, 1, From - 1) & Slice (Source, Natural'Min (Through, Len) + 1, Len);
+   end Delete;
+
+   function "=" (Left, Right : Rope) return Boolean is (Compare (Data_Of (Left), Data_Of (Right)) = 0);
+
+   function "<" (Left, Right : Rope) return Boolean is (Compare (Data_Of (Left), Data_Of (Right)) < 0);
+
+   function "<=" (Left, Right : Rope) return Boolean is (Compare (Data_Of (Left), Data_Of (Right)) <= 0);
+
+   function ">" (Left, Right : Rope) return Boolean is (Compare (Data_Of (Left), Data_Of (Right)) > 0);
+
+   function ">=" (Left, Right : Rope) return Boolean is (Compare (Data_Of (Left), Data_Of (Right)) >= 0);
 
 end Ropes;

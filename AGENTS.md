@@ -8,31 +8,32 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**Phase 1 and 2 done** (see `PLAN.md`'s phased plan): `Rope`/`Node`/
+**Phases 1-3 done** (see `PLAN.md`'s phased plan): `Rope`/`Node`/
 `Rope_Ref` skeleton, refcounting, `Null_Rope`, `Length`, `Is_Empty`,
 `"&"` (short-leaf merge plus depth-triggered auto-rebalance —
 `Balance`/`Balance_Insert`/`Balance_Walk`/`Concat_Forest`, the
-Fibonacci-forest algorithm), `From_String`/`To_String`, `Element`.
-`src/ropes.ads`/`.adb` exist and build; `test/test_construction.adb`
-(19 checks) and `test/test_balance.adb` (5 checks) both pass clean,
+Fibonacci-forest algorithm), `From_String`/`To_String`, `Element`,
+`Slice`, `Insert`, `Delete`, and the five comparison operators
+(`"="`/`"<"`/`"<="`/`">"`/`">="`). `src/ropes.ads`/`.adb` exist and
+build; `test/test_construction.adb` (19), `test_balance.adb` (5),
+`test_slice.adb` (8), `test_insert.adb` (8), `test_delete.adb` (9),
+and `test_compare.adb` (13) — 62 checks total — all pass clean,
 including under valgrind. `Balance`/`Max_Depth`/`Min_Length` are
 internal to `ropes.adb`, not public — `src/ropes-test_support.ads`/
 `.adb` is a small test-only child package (`function Depth`) so tests
 can confirm depth stays bounded without adding `Depth` to the real
 public API. Work through the remaining phases in order — each gets
-its own tests before moving to the next. Don't skip ahead to a later
-phase's API surface (`Slice`/`Index`/`Split`/iteration/etc.) — Phase
-2's balancing is what makes all of it safe to build on (`Cat`/
-`Balance` actually bounding tree depth).
+its own tests before moving to the next.
 
 `examples/rope_tool` (the Ada port of `RopeTool.Mod`, built on
-`arg_parser` — see `PLAN.md`'s "Command-line tool (rope_tool)")
-currently has `cat`/`len`/`fetch`, matching Phase 1's API — Phase 2
-added no new public `Ropes` operation, so `rope_tool` didn't grow this
-phase either (`"&"`'s rebalancing is transparent to `cat`, already
-exercised). Add a `rope_tool` subcommand in the same phase that adds
-its underlying `Ropes` operation — never a stub ahead of the operation
-existing.
+`arg_parser` — see `PLAN.md`'s "Command-line tool (rope_tool)") has
+`cat`/`len`/`fetch`/`slice`/`insert`/`delete`/`cmp`, matching Phases
+1-3's API (`cmp` is built from `"="`/`"<"` in `rope_tool_args.adb`
+itself, since `Ropes` has no public `Compare` function to wrap — see
+PLAN.md's "Comparison"). Add a `rope_tool` subcommand in the same
+phase that adds its underlying `Ropes` operation — never a stub ahead
+of the operation existing, and don't let `rope_tool` drift behind
+`Ropes`'s current surface from one phase to the next.
 
 ## Source material
 

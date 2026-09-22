@@ -7,13 +7,13 @@
 --  PLAN.md for the full design rationale and AGENTS.md for house
 --  conventions specific to this codebase.
 --
---  This is Phase 1+2 of PLAN.md's phased implementation plan: the
+--  This is Phase 1+2+3 of PLAN.md's phased implementation plan: the
 --  Rope/Node skeleton, reference counting, the smallest useful slice
 --  of the API (Length, Is_Empty, "&", From_String/To_String,
---  Element), and "&"'s automatic depth-bounded rebalancing.
---  Slice/Insert/Delete, comparison, search, split, iteration, and
---  case mapping are later phases -- see PLAN.md before adding to this
---  package.
+--  Element), "&"'s automatic depth-bounded rebalancing, and now
+--  Slice/Insert/Delete plus the five comparison operators. Search,
+--  split, iteration, and case mapping are later phases -- see
+--  PLAN.md before adding to this package.
 --
 --  A Rope is an immutable value: every operation returns a new Rope
 --  rather than modifying an existing one, so Ropes may be freely
@@ -57,6 +57,43 @@ package Ropes is
 
    function Element (Source : Rope; Index : Positive) return Character;
    --  Raises Ada.Strings.Index_Error if Index > Length (Source).
+
+   function Slice (Source : Rope; Low : Positive; High : Natural) return Rope;
+   --  The slice at positions Low through High, inclusive -- matches
+   --  Ada.Strings.Unbounded.Slice exactly, including its edge cases:
+   --  Null_Rope (not an error) if High < Low, even if Low = Length
+   --  (Source) + 1; raises Ada.Strings.Index_Error if Low - 1 >
+   --  Length (Source) or High > Length (Source). Rope.Mod's
+   --  Substring (start, len), but with inclusive 1-based Low/High
+   --  instead of a 0-based (start, len) pair, and Index_Error instead
+   --  of clamping -- see PLAN.md's "Access and slicing".
+
+   function Insert (Source : Rope; Before : Positive; New_Item : Rope) return Rope;
+   --  Source with New_Item spliced in just before index Before.
+   --  Raises Ada.Strings.Index_Error if Before - 1 > Length (Source)
+   --  -- Before = Length (Source) + 1 (append) is valid, matching
+   --  Ada.Strings.Unbounded.Insert. Rope.Mod's Insert, unclamped.
+
+   function Delete (Source : Rope; From : Positive; Through : Natural) return Rope;
+   --  Source with the characters from From through Through, inclusive,
+   --  removed. Source unchanged (not an error) if Through < From, even
+   --  if From is out of range; a Through past the end is clamped to
+   --  Length (Source) (also not an error). Raises
+   --  Ada.Strings.Index_Error only if From <= Through and From - 1 >
+   --  Length (Source) -- matches Ada.Strings.Unbounded.Delete exactly.
+   --  Rope.Mod's Remove, unclamped except where Ada.Strings.Unbounded
+   --  itself still clamps (Through past the end).
+
+   function "=" (Left, Right : Rope) return Boolean;
+   function "<" (Left, Right : Rope) return Boolean;
+   function "<=" (Left, Right : Rope) return Boolean;
+   function ">" (Left, Right : Rope) return Boolean;
+   function ">=" (Left, Right : Rope) return Boolean;
+   --  Lexicographic, character by character, then by length on a
+   --  common prefix -- Rope.Mod's Compare/Equal, exposed as the
+   --  standard operators instead of a -1/0/1 function. "=" replaces
+   --  the predefined (pointer-identity-based) equality that a private
+   --  type wrapping a Controlled component would otherwise get.
 
 private
 

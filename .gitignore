@@ -3,6 +3,10 @@ lib/
 test/obj/
 test/test_construction
 test/test_balance
+test/test_slice
+test/test_insert
+test/test_delete
+test/test_compare
 examples/obj/
 examples/rope_tool
 

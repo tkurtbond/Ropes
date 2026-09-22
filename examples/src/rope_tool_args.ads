@@ -33,6 +33,18 @@ package Rope_Tool_Args is
    --  --- fetch S I --- (I is 1-based, unlike RopeTool.Mod's 0-based Fetch)
    function Fetch_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
+   --  --- slice S LOW HIGH --- (1-based inclusive, unlike RopeTool.Mod's sub S START LEN)
+   function Slice_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- insert S BEFORE INS --- (1-based, unlike RopeTool.Mod's insert S POS INS)
+   function Insert_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- delete S FROM THROUGH --- (1-based inclusive, unlike RopeTool.Mod's remove S POS LEN)
+   function Delete_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- cmp A B --- (built from "="/"<" -- Ropes has no public Compare function; see PLAN.md's "Comparison")
+   function Cmp_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
    Commands : aliased Command_Array :=
      [Make_Command
        ("cat",
@@ -45,6 +57,26 @@ package Rope_Tool_Args is
        ("fetch",
         Make_Parser
           (Description => "fetch S I  Print the character of S at index I (1-based).", Handler => Fetch_Argument_Handler'Access,
+           Options     => null)),
+     Make_Command
+       ("slice",
+        Make_Parser
+          (Description => "slice S LOW HIGH  Print the slice of S from LOW through HIGH, inclusive (1-based).",
+           Handler     => Slice_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("insert",
+        Make_Parser
+          (Description => "insert S BEFORE INS  Print S with INS inserted before index BEFORE (1-based).",
+           Handler     => Insert_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("delete",
+        Make_Parser
+          (Description => "delete S FROM THROUGH  Print S with FROM through THROUGH removed, inclusive (1-based).",
+           Handler     => Delete_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("cmp",
+        Make_Parser
+          (Description => "cmp A B  Print -1, 0 or 1: how A compares to B.", Handler => Cmp_Argument_Handler'Access,
            Options     => null))];
 
    Main_Parser : Parser :=
