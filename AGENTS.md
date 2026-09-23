@@ -8,9 +8,9 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-11, Phases
-7-8 and 11 stretch phases and Phases 9-10 not really `Ada`-side changes
-— see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-12, Phases
+7-8 and 11 stretch phases and Phases 9-10 and 12 not really `Ada`-side
+changes — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
 depth-triggered auto-rebalance — `Balance`/`Balance_Insert`/
 `Balance_Walk`/`Concat_Forest`, the Fibonacci-forest algorithm), plus
@@ -173,7 +173,33 @@ comparison as an oracle.
 `examples/tests/run-tests.sh` gained an `input FILE` fixture line
 (standard input for the program, default `/dev/null`) for `lines -`
 — the one change to the harness since it was ported, since the
-original has no way to feed a program input at all.
+original then had no way to feed a program input at all (Phase 12 gave
+it the same line).
+
+**Phase 12 fed Phase 11 back into `Rope.Mod`, like Phase 9 did for
+Phase 8 — nothing under `src/`/`test/`/`examples/` changed for it
+except one stale harness comment.** At explicit user request,
+`~/Repos/Oberon/oberon-tools` (commit `eb449c2`) gained `IterateChunks`
+(`Process_Chunks`, as a Boolean-returning `ChunkVisitor` to match
+`Rope.Mod`'s own `Visitor`/`Visitor2` early-stop convention),
+`Write`/`WriteRider` and `ReadLine`/`ReadLineRider` (`Ropes.Text_IO`,
+translated: `Files.Rider`-based rather than `Files.File`-based, since
+the Rider is what carries the position in Oberon's `Files` — a
+`File` variant would have had to invent a position policy — and
+Boolean-returning reads, since Oberon has no exceptions to raise at
+end of input), and the linear `Compare`. Two voc facts shaped it,
+both confirmed by experiment rather than assumed: **voc's `Out` never
+flushes at program exit** (anything after the last line feed is
+silently lost, so `Write` ends with `Out.Flush`), and **`Out.String`
+stops at 0X** (leaves have no terminator and may contain 0X, so
+`Write` goes through `Out.Char`, and `WriteRider` through
+`Files.WriteBytes`). The backport also found `RopeTool`'s own version
+of the bug Phase 11 fixed here: it printed through `ToString` into an
+`ArgParser.MaxStringLength` (4095) buffer, silently truncating longer
+results — Oberon's fixed buffers cut short where Ada's stack copy
+overflowed. `RopeTest.Mod` 167 → 186 checks; `oberon-tools`' suite
+`302 ok, 0 failed`. The Oberon `ArgParser` already passed a bare `-`
+through, so its `lines -` never needed the `-- -` workaround.
 
 **`"*"` is a real find, not in the original design sketch**: `Rope.Mod`'s
 `Repeat`/`Make` were originally sketched as functions of those names,

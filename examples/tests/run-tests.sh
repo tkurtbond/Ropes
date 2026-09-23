@@ -44,8 +44,9 @@
 # rope-unknown-command.test's exact wording, which is Arg_Parser's own
 # Usage/error text, not ArgParser's). One addition since the port: the
 # "input" line, added at Phase 11 for rope_tool's "lines -" (the
-# original has no way to feed a program standard input, and ran it with
-# the harness's own).
+# original then had no way to feed a program standard input, and ran it
+# with the harness's own; Phase 12 added the same line back to the
+# original, in oberon-tools eb449c2).
 
 verbose=0
 show=0

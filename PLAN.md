@@ -1479,9 +1479,69 @@ parameter's type.
   the full usage text). `run-tests.sh` gained an `input FILE` line
   (the program's standard input, default `/dev/null` so nothing can
   hang on the terminal) — its one change since being ported, since the
-  original has no way to feed a program input. `41 ok, 0 failed`. A
+  original then had no way to feed a program input (Phase 12 gave it
+  the same line). `41 ok, 0 failed`. A
   fixture for the 20-million-character case would need 20 MB of
   expected output, so that case lives in `test_text_io.adb`.
+
+- **Phase 12, done — not an `Ada`-side change.** Phase 11's
+  additions fed back into `~/Repos/Oberon/oberon-tools/Rope.Mod`, at
+  explicit user request, the same way Phase 9 fed back Phase 8's — and,
+  like Phase 9, translated into `Rope.Mod`'s own conventions rather
+  than copied. `IterateChunks (r, visit)` is `Process_Chunks`, but with
+  a Boolean-returning `ChunkVisitor = PROCEDURE (VAR chunk: ARRAY OF
+  CHAR): BOOLEAN` for early stop, matching `Rope.Mod`'s existing
+  `Visitor`/`Visitor2` rather than `Ada.Containers`' no-early-stop
+  shape; `chunk` is `VAR` only to avoid copying the leaf, documented
+  as must-not-modify. `Write (r)` (standard output) and `WriteRider
+  (VAR w: Files.Rider; r)` are `Put`; `ReadLine (VAR line): BOOLEAN`
+  and `ReadLineRider (VAR rd: Files.Rider; VAR line): BOOLEAN` are
+  `Get_Line`, returning FALSE only at end of input (Oberon has no
+  exceptions, so `End_Error` becomes a result), reading 4096
+  characters at a time. Rider-based, not `Files.File`-based: in
+  Oberon's `Files` the Rider carries the position, so a `File` variant
+  would have had to pick one (overwrite from the start? append?) on
+  the caller's behalf, where a caller wanting to append can just
+  `Files.Set (w, f, Files.Length (f))` first. `Compare` got the same
+  explicit-stack leaf walk as here (`LeafWalk`/`StartWalk`/`NextLeaf`;
+  Oberon-2 has no array-slice comparison, so it compares character by
+  character within each run — still O(1) per character).
+
+  Two voc facts, each confirmed with a throwaway program rather than
+  assumed from the documentation: `Out` buffers until a line feed and
+  **never flushes at program exit**, so output after the last line
+  feed is silently lost — `Write` ends with `Out.Flush`; and
+  `Out.String` stops at the first 0X, while leaves have no terminator
+  and may contain 0X — so `Write` uses `Out.Char` (buffered by `Out`)
+  and `WriteRider` uses `Files.WriteBytes` directly on each leaf's
+  `chars^`. The backport also turned up `RopeTool`'s own counterpart
+  of the bug Phase 11 fixed here: its `PrintRope` went through
+  `ToString` into an `ArgParser.MaxStringLength` (4095) buffer, so
+  `RopeTool make 5000 x` printed only 4095 `x`s — Oberon's fixed
+  buffers truncated silently where Ada's stack copy overflowed loudly.
+  All 18 print sites now use `Rope.Write`; a new
+  `tests/rope-make-long.test` fails against the pre-Phase-12 build.
+
+  `RopeTool.Mod` gained `lines FILE` (standard input for `-`; the
+  Oberon `ArgParser` already passed a bare `-` through, so no `-- -`
+  workaround was ever needed there). `RopeTest.Mod` gained 19 checks
+  (167 → 186): `IterateChunks` (including a chunk containing 0X, passed
+  whole), `Compare` across two different leaf chunkings against
+  Oberon's own string comparison as the oracle (the same scenario as
+  `test_compare.adb`'s), and `WriteRider`/`ReadLineRider` round trips
+  through an unregistered `Files.New` file around the 4096 boundary.
+  `tests/run-tests.sh` gained this repo's `input FILE` line;
+  `rope-lines`/`rope-lines-stdin`/`rope-lines-missing` share
+  `examples/tests/data/lines.txt` with this repo's own `lines`
+  fixtures; `rope-selftest`/`rope-help`/`rope-unknown-command`
+  regenerated from real runs. `302 ok, 0 failed`; committed and pushed
+  as `eb449c2`. Here, only `examples/tests/run-tests.sh`'s header
+  comment changed (it said the original harness "has no way to feed a
+  program standard input", no longer true). Not carried back:
+  `Rope.Mod`'s `Blit` and `Escaped` still `Fetch` per character
+  (O(n log n)) — neither exists in the Ada port in that form, so there
+  was nothing to port — and `RopeTool` has no subcommand for
+  `WriteRider`, which only `RopeTest` covers.
 
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds
