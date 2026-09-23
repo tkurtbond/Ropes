@@ -963,6 +963,8 @@ parameter's type.
   a plain verb, matching `Trim`/`Capitalize`'s own naming pattern in
   this package.
 - A lazy/early-stopping `Split` iterator (see "Splitting" above).
+  **[Phase 8, done]**: the Process-callback `Split` overloads restore
+  `Rope.Mod`'s own dropped `Visitor` form — see "Splitting" above.
 - Wider-than-`Natural` length type for ropes over ~2×10⁹ characters
   (see the open question below).
 
