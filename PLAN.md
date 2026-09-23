@@ -1549,7 +1549,9 @@ parameter's type.
   `Rope.Mod`'s `Blit` and `Escaped` still `Fetch` per character
   (O(n log n)) — neither exists in the Ada port in that form, so there
   was nothing to port — and `RopeTool` has no subcommand for
-  `WriteRider`, which only `RopeTest` covers.
+  `WriteRider`, which only `RopeTest` covers. **[Phase 14, done]**:
+  `Blit` and `Escaped` made linear there too, `Escaped` renamed
+  `Escape` — see Phase 14 below.
 
 - **Phase 13 (stretch), done — whole-file I/O, in both `Ropes` and
   `Rope.Mod`.** At explicit user request. Motivation: loading a whole
@@ -1614,6 +1616,33 @@ parameter's type.
   three fixtures share `exact.bin`/`empty.txt` and give byte-identical
   expected output to this repo's. `oberon-tools`' suite `305 ok, 0
   failed`; committed and pushed there as `d4b154b`.
+
+- **Phase 14, done — not an `Ada`-side change.** At explicit user
+  request, `~/Repos/Oberon/oberon-tools/Rope.Mod`'s two remaining
+  per-character-`Fetch` operations, left alone at Phase 12 because
+  neither had an Ada counterpart in that form to port, were made
+  linear, and `Escaped` was renamed `Escape` — a verb, like every other
+  operation there, and the name this port already gave it at Phase 7
+  (see "Deferred / stretch" and `ropes.ads`'s own comment). `Blit`
+  now descends only into the subtrees overlapping the requested range
+  and copies straight out of each leaf, O(len + depth); `Escape` walks
+  the leaves and builds its result a 4096-character buffer at a time
+  instead of a `Fetch` and a `Cat` per character. Together ~0.77 s →
+  ~0.01 s on a million-character rope. No `Escaped` alias was kept,
+  since nothing outside `oberon-tools` called it; `RopeTool`'s
+  `escaped` *command* keeps its name, as this repo's `rope_tool` and
+  both repos' fixtures use it. `RopeTest.Mod` 195 → 199 checks,
+  covering what the old one-leaf checks couldn't: `Blit` over every
+  start and length across leaf boundaries (with sentinels either side,
+  catching one-too-many as well as wrong characters), and `Escape` of
+  every escape kind — including the `\NNN` form, previously untested
+  there — checked by the per-character property (escaping n copies of
+  a piece gives n copies of its escape) with leaf boundaries falling
+  mid-escape and output well past the buffer. `oberon-tools`' suite
+  `305 ok, 0 failed`; committed and pushed there as `a41f0a7`. Here,
+  only `ropes.ads`'s `Escape` comment changed (it described
+  `Rope.Mod`'s name as `Escaped`, and printing via its since-removed
+  `PrintRope`).
 
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds

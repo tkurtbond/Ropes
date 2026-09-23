@@ -360,15 +360,16 @@ package Ropes is
    --  return replaced by their two-character backslash escapes, and
    --  any other non-printable character (Character'Pos < 32 or >= 127)
    --  replaced by a backslash followed by its three-digit decimal code
-   --  -- Rope.Mod's Escaped, renamed: Ada string *literals* have no
+   --  -- Rope.Mod's Escaped, renamed (and renamed Escape in Rope.Mod
+   --  too, at Phase 14; see PLAN.md): Ada string *literals* have no
    --  backslash-escape syntax at all (quote-doubling is the only
    --  escape Ada source has), so this is purely a debug/display
    --  convenience, not anything resembling Ada literal syntax.
    --  "Escape" reads as a verb, matching Trim/Capitalize's own naming,
    --  without "Escaped"'s passive-participle ambiguity or a
    --  "To_..._String"-shaped name implying a String result -- this
-   --  still returns a Rope, printable as-is via To_String, same as
-   --  Rope.Mod's Escaped before its own caller's PrintRope.
+   --  still returns a Rope, printed like any other (rope_tool uses
+   --  Ropes.Text_IO.Put_Line, RopeTool.Mod uses Rope.Write).
 
 private
 

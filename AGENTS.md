@@ -8,9 +8,9 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-13, Phases
-7-8, 11 and 13 stretch phases and Phases 9-10 and 12 not really `Ada`-side
-changes — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-14, Phases
+7-8, 11 and 13 stretch phases and Phases 9-10, 12 and 14 not really
+`Ada`-side changes — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
 depth-triggered auto-rebalance — `Balance`/`Balance_Insert`/
 `Balance_Walk`/`Concat_Forest`, the Fibonacci-forest algorithm), plus
@@ -217,6 +217,12 @@ cord's own `cordxtra.c`, not assumed) — that is what Phase 13 adds;
 genuinely file-backed ropes (`CORD_from_file`/`_lazy`) stay out of
 scope. **When a scope list groups things, check each member against
 the source before treating the whole group as ruled out.**
+
+**Phase 14 made `Rope.Mod`'s `Blit` and `Escaped` linear and renamed
+`Escaped` to `Escape`** (`oberon-tools` `a41f0a7`) — the two
+per-character-`Fetch` operations Phase 12 had left alone there. Only
+`ropes.ads`'s `Escape` comment changed here. See `PLAN.md`'s Phase 14
+entry.
 
 **`"*"` is a real find, not in the original design sketch**: `Rope.Mod`'s
 `Repeat`/`Make` were originally sketched as functions of those names,
