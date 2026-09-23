@@ -1317,6 +1317,45 @@ rather than one big test file added at the end. Each phase also adds
 the matching `rope_tool` subcommand(s) — see "Command-line tool
 (rope_tool)" above for the current/planned mapping.
 
+## Remaining scope, as of Phase 8
+
+Everything in "Deferred / stretch" above is now done — Phase 7 closed
+out the rest of "Construction and concatenation" plus `Escape`, and
+Phase 8 added `Overwrite`/`Head`/`Tail`, `Contains`, and the
+Process-callback `Split`. What's left, gathered in one place for
+whichever future phase picks it up, rather than left scattered across
+"What's explicitly out of scope (v1)" and "Open questions" above:
+
+- **Cord/paper features never in `Rope.Mod`'s own scope to begin
+  with** (see "What's explicitly out of scope (v1)" above — this plan
+  has never targeted them, not even as a stretch item): lazy/
+  function-generator leaves (cord's `CORD_from_fn`), lazy substring
+  nodes (`Slice` always copies here, matching `Rope.Mod`'s own
+  `Substring`), file-backed ropes (`CORD_from_file`/`_lazy`/`_eager`),
+  `CORD_printf`-style formatting. `PLAN.md` suggests a separate
+  `Ropes.Lazy` child package if a real need for any of these shows up
+  — none are on any phase's list, and adding them would be a bigger
+  step than Phase 8's scope-expansion (matching cord's fuller surface,
+  not just `Unbounded_String`'s).
+- **Refcount task-safety.** Plain `Natural`, not atomic — same default
+  as `Ada.Strings.Unbounded` and most `Ada.Containers` types. Only
+  matters if `Rope` values need to be copied/dropped concurrently from
+  multiple tasks without external synchronization; revisit if that
+  becomes a real requirement, not speculatively.
+- **`Natural`-bounded length** (~2.1×10⁹ characters). Matches
+  `Unbounded_String`'s own ceiling, so not a new limitation versus
+  what's already in this codebase — but in some tension with "scales
+  past what a flat array handles well" being ropes' whole point. A
+  wider `Rope_Length` type is the alternative, never seriously
+  pursued; `test_repeat.adb`'s overflow-guard check already confirms
+  the current `Natural` ceiling raises `Ada.Strings.Length_Error`
+  cleanly rather than wrapping, so this is a scaling question, not a
+  correctness gap.
+
+No phase is currently planned for any of these — they're recorded here
+so a future session doesn't have to re-derive "what's actually left"
+from three different sections of this file.
+
 ## Testing approach
 
 Mirrors `alibfyaml`'s `test/` convention (see its `AGENTS.md`): one
