@@ -1613,7 +1613,7 @@ parameter's type.
   0X surviving `ReadAll`); `RopeTool.Mod` gained `readfile FILE`, whose
   three fixtures share `exact.bin`/`empty.txt` and give byte-identical
   expected output to this repo's. `oberon-tools`' suite `305 ok, 0
-  failed`.
+  failed`; committed and pushed there as `d4b154b`.
 
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds
