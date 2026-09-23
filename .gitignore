@@ -27,3 +27,21 @@ examples/rope_tool
 *~
 .\#*
 \#*\#
+
+
+# Object file
+*.o
+
+# Ada Library Information
+*.ali
+
+# Unsightly droppings.
+*~
+.DS_Store
+.\#*
+.\#*
+.~
+.~*\#
+\#*\#
+\#*\#
+
