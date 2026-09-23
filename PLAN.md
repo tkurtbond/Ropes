@@ -1323,7 +1323,7 @@ parameter's type.
   rather than copied verbatim from `Ropes`'s Ada.Strings-flavored
   exception behavior — the same "translate the scenario, not the
   assertion" discipline this file's own "Sources being ported" section
-  states for the Ada→Oberon direction, applied in reverse. The Ada
+  states for the Oberon→Ada direction, applied in reverse. The Ada
   port's other Phase 7/8 additions did **not** make the trip back: the
   operator overloads and `From_Unbounded_String`/`To_Unbounded_String`
   have no Oberon-2 counterpart (no operator overloading, no unbounded
