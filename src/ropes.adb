@@ -397,27 +397,96 @@ package body Ropes is
       end case;
    end Node_Slice;
 
+   --  A left-to-right walk over a tree's leaves, one leaf per
+   --  Next_Leaf call, in amortized O(1) per leaf: a pre-order walk with
+   --  an explicit stack of subtrees still to visit (Right pushed before
+   --  Left, so Left comes off first). That stack never holds more than
+   --  Depth + 1 entries, and every concat node's Depth is set by
+   --  New_Concat, so Size => Root.Depth + 1 always suffices.
+   type Node_Stack is array (Positive range <>) of Node_Access;
+
+   type Leaf_Walk (Size : Positive) is record
+      Stack : Node_Stack (1 .. Size);
+      Top   : Natural := 0;
+   end record;
+
+   procedure Start_Walk (W : in out Leaf_Walk; Root : Node_Access) is
+   begin
+      W.Stack (1) := Root;
+      W.Top       := 1;
+   end Start_Walk;
+
+   --  Precondition: the walk has a leaf left to return.
+   procedure Next_Leaf (W : in out Leaf_Walk; Leaf : out Node_Access) is
+      N : Node_Access;
+   begin
+      loop
+         N     := W.Stack (W.Top);
+         W.Top := W.Top - 1;
+         exit when N.Kind = Leaf_Kind;
+         W.Stack (W.Top + 1) := N.Right;
+         W.Stack (W.Top + 2) := N.Left;
+         W.Top               := W.Top + 2;
+      end loop;
+      Leaf := N;
+   end Next_Leaf;
+
    --  Rope.Mod's Compare: <0, 0 or >0, like strcmp -- lexicographic by
    --  character, then by length. Left and Right are borrowed
    --  (possibly null).
+   --
+   --  Linear in the common prefix (since Phase 11): walks both ropes'
+   --  leaves in step, a run at a time, where a run is the longest
+   --  stretch lying within one leaf of each, and compares each run as a
+   --  single String slice (predefined String "=" and "<" are exactly
+   --  this character-by-character lexicographic order) -- not a Fetch
+   --  from the root per character, which was O(n log n). Identical
+   --  trees (one rope copied from the other, sharing its root) compare
+   --  equal in O(1).
    function Compare (Left, Right : Node_Access) return Integer is
-      L_Len : constant Natural := (if Left = null then 0 else Left.Len);
-      R_Len : constant Natural := (if Right = null then 0 else Right.Len);
+      L_Len  : constant Natural := (if Left = null then 0 else Left.Len);
+      R_Len  : constant Natural := (if Right = null then 0 else Right.Len);
+      Common : constant Natural := Natural'Min (L_Len, R_Len);
    begin
-      for I in 1 .. Natural'Min (L_Len, R_Len) loop
+      if Left = Right then
+         return 0;
+      end if;
+      if Common > 0 then
          declare
-            LC : constant Character := Fetch (Left, I);
-            RC : constant Character := Fetch (Right, I);
+            L_Walk         : Leaf_Walk (Left.Depth + 1);
+            R_Walk         : Leaf_Walk (Right.Depth + 1);
+            L_Leaf, R_Leaf : Node_Access;
+            L_Pos, R_Pos   : Positive := 1;  --  Next character within each leaf.
+            Remaining      : Natural  := Common;
          begin
-            if LC /= RC then
-               if LC < RC then
-                  return -1;
-               else
-                  return 1;
+            Start_Walk (L_Walk, Left);
+            Start_Walk (R_Walk, Right);
+            Next_Leaf (L_Walk, L_Leaf);
+            Next_Leaf (R_Walk, R_Leaf);
+            while Remaining > 0 loop
+               if L_Pos > L_Leaf.Len then
+                  Next_Leaf (L_Walk, L_Leaf);
+                  L_Pos := 1;
                end if;
-            end if;
+               if R_Pos > R_Leaf.Len then
+                  Next_Leaf (R_Walk, R_Leaf);
+                  R_Pos := 1;
+               end if;
+               declare
+                  Run : constant Positive := Natural'Min (Natural'Min (L_Leaf.Len - L_Pos + 1, R_Leaf.Len - R_Pos + 1), Remaining);
+                  L_Run : String renames L_Leaf.Chars (L_Pos .. L_Pos + Run - 1);
+                  R_Run : String renames R_Leaf.Chars (R_Pos .. R_Pos + Run - 1);
+               begin
+                  if L_Run /= R_Run then
+                     return (if L_Run < R_Run then -1 else 1);
+                  end if;
+                  L_Pos     := L_Pos + Run;
+                  R_Pos     := R_Pos + Run;
+                  Remaining := Remaining - Run;
+               end;
+            end loop;
          end;
-      end loop;
+      end if;
       if L_Len = R_Len then
          return 0;
       elsif L_Len < R_Len then
@@ -569,6 +638,31 @@ package body Ropes is
       Copy (Data_Of (Source));
       return Result;
    end To_String;
+
+   procedure Process_Chunks (Source : Rope; Process : not null access procedure (Chunk : String)) is
+      --  Rope has a controlled part, so it is passed by reference (RM
+      --  6.2): were Process to assign to the very variable passed as
+      --  Source, the tree could be freed mid-walk. Holding our own
+      --  reference for the duration pins it. O(1) -- a refcount bump.
+      Hold : constant Rope := Source;
+
+      procedure Walk (N : Node_Access) is
+      begin
+         if N = null then
+            return;
+         end if;
+         case N.Kind is
+            when Leaf_Kind =>
+               Process (N.Chars);
+
+            when Concat_Kind =>
+               Walk (N.Left);
+               Walk (N.Right);
+         end case;
+      end Walk;
+   begin
+      Walk (Data_Of (Hold));
+   end Process_Chunks;
 
    function From_Unbounded_String (Source : Ada.Strings.Unbounded.Unbounded_String) return Rope is
      (From_String (Ada.Strings.Unbounded.To_String (Source)));

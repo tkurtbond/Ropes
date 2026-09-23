@@ -31,7 +31,16 @@ construction (`From_String`, `From_Character`, `"&"`, `"*"`,
 `Overwrite`, `Head`, `Tail`), comparison (`=`, `<`, `<=`, `>`, `>=`),
 searching (`Index`, `Contains`), `Split` (array-returning or
 callback), `Trim`, `Map`/`Map_Indexed`, case conversion
-(`To_Upper`, `To_Lower`, `Capitalize`, `Uncapitalize`) and `Escape`.
+(`To_Upper`, `To_Lower`, `Capitalize`, `Uncapitalize`), `Escape`, and
+`Process_Chunks`, which hands each leaf to a callback so a rope can be
+written anywhere without flattening it.
+
+[`src/ropes-text_io.ads`](src/ropes-text_io.ads) (`Ropes.Text_IO`)
+adds `Put`, `Put_Line` and `Get_Line`, mirroring
+`Ada.Text_IO.Unbounded_IO`. Prefer them to `Put_Line (To_String (R))`:
+`To_String` builds its copy on the stack, so a large enough rope
+overflows it, while `Put` writes leaf by leaf and `Get_Line` reads a
+line of any length in chunks.
 
 ## Example
 
@@ -39,12 +48,13 @@ callback), `Trim`, `Map`/`Map_Indexed`, case conversion
 with Ada.Strings;
 with Ada.Text_IO; use Ada.Text_IO;
 with Ropes;       use Ropes;
+with Ropes.Text_IO;
 
 procedure Hello_Ropes is
    R : constant Rope := From_String ("Hello") & ", " & From_String ("world");
    S : constant Rope := Insert (R, Before => 8, New_Item => From_String ("big "));
 begin
-   Put_Line (To_String (S));                     --  Hello, big world
+   Ropes.Text_IO.Put_Line (S);                   --  Hello, big world
    Put_Line (Natural'Image (Length (S)));        --  16
    Put_Line (To_String (Slice (S, 8, 10)));      --  big
    Put_Line (Natural'Image (Index (S, 'o', Going => Ada.Strings.Backward)));  --  13
@@ -71,7 +81,7 @@ Build the library (a static library, `lib/libropes.a`):
 gprbuild -P ropes.gpr -p
 ```
 
-Build and run the unit tests (20 standalone programs, one per area,
+Build and run the unit tests (21 standalone programs, one per area,
 each printing `ok   - ...` / `FAIL - ...` per check):
 
 ```sh
@@ -89,6 +99,7 @@ cd examples
 gprbuild -P rope_tool.gpr -p
 ./rope_tool cat foo bar       # foobar
 ./rope_tool split a,b,c ,     # a / b / c, one per line
+./rope_tool lines tests/data/lines.txt   # each line's length, then the line
 ./rope_tool --help            # list every subcommand
 ./tests/run-tests.sh
 ```

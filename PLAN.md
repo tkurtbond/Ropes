@@ -162,6 +162,7 @@ Ropes/                   -- repo root (github.com/tkurtbond/Ropes)
     ropes.ads / .adb      -- the whole public API; one package, matching
                               Rope.Mod's own single-MODULE scope
     ropes-test_support.ads / .adb  -- test-only internals accessor (Depth); see Phase 2
+    ropes-text_io.ads / .adb       -- Put/Put_Line/Get_Line on Rope; see Phase 11
   test/
     test.gpr
     test_*.adb            -- one standalone program per concern (see Testing)
@@ -257,7 +258,9 @@ than adding new ones: `contains` (added at Phase 7 wrapping `Index
 `Ropes.Contains`, and `split`'s `Rope`-separator case now demonstrates
 the new Process-callback `Split` overload (printing each piece as
 `Process` visits it) instead of only the array-returning form used
-before.
+before. Phase 11 switched every rope-valued result to
+`Ropes.Text_IO.Put_Line` and added `lines FILE` (`Get_Line`'s demo; see
+Phase 11 below).
 
 `~/Repos/Oberon/oberon-tools/tests/rope-*.test` (see "Sources being
 ported" above) are black-box fixtures written against `RopeTool`, run
@@ -277,7 +280,7 @@ later phase to add). Same
 than hand-derived wherever the translation was non-mechanical — see
 "Testing approach" below for the two real divergences that caught
 (`bigcat`'s overflow behavior and `slice`'s past-the-end boundary).
-Currently `38 ok, 0 failed`; run via `cd examples &&
+Currently `41 ok, 0 failed`; run via `cd examples &&
 ./tests/run-tests.sh`.
 
 ## Core design
@@ -1379,13 +1382,111 @@ parameter's type.
   subcommand, since `chars` already demonstrates `Ropes.Cursor`/
   `Iterable` — there is no new `Ropes` operation this phase adds for it
   to demonstrate).
+- **Phase 11 (stretch), done — `Process_Chunks`, `Ropes.Text_IO`, a
+  linear `Compare`, and `rope_tool lines`.**
+  At explicit user request, the same kind of scope expansion as Phase
+  8: `Rope.Mod` has no output operations (only `ToString`/`Blit`), so
+  there is no counterpart to port. Motivated by a real failure, not
+  just convenience — `To_String` builds a stack-allocated `String (1 ..
+  Length)` and copies it again to return it, so `Put_Line (To_String
+  (R))` on a large rope raises `STORAGE_ERROR`. Confirmed rather than
+  assumed: a 20-million-character rope overflows `To_String` but
+  round-trips through `Put_Line`/`Get_Line` in well under a second;
+  `rope_tool make 20000000 x` crashed before this phase and works
+  after it.
+
+  *`Process_Chunks (Source, Process)`* (in `Ropes` itself): calls
+  `Process (Chunk : String)` once per leaf, in order — the general
+  primitive for writing a rope anywhere (file, stream, hash) without
+  flattening it. Shaped like `Ada.Containers`' `Iterate`/
+  `Query_Element` (access-to-procedure, no early stop — raise and
+  handle an exception to stop, same as with those), rather than
+  `Split`'s Boolean-returning `Process`, which mirrors `Rope.Mod`'s own
+  visitor. Never called for `Null_Rope`, never with an empty chunk; the
+  chunking itself is unspecified (it depends on how the rope was
+  built). It pins `Source` with its own reference for the whole walk:
+  `Rope` is a by-reference type (it has a controlled part, RM 6.2), so
+  a `Process` that assigns to the variable passed as `Source` would
+  otherwise free the tree mid-walk — confirmed with valgrind by
+  removing the pin (see `AGENTS.md` for the two ways that experiment
+  can falsely pass).
+
+  *`Ropes.Text_IO`* (new child package): `Put`/`Put_Line`/`Get_Line`,
+  each with and without a `File`, plus `Get_Line`'s procedure form —
+  exactly `Ada.Text_IO.Unbounded_IO`'s subprogram set for
+  `Unbounded_String` (checked against GNAT's `a-suteio.adb`, whose
+  package name, `Ada.Strings.Unbounded.Text_IO`, is where
+  `Ropes.Text_IO`'s comes from). A child package rather than `with
+  Ada.Text_IO` in `Ropes`'s body, so programs that never do rope I/O
+  don't depend on it through `Ropes` — the same split the standard
+  library makes. `Put` is `Process_Chunks` with `Ada.Text_IO.Put`
+  per leaf; `Get_Line` is GNAT's own `Unbounded_IO.Get_Line` loop
+  (read into a fixed buffer, keep going while it comes back full) with
+  a 4096-character buffer, each full buffer becoming one leaf, so a
+  line of any length is read without one buffer as long as the whole
+  line.
+
+  `test_text_io.adb` (17 checks): chunks concatenate to `To_String`;
+  `Null_Rope` never calls `Process`; the clobbering-`Process` case
+  above (fails under valgrind without the pin); `Put`/`Put_Line`
+  against `Put (To_String (...))`; the no-`File` overloads through
+  `Set_Output`/`Set_Input`; `Get_Line` on lines of length 0, 1, 4095–
+  4097, 8191–8193 and 100000 (the buffer boundary is where an
+  off-by-one would hide), `End_Error` at end of file, an unterminated
+  last line of exactly 4096 characters; and the 20-million-character
+  round trip. Uses Ada's anonymous temporary files (`Create` with no
+  name, `Reset` to `In_File`), so it leaves nothing behind.
+
+  *`Compare`, made linear.* Writing that round-trip check showed `"="`
+  taking ~7 s on two 20-million-character ropes: `Compare` `Fetch`ed
+  every character from the root, O(n log n), since Phase 3. It now
+  walks both ropes' leaves in step with an explicit-stack pre-order
+  walk (`Leaf_Walk`/`Next_Leaf`, the stack bounded by the root's own
+  `Depth + 1`), comparing one run — the longest stretch within one leaf
+  of each — at a time as a `String` slice (predefined `String` `"="`/
+  `"<"` are exactly this lexicographic order), and returns 0 at once
+  for two ropes sharing a root. A first version re-descended from the
+  root with `Locate_Leaf` at each leaf crossing: linear in characters,
+  but `O(leaves × depth)`, and `"*"`'s ropes have 10–20-character
+  leaves, so it only reached ~1.5 s; the stack walk reached ~0.1 s.
+  `test_compare.adb` (13 → 19 checks) gained what its one-leaf-rope
+  checks never exercised: the same text under two different leaf
+  chunkings (17 and 23 characters) compared with a one-character change
+  at every position, and at every prefix length, against `String`
+  comparison as the oracle; plus two large equal ropes with no shared
+  structure, and a rope against a copy of itself.
+
+  *`rope_tool`*: every rope-valued result now printed with
+  `Ropes.Text_IO.Put_Line` instead of `Put_Line (To_String (...))`,
+  and a new `lines FILE` subcommand — the one command that reads input,
+  demonstrating `Get_Line`: each line of FILE printed as its length, a
+  space, and the line, via the `File` overload, or of standard input
+  via the no-`File` overload when FILE is `-`. That `-` must be given
+  as `-- -`: `Arg_Parser` treats a bare `-` as an empty cluster of short
+  options and silently drops it rather than passing it on as a
+  positional argument (the same happens to `cat - b`) — a bug in
+  `arg_parser` itself, documented here and in `lines`'s help text
+  rather than fixed, since `arg_parser` is a separate, installed
+  library. Three new fixtures — `rope-lines.test`,
+  `rope-lines-stdin.test`, `rope-lines-missing.test` — reading
+  `examples/tests/data/lines.txt` (lines of 4096 and 4097 characters
+  either side of `Get_Line`'s buffer, an empty line, and an
+  unterminated last line), their expected output derived independently
+  of `rope_tool`, not copied from a run; `rope-help.test`/
+  `rope-unknown-command.test` regenerated from real runs (each embeds
+  the full usage text). `run-tests.sh` gained an `input FILE` line
+  (the program's standard input, default `/dev/null` so nothing can
+  hang on the terminal) — its one change since being ported, since the
+  original has no way to feed a program input. `41 ok, 0 failed`. A
+  fixture for the 20-million-character case would need 20 MB of
+  expected output, so that case lives in `test_text_io.adb`.
 
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds
 the matching `rope_tool` subcommand(s) — see "Command-line tool
 (rope_tool)" above for the current/planned mapping.
 
-## Remaining scope, as of Phase 8
+## Remaining scope, as of Phase 11
 
 Everything in "Deferred / stretch" above is now done — Phase 7 closed
 out the rest of "Construction and concatenation" plus `Escape`, and
@@ -1393,7 +1494,9 @@ Phase 8 added `Overwrite`/`Head`/`Tail`, `Contains`, and the
 Process-callback `Split`. (Phase 9, below, doesn't change anything
 here — it fed Phase 8's additions back into `Rope.Mod`, not into
 `Ropes` itself, so this list is still current as of Phase 8, the last
-phase that touched this repo's own scope.) What's left, gathered in
+phase that touched this repo's own scope — until Phase 11, which added
+`Process_Chunks`/`Ropes.Text_IO`, made `Compare` linear, and found the
+`Arg_Parser` bare-`-` bug listed below.) What's left, gathered in
 one place for whichever future phase picks it up, rather than left
 scattered across "What's explicitly out of scope (v1)" and "Open
 questions" above:
@@ -1423,6 +1526,12 @@ questions" above:
   the current `Natural` ceiling raises `Ada.Strings.Length_Error`
   cleanly rather than wrapping, so this is a scaling question, not a
   correctness gap.
+
+- **`Arg_Parser` drops a bare `-` argument** (found at Phase 11;
+  see its entry): `rope_tool lines -` has to be written `lines -- -`.
+  The fix belongs in `~/Repos/Ada/arg_parser`'s
+  `Parse_Arguments` (treat a lone `-` as a positional argument, as
+  POSIX utilities do), not in this repo.
 
 No phase is currently planned for any of these — they're recorded here
 so a future session doesn't have to re-derive "what's actually left"
@@ -1499,10 +1608,11 @@ above — the valid empty-`Slice` case is `High < Low` specifically
 the end." `rope-selftest.test` was the one Oberon original skipped
 outright — it drives the internal `RopeTest` binary, which has no
 `rope_tool` counterpart at all; `cd test && ./test_<name>` is
-`Ropes`'s own equivalent, already covered above. Four fixtures have no
+`Ropes`'s own equivalent, already covered above. Seven fixtures have no
 Oberon original: `rope-chars.test`, `rope-overwrite.test`,
-`rope-head.test`, `rope-tail.test`, for commands `RopeTool.Mod` never
-had to begin with. Run via `cd examples && ./tests/run-tests.sh`
+`rope-head.test`, `rope-tail.test`, and (Phase 11) `rope-lines.test`,
+`rope-lines-stdin.test`, `rope-lines-missing.test`, for commands
+`RopeTool.Mod` never had to begin with. Run via `cd examples && ./tests/run-tests.sh`
 (`-v` per-test, `-o` also showing captured output, or name specific
-fixtures — see the script's own header comment); currently `38 ok, 0
+fixtures — see the script's own header comment); currently `41 ok, 0
 failed`.

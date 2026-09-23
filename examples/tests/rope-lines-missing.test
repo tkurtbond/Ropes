@@ -1,0 +1,8 @@
+# A FILE that does not exist: a clean "Error: ..." message and exit
+# status 1, not an unhandled Name_Error.
+program rope_tool
+arg lines
+arg tests/data/no-such-file.txt
+status 1
+output
+Error: cannot open "tests/data/no-such-file.txt"

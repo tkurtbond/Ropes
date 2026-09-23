@@ -4,6 +4,7 @@ with Ada.Strings.Fixed;
 with Ada.Strings.Maps;
 with Ada.Text_IO;      use Ada.Text_IO;
 with Ropes;            use Ropes;
+with Ropes.Text_IO;
 
 package body Rope_Tool_Args is
 
@@ -34,7 +35,7 @@ package body Rope_Tool_Args is
       if Cat_Count = 0 then
          Cat_A := From_String (Arg);
       elsif Cat_Count = 1 then
-         Put_Line (To_String (Cat_A & From_String (Arg)));
+         Ropes.Text_IO.Put_Line (Cat_A & From_String (Arg));
       end if;
       Cat_Count := Cat_Count + 1;
       return True;
@@ -92,7 +93,7 @@ package body Rope_Tool_Args is
             Slice_Low := Positive'Value (Arg);
 
          when 2 =>
-            Put_Line (To_String (Slice (Slice_S, Slice_Low, Natural'Value (Arg))));
+            Ropes.Text_IO.Put_Line (Slice (Slice_S, Slice_Low, Natural'Value (Arg)));
 
          when others =>
             null;
@@ -129,7 +130,7 @@ package body Rope_Tool_Args is
             Insert_Before := Positive'Value (Arg);
 
          when 2 =>
-            Put_Line (To_String (Insert (Insert_S, Insert_Before, From_String (Arg))));
+            Ropes.Text_IO.Put_Line (Insert (Insert_S, Insert_Before, From_String (Arg)));
 
          when others =>
             null;
@@ -166,7 +167,7 @@ package body Rope_Tool_Args is
             Delete_From := Positive'Value (Arg);
 
          when 2 =>
-            Put_Line (To_String (Delete (Delete_S, Delete_From, Natural'Value (Arg))));
+            Ropes.Text_IO.Put_Line (Delete (Delete_S, Delete_From, Natural'Value (Arg)));
 
          when others =>
             null;
@@ -396,7 +397,7 @@ package body Rope_Tool_Args is
             declare
                function Print_Piece (Piece : Rope) return Boolean is
                begin
-                  Put_Line (To_String (Piece));
+                  Ropes.Text_IO.Put_Line (Piece);
                   return True;
                end Print_Piece;
             begin
@@ -442,21 +443,21 @@ package body Rope_Tool_Args is
    function Trim_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
       pragma Unreferenced (Start_With);
    begin
-      Put_Line (To_String (Trim (From_String (Arg))));
+      Ropes.Text_IO.Put_Line (Trim (From_String (Arg)));
       return True;
    end Trim_Argument_Handler;
 
    function Triml_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
       pragma Unreferenced (Start_With);
    begin
-      Put_Line (To_String (Trim (From_String (Arg), Right => Ada.Strings.Maps.Null_Set)));
+      Ropes.Text_IO.Put_Line (Trim (From_String (Arg), Right => Ada.Strings.Maps.Null_Set));
       return True;
    end Triml_Argument_Handler;
 
    function Trimr_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
       pragma Unreferenced (Start_With);
    begin
-      Put_Line (To_String (Trim (From_String (Arg), Left => Ada.Strings.Maps.Null_Set)));
+      Ropes.Text_IO.Put_Line (Trim (From_String (Arg), Left => Ada.Strings.Maps.Null_Set));
       return True;
    end Trimr_Argument_Handler;
 
@@ -465,28 +466,28 @@ package body Rope_Tool_Args is
    function Upper_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
       pragma Unreferenced (Start_With);
    begin
-      Put_Line (To_String (To_Upper (From_String (Arg))));
+      Ropes.Text_IO.Put_Line (To_Upper (From_String (Arg)));
       return True;
    end Upper_Argument_Handler;
 
    function Lower_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
       pragma Unreferenced (Start_With);
    begin
-      Put_Line (To_String (To_Lower (From_String (Arg))));
+      Ropes.Text_IO.Put_Line (To_Lower (From_String (Arg)));
       return True;
    end Lower_Argument_Handler;
 
    function Capitalize_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
       pragma Unreferenced (Start_With);
    begin
-      Put_Line (To_String (Capitalize (From_String (Arg))));
+      Ropes.Text_IO.Put_Line (Capitalize (From_String (Arg)));
       return True;
    end Capitalize_Argument_Handler;
 
    function Uncapitalize_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
       pragma Unreferenced (Start_With);
    begin
-      Put_Line (To_String (Uncapitalize (From_String (Arg))));
+      Ropes.Text_IO.Put_Line (Uncapitalize (From_String (Arg)));
       return True;
    end Uncapitalize_Argument_Handler;
 
@@ -501,7 +502,7 @@ package body Rope_Tool_Args is
       if Repeat_Count = 0 then
          Repeat_S := From_String (Arg);
       elsif Repeat_Count = 1 then
-         Put_Line (To_String (Natural'Value (Arg) * Repeat_S));
+         Ropes.Text_IO.Put_Line (Natural'Value (Arg) * Repeat_S);
       end if;
       Repeat_Count := Repeat_Count + 1;
       return True;
@@ -530,7 +531,7 @@ package body Rope_Tool_Args is
                Set_Exit_Status (Failure);
                return False;
             end if;
-            Put_Line (To_String (Make_Len * Arg (Arg'First)));
+            Ropes.Text_IO.Put_Line (Make_Len * Arg (Arg'First));
 
          when others =>
             null;
@@ -648,7 +649,7 @@ package body Rope_Tool_Args is
    function Escaped_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
       pragma Unreferenced (Start_With);
    begin
-      Put_Line (To_String (Escape (From_String (Arg))));
+      Ropes.Text_IO.Put_Line (Escape (From_String (Arg)));
       return True;
    end Escaped_Argument_Handler;
 
@@ -669,7 +670,7 @@ package body Rope_Tool_Args is
             Overwrite_Pos := Positive'Value (Arg);
 
          when 2 =>
-            Put_Line (To_String (Overwrite (Overwrite_S, Overwrite_Pos, From_String (Arg))));
+            Ropes.Text_IO.Put_Line (Overwrite (Overwrite_S, Overwrite_Pos, From_String (Arg)));
 
          when others =>
             null;
@@ -700,7 +701,7 @@ package body Rope_Tool_Args is
       if Head_Count = 0 then
          Head_S := From_String (Arg);
       elsif Head_Count = 1 then
-         Put_Line (To_String (Head (Head_S, Natural'Value (Arg))));
+         Ropes.Text_IO.Put_Line (Head (Head_S, Natural'Value (Arg)));
       end if;
       Head_Count := Head_Count + 1;
       return True;
@@ -720,7 +721,7 @@ package body Rope_Tool_Args is
       if Tail_Count = 0 then
          Tail_S := From_String (Arg);
       elsif Tail_Count = 1 then
-         Put_Line (To_String (Tail (Tail_S, Natural'Value (Arg))));
+         Ropes.Text_IO.Put_Line (Tail (Tail_S, Natural'Value (Arg)));
       end if;
       Tail_Count := Tail_Count + 1;
       return True;
@@ -730,5 +731,58 @@ package body Rope_Tool_Args is
          Set_Exit_Status (Failure);
          return False;
    end Tail_Argument_Handler;
+
+   --  --- lines FILE ---
+   --
+   --  The one rope_tool command that reads input, demonstrating
+   --  Ropes.Text_IO.Get_Line (Phase 11) as the rest demonstrate its
+   --  Put_Line: each line is read whole, however long, without a
+   --  buffer as long as the line. FILE = "-" reads Current_Input via
+   --  the no-File overload; anything else is opened and read via the
+   --  File overload. No Rope.Mod/RopeTool.Mod counterpart (Rope.Mod has
+   --  no I/O at all).
+   --
+   --  "-" has to be given as "-- -": Arg_Parser treats a bare "-" as an
+   --  (empty) cluster of short options and silently drops it, rather than
+   --  passing it on as a positional argument, so without the "--" this
+   --  handler never sees it at all.
+
+   function Lines_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+
+      procedure Print (Line : Rope) is
+      begin
+         Put (Ada.Strings.Fixed.Trim (Natural'Image (Length (Line)), Ada.Strings.Both) & " ");
+         Ropes.Text_IO.Put_Line (Line);
+      end Print;
+
+      F : File_Type;
+   begin
+      if Arg = "-" then
+         while not End_Of_File loop
+            Print (Ropes.Text_IO.Get_Line);
+         end loop;
+      else
+         Open (F, In_File, Arg);
+         while not End_Of_File (F) loop
+            Print (Ropes.Text_IO.Get_Line (F));
+         end loop;
+         Close (F);
+      end if;
+      return True;
+   exception
+      when Name_Error | Use_Error =>
+         Put_Line (Standard_Error, "Error: cannot open """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Device_Error           =>
+         --  E.g. FILE is a directory: Open succeeds, reading does not.
+         if Is_Open (F) then
+            Close (F);
+         end if;
+         Put_Line (Standard_Error, "Error: cannot read """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+   end Lines_Argument_Handler;
 
 end Rope_Tool_Args;

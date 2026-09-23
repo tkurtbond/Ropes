@@ -8,8 +8,8 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-10, Phases
-7-8 both stretch phases and Phases 9-10 not really `Ada`-side changes
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-11, Phases
+7-8 and 11 stretch phases and Phases 9-10 not really `Ada`-side changes
 — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
 depth-triggered auto-rebalance — `Balance`/`Balance_Insert`/
@@ -29,19 +29,21 @@ loop`), `Trim` (`Ada.Strings.Maps.Character_Set`-based, collapsing
 `Map_Indexed`, `To_Upper`/`To_Lower`/`Capitalize`/`Uncapitalize`, `"*"`
 (`Natural, Character`/`Rope`, collapsing `Rope.Mod`'s `Make`/`Repeat`
 into `Ada.Strings.Fixed`'s own `"*"` vocabulary — see the "`"*"` is a
-real find" note below), and `Escape`. `src/ropes.ads`/`.adb` exist and
+real find" note below), `Escape`, and (Phase 11) `Process_Chunks` plus
+the `Ropes.Text_IO` child package (`Put`/`Put_Line`/`Get_Line`).
+`src/ropes.ads`/`.adb` and `src/ropes-text_io.ads`/`.adb` exist and
 build; `test/test_construction.adb` (19), `test_balance.adb` (5),
 `test_slice.adb` (8), `test_insert.adb` (8), `test_delete.adb` (9),
-`test_compare.adb` (13), `test_index.adb` (25), `test_split.adb` (15),
+`test_compare.adb` (19), `test_index.adb` (25), `test_split.adb` (15),
 `test_iterator.adb` (12), `test_map.adb` (4), `test_case.adb` (8),
 `test_trim.adb` (7), `test_concat_overloads.adb` (12),
 `test_unbounded.adb` (4), `test_repeat.adb` (8), `test_escape.adb`
 (5), `test_overwrite.adb` (6), `test_head_tail.adb` (10),
-`test_contains.adb` (9), and `test_split_visitor.adb` (13) — 200
-checks total — all pass clean, including under valgrind. Plus a
+`test_contains.adb` (9), `test_split_visitor.adb` (13), and
+`test_text_io.adb` (17) — 223 checks total — all pass clean, including under valgrind. Plus a
 black-box `rope_tool` test suite, `examples/tests/` (`run-tests.sh` +
-38 `.test` fixtures, ported from
-`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `38 ok, 0 failed`.
+41 `.test` fixtures, ported from
+`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `41 ok, 0 failed`.
 `Balance`/`Max_Depth`/`Min_Length` are internal to `ropes.adb`, not
 public — `src/ropes-test_support.ads`/`.adb` is a small test-only
 child package (`function Depth`) so tests can confirm depth stays
@@ -116,6 +118,63 @@ project's own discipline (verify against the real source, don't
 assume) should also apply to its own prose, not just to `Ropes`'s Ada
 code.
 
+**Phase 11 added output/input that never flattens a rope** — another
+scope expansion at explicit user request, like Phase 8 (`Rope.Mod`
+has no output operations at all, only `ToString`/`Blit`). The
+motivation is a real failure, not just convenience: `To_String`
+builds its result as a stack-allocated `String (1 .. Length)` and
+copies it again to return it, so printing a large rope via `Put_Line
+(To_String (R))` raises `STORAGE_ERROR` — confirmed, not assumed:
+`rope_tool make 20000000 x` crashed that way before this phase and
+prints all 20,000,001 bytes after it. `Process_Chunks` (in `Ropes`)
+is the general primitive — one callback per leaf, shaped like
+`Ada.Containers`' `Iterate`/`Query_Element` — and `Ropes.Text_IO` is
+built on it, mirroring `Ada.Text_IO.Unbounded_IO`'s
+`Put`/`Put_Line`/`Get_Line` exactly (the child-package name is GNAT's
+own `Ada.Strings.Unbounded.Text_IO` precedent). A child package, not
+`with Ada.Text_IO` in `Ropes`'s own body, so programs that never do
+rope I/O don't depend on it through `Ropes`. `rope_tool` now prints
+every rope result with `Ropes.Text_IO.Put_Line` instead of `Put_Line
+(To_String (...))`.
+
+**`Process_Chunks` holds its own reference to `Source` for the whole
+walk (`Hold : constant Rope := Source`), and that is load-bearing**:
+`Rope` has a controlled part, so it is a by-reference type (RM 6.2),
+and a `Process` that assigns to the very variable passed as `Source`
+would otherwise free the tree mid-walk — confirmed under valgrind
+(`Invalid read`s) with the pin removed. Two traps hit while
+confirming it, worth knowing for any future "does this guard matter"
+experiment: (1) merely no longer *reading through* `Hold` doesn't
+unpin anything — the declaration alone keeps the reference, so the
+experiment has to delete the declaration; (2) a test whose expected
+value is a *copy* of the rope being clobbered (`Expected := R`) keeps
+the tree alive itself and can never catch the bug — build the
+expected value separately. `test_text_io.adb`'s `Clobber` check does
+both correctly, and fails under valgrind if the pin is removed.
+
+**Phase 11 also made `Compare` linear** (so `"="`/`"<"`/... are):
+it used to `Fetch` every character from the root, O(n log n) — ~7 s
+to compare two 20-million-character ropes, found while writing
+`test_text_io.adb`. It now walks both ropes' leaves in step with an
+explicit-stack pre-order walk (`Leaf_Walk`/`Next_Leaf` in
+`ropes.adb`, stack bounded by the root's own `Depth + 1`), comparing a
+run at a time as `String` slices, and returns 0 at once for two ropes
+sharing a root. The first version re-descended from the root with
+`Locate_Leaf` at each leaf crossing — linear in characters but still
+`O(leaves × depth)`, and `"*"`'s ropes have 10–20-character leaves, so
+it only got 7 s down to ~1.5 s; the stack walk got it to ~0.1 s. **"Is
+it linear" needs checking against a rope with many small leaves, not
+just a long one.** `test_compare.adb` gained checks that the old
+suite (all one-leaf ropes) could never have caught a run-logic bug
+with: every one-character difference position and every prefix length
+across two different leaf chunkings, checked against `String`
+comparison as an oracle.
+
+`examples/tests/run-tests.sh` gained an `input FILE` fixture line
+(standard input for the program, default `/dev/null`) for `lines -`
+— the one change to the harness since it was ported, since the
+original has no way to feed a program input at all.
+
 **`"*"` is a real find, not in the original design sketch**: `Rope.Mod`'s
 `Repeat`/`Make` were originally sketched as functions of those names,
 but `Ada.Strings.Fixed` already has `"*" (Natural, Character)`/`"*"
@@ -159,8 +218,12 @@ true going forward).
 `cat`/`len`/`fetch`/`slice`/`insert`/`delete`/`overwrite`/`head`/`tail`/
 `cmp`/`index`/`rindex`/`indexchar`/`rindexchar`/`split`/`chars`/`trim`/
 `triml`/`trimr`/`upper`/`lower`/`capitalize`/`uncapitalize`/`repeat`/
-`make`/`bigcat`/`contains`/`escaped`, matching all of `Ropes`'s API
-through Phase 8 (`cmp` is built from `"="`/`"<"` in
+`make`/`bigcat`/`contains`/`escaped`/`lines`, matching all of `Ropes`'s API
+through Phase 11 (`lines FILE` is Phase 11's `Ropes.Text_IO.Get_Line`
+demo, the one command that reads input — `-` for standard input, which
+must be given as `-- -`: `Arg_Parser` silently drops a bare `-`
+instead of passing it on as a positional argument, a bug in
+`arg_parser` itself, not worked around there; `cmp` is built from `"="`/`"<"` in
 `rope_tool_args.adb` itself, since `Ropes` has no public `Compare`
 function to wrap — see PLAN.md's "Comparison"; `index`/`rindex` and
 `indexchar`/`rindexchar` are each one `Ropes.Index` overload called
@@ -177,7 +240,9 @@ three separate trim commands; no `map`/`map_indexed` subcommand, since
 shape and `RopeTool.Mod` itself has none either; `bigcat` prints
 `Length (N1 * CH1 & N2 * CH2)`, exercising `"*"`'s binary-doubling
 sharing and `New_Concat`'s overflow guard the same way `RopeTool.Mod`'s
-own `bigcat` does; `contains` now calls the real `Ropes.Contains`
+own `bigcat` does; every rope-valued result is printed via `Ropes.Text_IO.Put_Line`
+(Phase 11), never `Put_Line (To_String (...))`, so large results no
+longer overflow the stack; `contains` now calls the real `Ropes.Contains`
 rather than the inline `Index (...) /= 0` it used when first added at
 Phase 7, before `Ropes.Contains` existed; `split`'s `Rope`-separator
 case demonstrates the Process-callback `Split` overload, not just the

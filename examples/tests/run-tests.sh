@@ -22,6 +22,9 @@
 #   env NAME=VALUE   set an environment variable for the program; repeat
 #                    for each variable (optional)
 #   dir DIRECTORY    run the program in this directory (optional)
+#   input FILE       the program's standard input, relative to DIRECTORY
+#                    (optional; default /dev/null, so no test can hang
+#                    waiting on the terminal)
 #   status N         the expected exit status
 #   output           everything after this line is the expected output
 #
@@ -39,7 +42,10 @@
 # 0-based -> 1-based indices, HALT/clamp -> an Ada.Strings exception
 # with this CLI's own "Error: ..." wording, and rope-help.test's /
 # rope-unknown-command.test's exact wording, which is Arg_Parser's own
-# Usage/error text, not ArgParser's).
+# Usage/error text, not ArgParser's). One addition since the port: the
+# "input" line, added at Phase 11 for rope_tool's "lines -" (the
+# original has no way to feed a program standard input, and ran it with
+# the harness's own).
 
 verbose=0
 show=0
@@ -92,6 +98,7 @@ for fixture in "${fixtures[@]}"; do
   program=
   status=
   dir=.
+  input=/dev/null
   args=()
   envs=()
   while IFS= read -r line; do
@@ -102,6 +109,7 @@ for fixture in "${fixtures[@]}"; do
       'arg '*)   args+=("${line#arg }") ;;
       'env '*)   envs+=("${line#env }") ;;
       'dir '*)   dir=${line#dir } ;;
+      'input '*) input=${line#input } ;;
       'status '*)  status=${line#status } ;;
       output)    break ;;
     esac
@@ -112,7 +120,7 @@ for fixture in "${fixtures[@]}"; do
     /*) exe=$bindir/$program ;;
     *)  exe=$root/$bindir/$program ;;
   esac
-  raw=$(cd "$dir" && env "${envs[@]}" "$exe" "${args[@]}" 2>&1)
+  raw=$(cd "$dir" && env "${envs[@]}" "$exe" "${args[@]}" < "$input" 2>&1)
   got=$?
   raw=${raw//"$exe"/$program}
   actual=$(printf '%s\n' "$raw" | strip)

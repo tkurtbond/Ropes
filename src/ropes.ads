@@ -88,6 +88,26 @@ package Ropes is
    function To_String (Source : Rope) return String;
    --  "" if Source is Null_Rope.
 
+   procedure Process_Chunks (Source : Rope; Process : not null access procedure (Chunk : String));
+   --  Calls Process once per leaf of Source, in order, passing that
+   --  leaf's characters -- so the concatenation of every Chunk passed
+   --  equals To_String (Source), but Source is never flattened into
+   --  one String. Never called for Null_Rope, and never called with an
+   --  empty Chunk. How Source is divided into chunks is unspecified
+   --  (it depends on how Source was built); only their order and
+   --  concatenation are. Chunk is a view of a leaf's own storage: it
+   --  is only valid during that call, so copy it if it needs to
+   --  outlive the call.
+   --
+   --  No Rope.Mod counterpart (Phase 11, at explicit user request --
+   --  see PLAN.md): the general primitive for writing a rope anywhere
+   --  -- a file (Ropes.Text_IO is built on this), a stream, a hash --
+   --  without To_String's full O(Length) copy, which lives on the stack
+   --  and so can overflow it for a large enough rope. Shaped like
+   --  Ada.Containers' own Iterate/Query_Element (a Process
+   --  access-to-procedure, no early stop); a caller wanting to stop
+   --  early can raise and handle an exception, same as with those.
+
    function From_Unbounded_String (Source : Ada.Strings.Unbounded.Unbounded_String) return Rope;
    function To_Unbounded_String (Source : Rope) return Ada.Strings.Unbounded.Unbounded_String;
    --  No Rope.Mod counterpart (Oberon-2 has no unbounded string type)
@@ -170,7 +190,10 @@ package Ropes is
    --  common prefix -- Rope.Mod's Compare/Equal, exposed as the
    --  standard operators instead of a -1/0/1 function. "=" replaces
    --  the predefined (pointer-identity-based) equality that a private
-   --  type wrapping a Controlled component would otherwise get.
+   --  type wrapping a Controlled component would otherwise get. Time
+   --  is linear in the common prefix, regardless of how differently
+   --  the two ropes' trees are shaped, and O(1) for a rope compared
+   --  with a copy of itself.
 
    function Index (Source : Rope; Pattern : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
    function Index

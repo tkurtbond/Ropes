@@ -108,6 +108,9 @@ package Rope_Tool_Args is
    --  --- tail S COUNT --- (Ropes.Tail, default Pad; no Rope.Mod/RopeTool.Mod counterpart)
    function Tail_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
+   --  --- lines FILE --- (Ropes.Text_IO.Get_Line, File and Current_Input overloads; no Rope.Mod/RopeTool.Mod counterpart)
+   function Lines_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
    Commands : aliased Command_Array :=
      [Make_Command
        ("cat",
@@ -245,7 +248,13 @@ package Rope_Tool_Args is
        ("tail",
         Make_Parser
           (Description => "tail S COUNT  Print the last COUNT characters of S, space-padded if S is shorter.",
-           Handler     => Tail_Argument_Handler'Access, Options => null))];
+           Handler     => Tail_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("lines",
+        Make_Parser
+          (Description =>
+             "lines FILE  Read FILE (standard input if FILE is -, given as ""-- -"") and print each line's length, a space, and the line.",
+           Handler     => Lines_Argument_Handler'Access, Options => null))];
 
    Main_Parser : Parser :=
      Make_Parser
