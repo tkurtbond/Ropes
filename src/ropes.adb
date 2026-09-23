@@ -526,6 +526,47 @@ package body Ropes is
       end if;
    end Compare;
 
+   --  Compare above, with a String for Right: the same run-at-a-time
+   --  walk, over Left's leaves only, each run compared with the next
+   --  stretch of Right. Offset counts characters of Right already
+   --  compared, rather than holding an index into Right, so that a
+   --  Right ending at Positive'Last can't overflow it.
+   function Compare (Left : Node_Access; Right : String) return Integer is
+      L_Len  : constant Natural := (if Left = null then 0 else Left.Len);
+      R_Len  : constant Natural := Right'Length;
+      Common : constant Natural := Natural'Min (L_Len, R_Len);
+   begin
+      if Common > 0 then
+         declare
+            Walk   : Leaf_Walk (Left.Depth + 1);
+            Leaf   : Node_Access;
+            Offset : Natural := 0;
+         begin
+            Start_Walk (Walk, Left);
+            while Offset < Common loop
+               Next_Leaf (Walk, Leaf);
+               declare
+                  Run   : constant Positive := Natural'Min (Leaf.Len, Common - Offset);
+                  L_Run : String renames Leaf.Chars (1 .. Run);
+                  R_Run : String renames Right (Right'First + Offset .. Right'First + Offset + (Run - 1));
+               begin
+                  if L_Run /= R_Run then
+                     return (if L_Run < R_Run then -1 else 1);
+                  end if;
+                  Offset := Offset + Run;
+               end;
+            end loop;
+         end;
+      end if;
+      if L_Len = R_Len then
+         return 0;
+      elsif L_Len < R_Len then
+         return -1;
+      else
+         return 1;
+      end if;
+   end Compare;
+
    --  Rope.Mod's MapHelper: N with Convert applied to every character,
    --  in increasing index order. Built via New_Concat directly, not
    --  New_Simple_Cat -- the result must have exactly N's own tree
@@ -783,6 +824,9 @@ package body Ropes is
       return Slice (Source, 1, Before - 1) & New_Item & Slice (Source, Before, Len);
    end Insert;
 
+   function Insert (Source : Rope; Before : Positive; New_Item : String) return Rope is
+     (Insert (Source, Before, From_String (New_Item)));
+
    function Delete (Source : Rope; From : Positive; Through : Natural) return Rope is
       Len : constant Natural := Length (Source);
    begin
@@ -811,6 +855,9 @@ package body Ropes is
       end;
    end Overwrite;
 
+   function Overwrite (Source : Rope; Position : Positive; New_Item : String) return Rope is
+     (Overwrite (Source, Position, From_String (New_Item)));
+
    function Head (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope is
    begin
       if Count <= Length (Source) then
@@ -837,6 +884,30 @@ package body Ropes is
    function ">" (Left, Right : Rope) return Boolean is (Compare (Data_Of (Left), Data_Of (Right)) > 0);
 
    function ">=" (Left, Right : Rope) return Boolean is (Compare (Data_Of (Left), Data_Of (Right)) >= 0);
+
+   --  The String overloads: Compare (Data_Of (String_Side), Other)
+   --  orders the rope against the string, so it is negated in sense
+   --  when the String is the Left operand.
+
+   function "=" (Left : Rope; Right : String) return Boolean is (Compare (Data_Of (Left), Right) = 0);
+
+   function "=" (Left : String; Right : Rope) return Boolean is (Compare (Data_Of (Right), Left) = 0);
+
+   function "<" (Left : Rope; Right : String) return Boolean is (Compare (Data_Of (Left), Right) < 0);
+
+   function "<" (Left : String; Right : Rope) return Boolean is (Compare (Data_Of (Right), Left) > 0);
+
+   function "<=" (Left : Rope; Right : String) return Boolean is (Compare (Data_Of (Left), Right) <= 0);
+
+   function "<=" (Left : String; Right : Rope) return Boolean is (Compare (Data_Of (Right), Left) >= 0);
+
+   function ">" (Left : Rope; Right : String) return Boolean is (Compare (Data_Of (Left), Right) > 0);
+
+   function ">" (Left : String; Right : Rope) return Boolean is (Compare (Data_Of (Right), Left) < 0);
+
+   function ">=" (Left : Rope; Right : String) return Boolean is (Compare (Data_Of (Left), Right) >= 0);
+
+   function ">=" (Left : String; Right : Rope) return Boolean is (Compare (Data_Of (Right), Left) <= 0);
 
    ------------------------------------------------------------------
    --  Search.
@@ -923,6 +994,13 @@ package body Ropes is
    end Index;
 
    function Index
+     (Source : Rope; Pattern : String; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural is
+     (Index (Source, From_String (Pattern), From, Going));
+
+   function Index (Source : Rope; Pattern : String; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural is
+     (Index (Source, From_String (Pattern), Going));
+
+   function Index
      (Source : Rope; Pattern : Character; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural
    is
       S_D   : constant Node_Access := Data_Of (Source);
@@ -974,6 +1052,11 @@ package body Ropes is
    function Contains (Source : Rope; Pattern : Character) return Boolean is (Index (Source, Pattern) /= 0);
 
    function Contains (Source : Rope; Pattern : Character; From : Positive) return Boolean is
+     (Index (Source, Pattern, From, Ada.Strings.Forward) /= 0);
+
+   function Contains (Source : Rope; Pattern : String) return Boolean is (Index (Source, Pattern) /= 0);
+
+   function Contains (Source : Rope; Pattern : String; From : Positive) return Boolean is
      (Index (Source, Pattern, From, Ada.Strings.Forward) /= 0);
 
    ------------------------------------------------------------------

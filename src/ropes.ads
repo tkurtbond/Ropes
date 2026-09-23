@@ -174,6 +174,11 @@ package Ropes is
    --  -- Before = Length (Source) + 1 (append) is valid, matching
    --  Ada.Strings.Unbounded.Insert. Rope.Mod's Insert, unclamped.
 
+   function Insert (Source : Rope; Before : Positive; New_Item : String) return Rope;
+   --  As above, with a String New_Item -- the form
+   --  Ada.Strings.Unbounded.Insert itself takes. Same as Insert
+   --  (Source, Before, From_String (New_Item)).
+
    function Delete (Source : Rope; From : Positive; Through : Natural) return Rope;
    --  Source with the characters from From through Through, inclusive,
    --  removed. Source unchanged (not an error) if Through < From, even
@@ -195,6 +200,11 @@ package Ropes is
    --  Insert above. No Rope.Mod counterpart (Oberon-2's Rope has no
    --  positional-replace operation at all) -- see PLAN.md's "Deferred
    --  / stretch" section for why this was added anyway.
+
+   function Overwrite (Source : Rope; Position : Positive; New_Item : String) return Rope;
+   --  As above, with a String New_Item -- the form
+   --  Ada.Strings.Unbounded.Overwrite itself takes. Same as Overwrite
+   --  (Source, Position, From_String (New_Item)).
 
    function Head (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope;
    function Tail (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope;
@@ -218,6 +228,23 @@ package Ropes is
    --  the two ropes' trees are shaped, and O(1) for a rope compared
    --  with a copy of itself.
 
+   function "=" (Left : Rope; Right : String) return Boolean;
+   function "=" (Left : String; Right : Rope) return Boolean;
+   function "<" (Left : Rope; Right : String) return Boolean;
+   function "<" (Left : String; Right : Rope) return Boolean;
+   function "<=" (Left : Rope; Right : String) return Boolean;
+   function "<=" (Left : String; Right : Rope) return Boolean;
+   function ">" (Left : Rope; Right : String) return Boolean;
+   function ">" (Left : String; Right : Rope) return Boolean;
+   function ">=" (Left : Rope; Right : String) return Boolean;
+   function ">=" (Left : String; Right : Rope) return Boolean;
+   --  As above, comparing a Rope with a String -- the mixed overloads
+   --  Ada.Strings.Unbounded has for each operator. The same order as
+   --  comparing Left with From_String (Right) (or From_String (Left)
+   --  with Right), but the String is never copied into a rope: it is
+   --  compared a leaf at a time, in time linear in the common prefix.
+   --  The String need not start at index 1.
+
    function Index (Source : Rope; Pattern : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
    function Index
      (Source : Rope; Pattern : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
@@ -236,6 +263,16 @@ package Ropes is
    --  when Pattern is also Null_Rope (Source's emptiness is checked
    --  before Pattern's) -- see PLAN.md's "Search" section.
 
+   function Index (Source : Rope; Pattern : String; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+   function Index
+     (Source : Rope; Pattern : String; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+   --  As above, with a String Pattern -- the form Ada.Strings.Fixed
+   --  and Ada.Strings.Unbounded's own Index take. Same as Index
+   --  (Source, From_String (Pattern), ...), including every boundary
+   --  rule above: Ada.Strings.Pattern_Error for an empty Pattern ("",
+   --  like Null_Rope), with Source's emptiness checked first in the
+   --  From overload only.
+
    function Index (Source : Rope; Pattern : Character; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
    function Index
      (Source : Rope; Pattern : Character; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
@@ -247,15 +284,17 @@ package Ropes is
    function Contains (Source, Pattern : Rope; From : Positive) return Boolean;
    function Contains (Source : Rope; Pattern : Character) return Boolean;
    function Contains (Source : Rope; Pattern : Character; From : Positive) return Boolean;
+   function Contains (Source : Rope; Pattern : String) return Boolean;
+   function Contains (Source : Rope; Pattern : String; From : Positive) return Boolean;
    --  Whether Pattern occurs anywhere in Source (or at/after From, for
    --  the From overloads) -- a thin wrapper over Index (...) /= 0,
    --  always Going => Forward (there is no Going parameter here:
    --  "contains" is an existence question, not a search direction, and
    --  Rope.Mod's own Contains -- the Character/From overload's direct
    --  model -- has no Going option either). Genuinely a thin wrapper:
-   --  the Rope overloads inherit Index's own Ada.Strings.Pattern_Error
-   --  on a Null_Rope Pattern rather than softening it to some other
-   --  answer.
+   --  the Rope and String overloads inherit Index's own
+   --  Ada.Strings.Pattern_Error on an empty Pattern (Null_Rope or "")
+   --  rather than softening it to some other answer.
 
    type Rope_Array is array (Positive range <>) of Rope;
 

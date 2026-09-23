@@ -14,7 +14,8 @@ project Test is
       "test_overwrite.adb", "test_head_tail.adb", "test_contains.adb", "test_split_visitor.adb",
       "test_text_io.adb",
       "test_stream_io.adb",
-      "test_copy_slice.adb");
+      "test_copy_slice.adb",
+      "test_string_overloads.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use

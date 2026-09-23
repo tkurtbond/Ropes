@@ -8,7 +8,7 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-15, Phases
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-16, Phases
 7-8, 11 and 13 stretch phases and Phases 9-10, 12 and 14 not really
 `Ada`-side changes — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
@@ -17,6 +17,8 @@ depth-triggered auto-rebalance — `Balance`/`Balance_Insert`/
 `"&"`'s `Character`/`String` overloads, `From_String`/`From_Character`/
 `To_String`, `From_Unbounded_String`/`To_Unbounded_String`, `Element`,
 `Slice`, `Copy_Slice` (Phase 15, `Rope.Mod`'s `Blit`), `Insert`,
+(Phase 16: `String` overloads of `Index`/`Contains`/`Insert`/`Overwrite` and of
+all five comparison operators, both operand orders),
 `Delete`, `Overwrite`/`Head`/`Tail`, the five
 comparison operators (`"="`/`"<"`/`"<="`/`">"`/`">="`), `Index`
 (`Rope`/`Character` patterns, each with a no-`From` and a
@@ -42,7 +44,7 @@ the `Ropes.Text_IO` child package (`Put`/`Put_Line`/`Get_Line`).
 `test_unbounded.adb` (4), `test_repeat.adb` (8), `test_escape.adb`
 (5), `test_overwrite.adb` (6), `test_head_tail.adb` (10),
 `test_contains.adb` (9), `test_split_visitor.adb` (13), and
-`test_text_io.adb` (17), `test_stream_io.adb` (11), `test_copy_slice.adb` (11) — 245 checks total — all pass clean, including under valgrind. Plus a
+`test_text_io.adb` (17), `test_stream_io.adb` (11), `test_copy_slice.adb` (11), `test_string_overloads.adb` (25) — 270 checks total — all pass clean, including under valgrind. Plus a
 black-box `rope_tool` test suite, `examples/tests/` (`run-tests.sh` +
 47 `.test` fixtures, ported from
 `~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `47 ok, 0 failed`.
@@ -218,6 +220,24 @@ cord's own `cordxtra.c`, not assumed) — that is what Phase 13 adds;
 genuinely file-backed ropes (`CORD_from_file`/`_lazy`) stay out of
 scope. **When a scope list groups things, check each member against
 the source before treating the whole group as ruled out.**
+
+**Phase 16 added the `String` overloads `Ada.Strings.Unbounded` has
+and `Ropes` lacked** — at explicit user request, after asking what
+`Ada.Strings.Fixed`/`Unbounded` functionality `Ropes` was missing:
+`Index` (`Pattern : String`, with and without `From`), `Insert`/
+`Overwrite` (`New_Item : String`), and `"="`/`"<"`/`"<="`/`">"`/`">="`
+for `(Rope, String)` and `(String, Rope)`. `Index`/`Insert`/`Overwrite`
+just wrap `From_String` (like `Split`'s `String` overload already
+did); the comparisons have their own `Compare (Node_Access, String)`,
+walking only the rope's leaves, so the String is never copied. Its
+check against a `String` ending at `Positive'Last` caught a real
+overflow in the first version (`Right'First + Offset + Run - 1`
+overflows before the `- 1`) — **index arithmetic on a caller's
+`String` needs testing at `Positive'Last`, not only at `'First /= 1`**.
+`Contains` got the matching `String` pair (with and without `From`)
+as a follow-up request. `rope_tool`'s `insert`/`overwrite`/`cmp` now
+pass their argument straight to these overloads (`contains` stays
+`Character`-based, matching `RopeTool.Mod`'s own).
 
 **Phase 14 made `Rope.Mod`'s `Blit` and `Escaped` linear and renamed
 `Escaped` to `Escape`** (`oberon-tools` `a41f0a7`) — the two

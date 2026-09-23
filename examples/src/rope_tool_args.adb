@@ -184,7 +184,7 @@ package body Rope_Tool_Args is
             Insert_Before := Positive'Value (Arg);
 
          when 2 =>
-            Ropes.Text_IO.Put_Line (Insert (Insert_S, Insert_Before, From_String (Arg)));
+            Ropes.Text_IO.Put_Line (Insert (Insert_S, Insert_Before, Arg));
 
          when others =>
             null;
@@ -244,7 +244,8 @@ package body Rope_Tool_Args is
    --  --- cmp A B ---
    --  Ropes has no public Compare function (see PLAN.md's
    --  "Comparison"): built here from "="/"<" instead, same as any
-   --  other Ropes client would have to.
+   --  other Ropes client would have to. B is compared as the String
+   --  it arrives as, using the mixed Rope/String operators.
 
    Cmp_Count : Natural := 0;
    Cmp_A     : Rope;
@@ -255,17 +256,13 @@ package body Rope_Tool_Args is
       if Cmp_Count = 0 then
          Cmp_A := From_String (Arg);
       elsif Cmp_Count = 1 then
-         declare
-            Cmp_B : constant Rope := From_String (Arg);
-         begin
-            if Cmp_A = Cmp_B then
-               Put_Line ("0");
-            elsif Cmp_A < Cmp_B then
-               Put_Line ("-1");
-            else
-               Put_Line ("1");
-            end if;
-         end;
+         if Cmp_A = Arg then
+            Put_Line ("0");
+         elsif Cmp_A < Arg then
+            Put_Line ("-1");
+         else
+            Put_Line ("1");
+         end if;
       end if;
       Cmp_Count := Cmp_Count + 1;
       return True;
@@ -724,7 +721,7 @@ package body Rope_Tool_Args is
             Overwrite_Pos := Positive'Value (Arg);
 
          when 2 =>
-            Ropes.Text_IO.Put_Line (Overwrite (Overwrite_S, Overwrite_Pos, From_String (Arg)));
+            Ropes.Text_IO.Put_Line (Overwrite (Overwrite_S, Overwrite_Pos, Arg));
 
          when others =>
             null;

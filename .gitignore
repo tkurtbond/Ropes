@@ -24,6 +24,7 @@ test/test_split_visitor
 test/test_text_io
 test/test_stream_io
 test/test_copy_slice
+test/test_string_overloads
 examples/obj/
 examples/rope_tool
 

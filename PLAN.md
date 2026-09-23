@@ -546,6 +546,8 @@ boundary behavior. `[Phase 3, done.]`
 ```ada
 function Insert (Source : Rope; Before : Positive; New_Item : Rope) return Rope;  -- Rope.Mod's Insert
 function Delete (Source : Rope; From, Through : Natural) return Rope;             -- Rope.Mod's Remove
+function Insert (Source : Rope; Before : Positive; New_Item : String) return Rope;       -- Phase 16
+function Overwrite (Source : Rope; Position : Positive; New_Item : String) return Rope; -- Phase 16
 ```
 
 Names and parameter shapes taken directly from
@@ -582,6 +584,8 @@ function "<"  (Left, Right : Rope) return Boolean;
 function "<=" (Left, Right : Rope) return Boolean;
 function ">"  (Left, Right : Rope) return Boolean;
 function ">=" (Left, Right : Rope) return Boolean;
+--  Phase 16: each also for (Left : Rope; Right : String) and
+--  (Left : String; Right : Rope).
 ```
 
 Lexicographic, character-by-character, then by length on a common
@@ -604,6 +608,9 @@ function Index
 function Index
   (Source : Rope; Pattern : Character; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward)
    return Natural;
+
+--  Phase 16: Pattern : String, with and without From -- for Index
+--  and for Contains.
 ```
 
 Collapses `Rope.Mod`'s four functions (`Find`, `RFind`, `IndexChar`,
@@ -1694,6 +1701,43 @@ parameter's type.
   `rope-copyslice-no-fit.test`, `rope-copyslice-past-end.test`, and
   `rope-help.test`/`rope-unknown-command.test` regenerated. `47 ok, 0
   failed`.
+
+- **Phase 16, done — `String` overloads.** At explicit user request,
+  after asking what `Ada.Strings.Fixed`/`Ada.Strings.Unbounded`
+  functionality `Ropes` lacked: the `String`-taking forms
+  `Ada.Strings.Unbounded` has for `Index` (`Pattern`), `Insert`/
+  `Overwrite` (`New_Item`), and the five comparison operators (mixed
+  `(Rope, String)` and `(String, Rope)`, ten functions), and then
+  `Contains` (`Pattern : String`). No `Rope.Mod`
+  counterpart — Oberon-2 has no overloading. `Index`/`Insert`/
+  `Overwrite` are `From_String` wrappers over the `Rope` overloads, so
+  every boundary rule carries over unchanged (`""` raises
+  `Pattern_Error` exactly as `Null_Rope` does). The comparisons get
+  their own `Compare (Left : Node_Access; Right : String)`, the
+  Phase 11 run-at-a-time leaf walk over the rope's side only, so the
+  `String` is never copied into a leaf; it counts an `Offset` into
+  `Right` rather than holding an index, and `test_string_overloads.adb`'s
+  `Positive'Last`-ending `String` check caught the first version
+  computing `Right'First + Offset + Run - 1`, which overflows before
+  the `- 1` — now `+ (Run - 1)`.
+
+  `test_string_overloads.adb` (22 checks): `Index` in both directions,
+  with and without `From`, `Pattern_Error`/empty-`Source` ordering, a
+  pattern not starting at 1, and every pattern of lengths 1–20 against
+  `Ada.Strings.Fixed.Index` across 17-character leaves; `Insert`/
+  `Overwrite` including append, extension and `Index_Error`; and all
+  ten operators against predefined `String` comparison for every pair
+  of 13 strings (prefixes and one-character changes at and around leaf
+  boundaries), plus `Strings` not starting at 1, ending at
+  `Positive'Last`, and empty. Clean under valgrind; hand-formatted,
+  since `gnatpp` can't format its `[for I in ... =>]` aggregate.
+  `rope_tool`'s `insert`/`overwrite`/`cmp` now pass their argument
+  straight to the `String` overloads; their existing fixtures cover
+  them, `47 ok, 0 failed`. As a follow-up request, `Contains` got the
+  matching `String` pair too (with and without `From`, thin wrappers
+  over `Index` like its other overloads), with 3 more checks — 25 in
+  all. `rope_tool contains` stays `Character`-based, matching
+  `RopeTool.Mod`'s own `contains`.
 
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds
