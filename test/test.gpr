@@ -12,7 +12,8 @@ project Test is
       "test_compare.adb", "test_index.adb", "test_split.adb", "test_iterator.adb", "test_map.adb", "test_case.adb",
       "test_trim.adb", "test_concat_overloads.adb", "test_unbounded.adb", "test_repeat.adb", "test_escape.adb",
       "test_overwrite.adb", "test_head_tail.adb", "test_contains.adb", "test_split_visitor.adb",
-      "test_text_io.adb");
+      "test_text_io.adb",
+      "test_stream_io.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use

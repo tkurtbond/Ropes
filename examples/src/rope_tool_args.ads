@@ -111,6 +111,9 @@ package Rope_Tool_Args is
    --  --- lines FILE --- (Ropes.Text_IO.Get_Line, File and Current_Input overloads; no Rope.Mod/RopeTool.Mod counterpart)
    function Lines_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
+   --  --- readfile FILE --- (Ropes.Stream_IO.Read_File; no Rope.Mod/RopeTool.Mod counterpart before Phase 13)
+   function Readfile_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
    Commands : aliased Command_Array :=
      [Make_Command
        ("cat",
@@ -254,7 +257,13 @@ package Rope_Tool_Args is
         Make_Parser
           (Description =>
              "lines FILE  Read FILE (standard input if FILE is -) and print each line's length, a space, and the line.",
-           Handler     => Lines_Argument_Handler'Access, Options => null))];
+           Handler     => Lines_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("readfile",
+        Make_Parser
+          (Description =>
+             "readfile FILE  Read all of FILE, byte for byte, and print its length, a space, and its contents escaped.",
+           Handler     => Readfile_Argument_Handler'Access, Options => null))];
 
    Main_Parser : Parser :=
      Make_Parser

@@ -147,6 +147,13 @@ Matching `Rope.Mod`'s own stated scope, not cord's full surface:
 - No lazy substring nodes — `Slice` always copies, like `Rope.Mod`'s
   `Substring` and unlike cord's substring-node optimization.
 - No file-backed ropes (`CORD_from_file`/`_lazy`/`_eager`).
+  **[Phase 13, partly revisited]**: this bullet grouped `_eager` with
+  the other two, but it isn't file-backed at all — cord's
+  `CORD_from_file_eager` reads the whole file and closes it, returning
+  an ordinary in-memory cord. Its equivalent, `Ropes.Stream_IO`'s
+  `Read`/`Read_File`, was added at explicit user request. Genuinely
+  file-backed ropes (`CORD_from_file`/`_lazy`: the file kept open and
+  read on demand) are still out of scope.
 - No `CORD_printf`-style formatting.
 
 These could become a separate child package (`Ropes.Lazy`, say) later
@@ -163,6 +170,7 @@ Ropes/                   -- repo root (github.com/tkurtbond/Ropes)
                               Rope.Mod's own single-MODULE scope
     ropes-test_support.ads / .adb  -- test-only internals accessor (Depth); see Phase 2
     ropes-text_io.ads / .adb       -- Put/Put_Line/Get_Line on Rope; see Phase 11
+    ropes-stream_io.ads / .adb     -- whole-file Read/Write, byte for byte; see Phase 13
   test/
     test.gpr
     test_*.adb            -- one standalone program per concern (see Testing)
@@ -280,7 +288,7 @@ later phase to add). Same
 than hand-derived wherever the translation was non-mechanical — see
 "Testing approach" below for the two real divergences that caught
 (`bigcat`'s overflow behavior and `slice`'s past-the-end boundary).
-Currently `41 ok, 0 failed`; run via `cd examples &&
+Currently `44 ok, 0 failed`; run via `cd examples &&
 ./tests/run-tests.sh`.
 
 ## Core design
@@ -1543,6 +1551,70 @@ parameter's type.
   was nothing to port — and `RopeTool` has no subcommand for
   `WriteRider`, which only `RopeTest` covers.
 
+- **Phase 13 (stretch), done — whole-file I/O, in both `Ropes` and
+  `Rope.Mod`.** At explicit user request. Motivation: loading a whole
+  document is ropes' central use, and the only way to do it before was
+  a `Get_Line` loop re-adding `"\n"` after each line, which can't
+  reproduce a file exactly — it can't tell whether the last line had a
+  line feed, and `Text_IO` treats a form feed as a page terminator, not
+  a character.
+
+  *`Ropes.Stream_IO`* (new child package): `Read (File :
+  Stream_IO.File_Type) return Rope` (current position to end of file),
+  `Write (File, Item)`, `Read_File (Name) return Rope`, `Write_File
+  (Name, Item)` (creates or replaces). Built on
+  `Ada.Streams.Stream_IO`, deliberately **not** `Text_IO` — hence no
+  `Text_IO.File_Type` overload, though that was the first shape
+  suggested: `Text_IO` is line-oriented and can't round-trip bytes
+  (terminators aren't delivered as characters on input, and closing an
+  output file whose last line is unfinished adds a line terminator, per
+  the RM), so a `Text_IO.File_Type` version would promise exactness it
+  couldn't deliver. `Read` loops on `End_Of_File` rather than
+  precomputing `Size`, so it also works on files with no fixed size;
+  `Write` is `Process_Chunks` plus `String'Write` per leaf (a single
+  block write in GNAT). Leaves of at most 4096 characters, not one leaf
+  the size of the file: `Slice` copies the parts of leaves it covers, so
+  a one-leaf rope of a large file would make every later edit copy all
+  of it. Exceptions are `Stream_IO`'s own (`Name_Error`, `Use_Error`),
+  as the `Ada.Strings`/standard-library-vocabulary convention implies.
+  This is cord's `CORD_from_file_eager`, which "What's explicitly out
+  of scope" above had grouped with the file-backed ropes by mistake
+  (see the note there); genuinely file-backed ropes remain out.
+
+  `test_stream_io.adb` (11 checks): CR, form feed and no final line
+  feed survive a round trip; all 256 `Character` values; `Null_Rope` ↔
+  an empty file; `Write_File` replaces rather than overwrites a longer
+  file's start; `Name_Error` for a missing file; file sizes 1,
+  4095–4097, 8192, 8193 and 100000 (the chunk boundary); `Write`
+  appending at the current position and `Read` from a `Set_Index`
+  position to the end; a 20-million-character round trip. Clean under
+  valgrind. `rope_tool readfile FILE` prints the file's length and its
+  contents `Escape`d — escaped so that a CR, form feed, 0X, or missing
+  final line feed is visible in a fixture, rather than lost to the
+  harness's trailing-white-space stripping (or to bash, which can't hold
+  a NUL in a variable). New fixtures `rope-readfile.test` (on
+  `examples/tests/data/exact.bin`: `one` CR LF `two` FF `three` 0X
+  `four` LF `no final newline`), `rope-readfile-empty.test`,
+  `rope-readfile-missing.test`, expected output computed independently
+  from the escape rules; `rope-help.test`/`rope-unknown-command.test`
+  regenerated. `44 ok, 0 failed`.
+
+  *`Rope.Mod`* (`~/Repos/Oberon/oberon-tools`): `ReadAll (VAR rd:
+  Files.Rider): Rope` (rider position to end, via `Files.ReadBytes` in
+  4096-byte chunks — `rd.res` is the count *not* read),
+  `ReadFile (name; VAR r): BOOLEAN` (FALSE, with NIL, if `Files.Old`
+  gives NIL — a BOOLEAN because NIL is also the whole of an empty
+  file), and `WriteFile (name; r)` (`Files.New`, `WriteRider`,
+  `Files.Register`; a plain procedure, since `Register` HALTs(99) on
+  failure — confirmed in voc's `Files.Err` — so there is no failure
+  result to return). Rider-based for the positional form, per Phase
+  12's reasoning, rather than `Files.File`-based. `RopeTest.Mod`
+  186 → 195 checks (the same scenarios as `test_stream_io.adb`, plus a
+  0X surviving `ReadAll`); `RopeTool.Mod` gained `readfile FILE`, whose
+  three fixtures share `exact.bin`/`empty.txt` and give byte-identical
+  expected output to this repo's. `oberon-tools`' suite `305 ok, 0
+  failed`.
+
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds
 the matching `rope_tool` subcommand(s) — see "Command-line tool
@@ -1567,7 +1639,8 @@ questions" above:
   has never targeted them, not even as a stretch item): lazy/
   function-generator leaves (cord's `CORD_from_fn`), lazy substring
   nodes (`Slice` always copies here, matching `Rope.Mod`'s own
-  `Substring`), file-backed ropes (`CORD_from_file`/`_lazy`/`_eager`),
+  `Substring`), file-backed ropes (`CORD_from_file`/`_lazy`; `_eager`,
+  which isn't file-backed, has an equivalent since Phase 13),
   `CORD_printf`-style formatting. `PLAN.md` suggests a separate
   `Ropes.Lazy` child package if a real need for any of these shows up
   — none are on any phase's list, and adding them would be a bigger
@@ -1669,5 +1742,5 @@ Oberon original: `rope-chars.test`, `rope-overwrite.test`,
 `rope-lines-stdin.test`, `rope-lines-missing.test`, for commands
 `RopeTool.Mod` never had to begin with. Run via `cd examples && ./tests/run-tests.sh`
 (`-v` per-test, `-o` also showing captured output, or name specific
-fixtures — see the script's own header comment); currently `41 ok, 0
+fixtures — see the script's own header comment); currently `44 ok, 0
 failed`.

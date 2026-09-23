@@ -8,8 +8,8 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-12, Phases
-7-8 and 11 stretch phases and Phases 9-10 and 12 not really `Ada`-side
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-13, Phases
+7-8, 11 and 13 stretch phases and Phases 9-10 and 12 not really `Ada`-side
 changes — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
 depth-triggered auto-rebalance — `Balance`/`Balance_Insert`/
@@ -31,8 +31,9 @@ loop`), `Trim` (`Ada.Strings.Maps.Character_Set`-based, collapsing
 into `Ada.Strings.Fixed`'s own `"*"` vocabulary — see the "`"*"` is a
 real find" note below), `Escape`, and (Phase 11) `Process_Chunks` plus
 the `Ropes.Text_IO` child package (`Put`/`Put_Line`/`Get_Line`).
-`src/ropes.ads`/`.adb` and `src/ropes-text_io.ads`/`.adb` exist and
-build; `test/test_construction.adb` (19), `test_balance.adb` (5),
+`src/ropes.ads`/`.adb`, `src/ropes-text_io.ads`/`.adb` and (Phase 13)
+`src/ropes-stream_io.ads`/`.adb` (whole-file `Read`/`Write`/
+`Read_File`/`Write_File`, byte for byte) exist and build; `test/test_construction.adb` (19), `test_balance.adb` (5),
 `test_slice.adb` (8), `test_insert.adb` (8), `test_delete.adb` (9),
 `test_compare.adb` (19), `test_index.adb` (25), `test_split.adb` (15),
 `test_iterator.adb` (12), `test_map.adb` (4), `test_case.adb` (8),
@@ -40,10 +41,10 @@ build; `test/test_construction.adb` (19), `test_balance.adb` (5),
 `test_unbounded.adb` (4), `test_repeat.adb` (8), `test_escape.adb`
 (5), `test_overwrite.adb` (6), `test_head_tail.adb` (10),
 `test_contains.adb` (9), `test_split_visitor.adb` (13), and
-`test_text_io.adb` (17) — 223 checks total — all pass clean, including under valgrind. Plus a
+`test_text_io.adb` (17), `test_stream_io.adb` (11) — 234 checks total — all pass clean, including under valgrind. Plus a
 black-box `rope_tool` test suite, `examples/tests/` (`run-tests.sh` +
-41 `.test` fixtures, ported from
-`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `41 ok, 0 failed`.
+44 `.test` fixtures, ported from
+`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `44 ok, 0 failed`.
 `Balance`/`Max_Depth`/`Min_Length` are internal to `ropes.adb`, not
 public — `src/ropes-test_support.ads`/`.adb` is a small test-only
 child package (`function Depth`) so tests can confirm depth stays
@@ -201,6 +202,22 @@ overflowed. `RopeTest.Mod` 167 → 186 checks; `oberon-tools`' suite
 `302 ok, 0 failed`. The Oberon `ArgParser` already passed a bare `-`
 through, so its `lines -` never needed the `-- -` workaround.
 
+**Phase 13 added whole-file, byte-for-byte I/O in both repos** — at
+explicit user request, in `Ropes.Stream_IO` here and `Rope.Mod`'s
+`ReadAll`/`ReadFile`/`WriteFile` in `oberon-tools`. **Built on
+`Ada.Streams.Stream_IO`, not `Text_IO`, on purpose**: `Text_IO` is
+line-oriented and can't round-trip bytes (form feeds are page
+terminators; closing an output file with an unfinished last line adds
+a terminator), so there is deliberately no `Text_IO.File_Type`
+overload even though that was the shape first suggested. It also
+turned up a loose grouping in `PLAN.md`'s out-of-scope list:
+`CORD_from_file_eager` had been filed under "file-backed ropes", but
+it reads the whole file and returns an ordinary cord (checked in
+cord's own `cordxtra.c`, not assumed) — that is what Phase 13 adds;
+genuinely file-backed ropes (`CORD_from_file`/`_lazy`) stay out of
+scope. **When a scope list groups things, check each member against
+the source before treating the whole group as ruled out.**
+
 **`"*"` is a real find, not in the original design sketch**: `Rope.Mod`'s
 `Repeat`/`Make` were originally sketched as functions of those names,
 but `Ada.Strings.Fixed` already has `"*" (Natural, Character)`/`"*"
@@ -244,8 +261,10 @@ true going forward).
 `cat`/`len`/`fetch`/`slice`/`insert`/`delete`/`overwrite`/`head`/`tail`/
 `cmp`/`index`/`rindex`/`indexchar`/`rindexchar`/`split`/`chars`/`trim`/
 `triml`/`trimr`/`upper`/`lower`/`capitalize`/`uncapitalize`/`repeat`/
-`make`/`bigcat`/`contains`/`escaped`/`lines`, matching all of `Ropes`'s API
-through Phase 11 (`lines FILE` is Phase 11's `Ropes.Text_IO.Get_Line`
+`make`/`bigcat`/`contains`/`escaped`/`lines`/`readfile`, matching all of
+`Ropes`'s API through Phase 13 (`readfile FILE` is Phase 13's
+`Ropes.Stream_IO.Read_File` demo, printing the contents `Escape`d so
+that every byte shows in a fixture; `lines FILE` is Phase 11's `Ropes.Text_IO.Get_Line`
 demo, the one command that reads input — `-` for standard input; this
 needs `arg_parser` `264a098` or later, since older `Arg_Parser`s
 silently dropped a bare `-`, and `lines` briefly required `-- -` until

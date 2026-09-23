@@ -1,0 +1,7 @@
+# An empty file reads as the empty rope: length 0, nothing after it.
+program rope_tool
+arg readfile
+arg tests/data/empty.txt
+status 0
+output
+0

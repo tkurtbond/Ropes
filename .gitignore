@@ -22,6 +22,7 @@ test/test_head_tail
 test/test_contains
 test/test_split_visitor
 test/test_text_io
+test/test_stream_io
 examples/obj/
 examples/rope_tool
 

@@ -42,6 +42,13 @@ adds `Put`, `Put_Line` and `Get_Line`, mirroring
 overflows it, while `Put` writes leaf by leaf and `Get_Line` reads a
 line of any length in chunks.
 
+[`src/ropes-stream_io.ads`](src/ropes-stream_io.ads) (`Ropes.Stream_IO`)
+adds whole-file I/O, byte for byte: `Read_File (Name)`/`Write_File
+(Name, Item)`, and `Read`/`Write` on an `Ada.Streams.Stream_IO`
+file. Use it, not a `Get_Line` loop, to load or save a whole document:
+`Text_IO` is line-oriented, so it can't tell whether the last line had
+a line feed, and treats form feeds as page terminators.
+
 ## Example
 
 ```ada
@@ -81,7 +88,7 @@ Build the library (a static library, `lib/libropes.a`):
 gprbuild -P ropes.gpr -p
 ```
 
-Build and run the unit tests (21 standalone programs, one per area,
+Build and run the unit tests (22 standalone programs, one per area,
 each printing `ok   - ...` / `FAIL - ...` per check):
 
 ```sh
@@ -100,6 +107,7 @@ gprbuild -P rope_tool.gpr -p
 ./rope_tool cat foo bar       # foobar
 ./rope_tool split a,b,c ,     # a / b / c, one per line
 ./rope_tool lines tests/data/lines.txt   # each line's length, then the line
+./rope_tool readfile tests/data/exact.bin  # length, then every byte, escaped
 ./rope_tool --help            # list every subcommand
 ./tests/run-tests.sh
 ```

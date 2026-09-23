@@ -1,0 +1,11 @@
+# data/exact.bin read whole, byte for byte: a CR before a line feed, a
+# form feed, a 0X, and no line feed at the end -- each of which a
+# line-by-line read (lines) would lose or change.  Printed as its length,
+# a space, and its contents escaped, so every byte shows.  The same data
+# file and expected output as oberon-tools' rope-readfile.test.
+program rope_tool
+arg readfile
+arg tests/data/exact.bin
+status 0
+output
+36 one\r\ntwo\012three\000four\nno final newline

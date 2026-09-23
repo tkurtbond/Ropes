@@ -4,6 +4,7 @@ with Ada.Strings.Fixed;
 with Ada.Strings.Maps;
 with Ada.Text_IO;      use Ada.Text_IO;
 with Ropes;            use Ropes;
+with Ropes.Stream_IO;
 with Ropes.Text_IO;
 
 package body Rope_Tool_Args is
@@ -781,5 +782,29 @@ package body Rope_Tool_Args is
          Set_Exit_Status (Failure);
          return False;
    end Lines_Argument_Handler;
+
+   --  --- readfile FILE ---
+   --
+   --  Demonstrates Ropes.Stream_IO.Read_File (Phase 13): the whole file,
+   --  byte for byte. Printed escaped (Ropes.Escape) so that what makes a
+   --  byte-exact read different from a line-by-line one -- a CR, a form
+   --  feed, a 0X, whether there is a final line feed -- is visible in the
+   --  output rather than lost to the terminal or to the test harness's
+   --  trailing-white-space stripping.
+
+   function Readfile_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+      Contents : Rope;
+   begin
+      Contents := Ropes.Stream_IO.Read_File (Arg);
+      Put (Ada.Strings.Fixed.Trim (Natural'Image (Length (Contents)), Ada.Strings.Both) & " ");
+      Ropes.Text_IO.Put_Line (Escape (Contents));
+      return True;
+   exception
+      when Name_Error | Use_Error | Device_Error =>
+         Put_Line (Standard_Error, "Error: cannot read """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+   end Readfile_Argument_Handler;
 
 end Rope_Tool_Args;

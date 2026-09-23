@@ -95,3 +95,6 @@ tail S COUNT  Print the last COUNT characters of S, space-padded if S is shorter
 
 lines FILE  Read FILE (standard input if FILE is -) and print each line's length, a space, and the line.
 
+
+readfile FILE  Read all of FILE, byte for byte, and print its length, a space, and its contents escaped.
+
