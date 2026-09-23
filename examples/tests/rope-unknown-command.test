@@ -93,5 +93,5 @@ head S COUNT  Print the first COUNT characters of S, space-padded if S is shorte
 tail S COUNT  Print the last COUNT characters of S, space-padded if S is shorter.
 
 
-lines FILE  Read FILE (standard input if FILE is -, given as "-- -") and print each line's length, a space, and the line.
+lines FILE  Read FILE (standard input if FILE is -) and print each line's length, a space, and the line.
 

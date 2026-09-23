@@ -1461,13 +1461,15 @@ parameter's type.
   and a new `lines FILE` subcommand — the one command that reads input,
   demonstrating `Get_Line`: each line of FILE printed as its length, a
   space, and the line, via the `File` overload, or of standard input
-  via the no-`File` overload when FILE is `-`. That `-` must be given
-  as `-- -`: `Arg_Parser` treats a bare `-` as an empty cluster of short
-  options and silently drops it rather than passing it on as a
-  positional argument (the same happens to `cat - b`) — a bug in
-  `arg_parser` itself, documented here and in `lines`'s help text
-  rather than fixed, since `arg_parser` is a separate, installed
-  library. Three new fixtures — `rope-lines.test`,
+  via the no-`File` overload when FILE is `-`. That `-` first had to be
+  given as `-- -`: `Arg_Parser` treated a bare `-` as an empty cluster
+  of short options and silently dropped it (the same happened to `cat
+  - b`). Fixed upstream in `~/Repos/Ada/arg_parser` as `264a098`,
+  together with its clustered-short-option bugs (`-i10` rejected,
+  `-ia 10` giving `-i` the value `10` and also running `-a`, a cluster
+  continuing after a handler returned False), after which `rope_tool`
+  dropped the `-- -` workaround — so `rope_tool` now needs that
+  `arg_parser` or later. Three new fixtures — `rope-lines.test`,
   `rope-lines-stdin.test`, `rope-lines-missing.test` — reading
   `examples/tests/data/lines.txt` (lines of 4096 and 4097 characters
   either side of `Get_Line`'s buffer, an empty line, and an
@@ -1495,8 +1497,7 @@ Process-callback `Split`. (Phase 9, below, doesn't change anything
 here — it fed Phase 8's additions back into `Rope.Mod`, not into
 `Ropes` itself, so this list is still current as of Phase 8, the last
 phase that touched this repo's own scope — until Phase 11, which added
-`Process_Chunks`/`Ropes.Text_IO`, made `Compare` linear, and found the
-`Arg_Parser` bare-`-` bug listed below.) What's left, gathered in
+`Process_Chunks`/`Ropes.Text_IO`, and made `Compare` linear.) What's left, gathered in
 one place for whichever future phase picks it up, rather than left
 scattered across "What's explicitly out of scope (v1)" and "Open
 questions" above:
@@ -1526,12 +1527,6 @@ questions" above:
   the current `Natural` ceiling raises `Ada.Strings.Length_Error`
   cleanly rather than wrapping, so this is a scaling question, not a
   correctness gap.
-
-- **`Arg_Parser` drops a bare `-` argument** (found at Phase 11;
-  see its entry): `rope_tool lines -` has to be written `lines -- -`.
-  The fix belongs in `~/Repos/Ada/arg_parser`'s
-  `Parse_Arguments` (treat a lone `-` as a positional argument, as
-  POSIX utilities do), not in this repo.
 
 No phase is currently planned for any of these — they're recorded here
 so a future session doesn't have to re-derive "what's actually left"

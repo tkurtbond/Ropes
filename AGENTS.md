@@ -220,10 +220,10 @@ true going forward).
 `triml`/`trimr`/`upper`/`lower`/`capitalize`/`uncapitalize`/`repeat`/
 `make`/`bigcat`/`contains`/`escaped`/`lines`, matching all of `Ropes`'s API
 through Phase 11 (`lines FILE` is Phase 11's `Ropes.Text_IO.Get_Line`
-demo, the one command that reads input — `-` for standard input, which
-must be given as `-- -`: `Arg_Parser` silently drops a bare `-`
-instead of passing it on as a positional argument, a bug in
-`arg_parser` itself, not worked around there; `cmp` is built from `"="`/`"<"` in
+demo, the one command that reads input — `-` for standard input; this
+needs `arg_parser` `264a098` or later, since older `Arg_Parser`s
+silently dropped a bare `-`, and `lines` briefly required `-- -` until
+that was fixed upstream; `cmp` is built from `"="`/`"<"` in
 `rope_tool_args.adb` itself, since `Ropes` has no public `Compare`
 function to wrap — see PLAN.md's "Comparison"; `index`/`rindex` and
 `indexchar`/`rindexchar` are each one `Ropes.Index` overload called

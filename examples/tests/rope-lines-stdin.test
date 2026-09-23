@@ -3,12 +3,11 @@
 # internal 4096-character buffer -- and printed as its length, a space,
 # and the line. The last line has no terminator. No RopeTool.Mod
 # counterpart (Rope.Mod has no I/O).
-# Current_Input overload, FILE = "-". Given as "-- -" because
-# Arg_Parser drops a bare "-" instead of passing it on as an argument
-# (see rope_tool_args.adb's lines comment).
+# Current_Input overload, FILE = "-" (passed on as an argument by
+# Arg_Parser since arg_parser 264a098; before that it was dropped, and
+# this fixture had to use "-- -").
 program rope_tool
 arg lines
-arg --
 arg -
 input tests/data/lines.txt
 status 0

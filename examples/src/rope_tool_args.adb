@@ -740,12 +740,9 @@ package body Rope_Tool_Args is
    --  buffer as long as the line. FILE = "-" reads Current_Input via
    --  the no-File overload; anything else is opened and read via the
    --  File overload. No Rope.Mod/RopeTool.Mod counterpart (Rope.Mod has
-   --  no I/O at all).
-   --
-   --  "-" has to be given as "-- -": Arg_Parser treats a bare "-" as an
-   --  (empty) cluster of short options and silently drops it, rather than
-   --  passing it on as a positional argument, so without the "--" this
-   --  handler never sees it at all.
+   --  no I/O at all). Needs an Arg_Parser that passes a bare "-" on as
+   --  an argument (arg_parser 264a098 and later); older ones silently
+   --  dropped it, so this handler never saw it.
 
    function Lines_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
       pragma Unreferenced (Start_With);

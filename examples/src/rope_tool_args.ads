@@ -253,7 +253,7 @@ package Rope_Tool_Args is
        ("lines",
         Make_Parser
           (Description =>
-             "lines FILE  Read FILE (standard input if FILE is -, given as ""-- -"") and print each line's length, a space, and the line.",
+             "lines FILE  Read FILE (standard input if FILE is -) and print each line's length, a space, and the line.",
            Handler     => Lines_Argument_Handler'Access, Options => null))];
 
    Main_Parser : Parser :=
