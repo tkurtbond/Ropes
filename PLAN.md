@@ -1343,6 +1343,39 @@ parameter's type.
   0 failed`. Committed and pushed to `oberon-tools` as `512963b`; no
   file in this repo changed as a result, so there is nothing under
   `src/`/`test/`/`examples/` to point to for this phase.
+- **Phase 10, done — mostly not an `Ada`-side change either.** Caught
+  by the user reviewing `examples/src/rope_tool_args.adb`'s `chars`
+  comment: it said `chars` was "the one rope_tool command with no
+  RopeTool.Mod counterpart (it has no iterator-related subcommand at
+  all)" — true of `RopeTool.Mod` specifically, but easily misread as
+  "`Rope.Mod` has nothing iterator-related", which is false. `Rope.Mod`
+  has *two* character-level iteration APIs — `Iterate` (a push-based
+  `Visitor` callback with early-stop support) and the `Iterator` type
+  (a stateful `Get`/`Incr`/`Decr`/`Goto`/`Move`/`Peek`/`Source`
+  cursor) — both there all along; `RopeTool.Mod` just never had a
+  subcommand demonstrating either one. Two fixes, at explicit user
+  request: (1) the comment itself, corrected to state this precisely
+  rather than leave the ambiguous reading in place; (2) `RopeTool.Mod`
+  gained `iterate` (via `Rope.Iterate`) and `iterator` (via
+  `Rope.NewIterator`/`Get`/`Incr`) subcommands, each printing a rope's
+  characters one per line — the same output `chars` produces here,
+  demonstrating `Rope.Mod`'s two *separate* iteration APIs as two
+  separate commands rather than picking one to stand in for both.
+  Fixing this also surfaced a real, previously-unnoticed test gap:
+  `Rope.Iterate` had zero coverage in `RopeTest.Mod` (only the
+  `Iterator` type was checked, via `CheckIterator`) — closed with a new
+  `CheckIterate` (3 checks: visits every character in order, stops
+  early when the visitor returns `FALSE`, and `NIL` visits nothing),
+  164 → 167 checks. `tests/rope-selftest.test`, `rope-help.test` and
+  `rope-unknown-command.test` regenerated from real runs again (same
+  reason as Phase 9); new `tests/rope-iterate.test`/`rope-iterator.test`
+  fixtures added — `tests/run-tests.sh` reports `298 ok, 0 failed`.
+  Committed and pushed to `oberon-tools` as `6676de6`. The one thing
+  that *did* change in this repo: `rope_tool_args.adb`'s `chars`
+  comment itself, corrected as described above (no new `rope_tool`
+  subcommand, since `chars` already demonstrates `Ropes.Cursor`/
+  `Iterable` — there is no new `Ropes` operation this phase adds for it
+  to demonstrate).
 
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds

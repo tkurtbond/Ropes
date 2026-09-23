@@ -411,11 +411,18 @@ package body Rope_Tool_Args is
    end Split_Argument_Handler;
 
    --  --- chars S ---
-   --  The one rope_tool command with no RopeTool.Mod counterpart (it
-   --  has no iterator-related subcommand at all): a direct demo of
-   --  Ropes.Cursor and the Iterable aspect (see PLAN.md's "Iteration"
-   --  section), rather than a wrapped operation like every other
-   --  command here.
+   --  A direct demo of Ropes.Cursor and the Iterable aspect (see
+   --  PLAN.md's "Iteration" section) -- the Ada replacement for
+   --  Rope.Mod's own Iterator type -- rather than a wrapped operation
+   --  like every other command here. Rope.Mod itself has two
+   --  character-level iteration APIs, Iterate (a push-based Visitor
+   --  callback with early-stop support) and the Iterator type (a
+   --  stateful Get/Incr/Decr/Goto/Move/Peek/Source cursor); both
+   --  existed there all along -- it was RopeTool.Mod that had no
+   --  subcommand demonstrating either one, not Rope.Mod lacking the
+   --  capability. Since fixed (oberon-tools commit 6676de6): RopeTool.Mod
+   --  now has iterate/iterator subcommands that print a rope's
+   --  characters one per line, the same output chars produces here.
 
    function Chars_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
       pragma Unreferenced (Start_With);
@@ -584,7 +591,7 @@ package body Rope_Tool_Args is
       Bigcat_Count := Bigcat_Count + 1;
       return True;
    exception
-      when Constraint_Error          =>
+      when Constraint_Error         =>
          Put_Line (Standard_Error, "Error: not a valid count: """ & Arg & """");
          Set_Exit_Status (Failure);
          return False;

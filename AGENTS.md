@@ -8,9 +8,9 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-9, Phases
-7-8 both stretch phases and Phase 9 not an `Ada`-side change at all —
-see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-10, Phases
+7-8 both stretch phases and Phases 9-10 not really `Ada`-side changes
+— see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
 depth-triggered auto-rebalance — `Balance`/`Balance_Insert`/
 `Balance_Walk`/`Concat_Forest`, the Fibonacci-forest algorithm), plus
@@ -88,6 +88,33 @@ sibling `oberon-tools` checkout. The operator overloads and
 trip back (no Oberon-2 counterpart to either), nor did the
 Process-callback `Split` (it was already restoring `Rope.Mod`'s own
 pre-existing `Split` visitor, so there was nothing new to send back).
+
+**Phase 10 caught a misleading comment, and a real test gap it led
+to.** `examples/src/rope_tool_args.adb`'s `chars` comment said `chars`
+was "the one rope_tool command with no RopeTool.Mod counterpart (it
+has no iterator-related subcommand at all)" — true of `RopeTool.Mod`
+specifically, but easily misread as "`Rope.Mod` has nothing
+iterator-related", which is false: `Rope.Mod` has *two*
+character-level iteration APIs (`Iterate`, a push-based `Visitor`
+callback with early-stop support, and the `Iterator` type, a stateful
+`Get`/`Incr`/`Decr`/`Goto`/`Move`/`Peek`/`Source` cursor) — both there
+all along. `RopeTool.Mod` just never had a subcommand demonstrating
+either. Fixed the comment, and — at explicit user request — added
+`iterate`/`iterator` subcommands to `RopeTool.Mod` (each printing a
+rope's characters one per line, matching `chars`'s own output, as two
+*separate* commands for `Rope.Mod`'s two separate iteration APIs, not
+one standing in for both). Investigating this surfaced a real,
+previously-unnoticed gap: `Rope.Iterate` had zero test coverage in
+`RopeTest.Mod` (only the `Iterator` type was checked) — closed with a
+new `CheckIterate`, 164 → 167 checks. All in `oberon-tools` (commit
+`6676de6`); the only change in this repo is the comment fix itself —
+see `PLAN.md`'s Phase 10 entry for the full account. **A misleading
+comment is worth fixing the moment it's spotted, even in a file this
+project doesn't otherwise touch for a phase** — catching "technically
+true, easily misread" wording is exactly the kind of review this
+project's own discipline (verify against the real source, don't
+assume) should also apply to its own prose, not just to `Ropes`'s Ada
+code.
 
 **`"*"` is a real find, not in the original design sketch**: `Rope.Mod`'s
 `Repeat`/`Make` were originally sketched as functions of those names,
