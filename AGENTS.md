@@ -200,9 +200,9 @@ subprocess (exit status + combined stdout/stderr), distinct from
 - `Rope.Mod`'s own test suite: `~/Repos/Oberon/oberon-tools/RopeTest.Mod`
   (internal `ok`/`not ok` check battery) and
   `~/Repos/Oberon/oberon-tools/RopeTool.Mod` (a CLI demo exposing each
-  operation as a subcommand — **being ported**, as `examples/
-  rope_tool`, built on `~/Repos/Ada/arg_parser`; see `PLAN.md`'s
-  "Command-line tool (rope_tool)"), plus the black-box fixtures at
+  operation as a subcommand — **fully ported** as of Phase 7, as
+  `examples/rope_tool`, built on `~/Repos/Ada/arg_parser`; see
+  `PLAN.md`'s "Command-line tool (rope_tool)"), plus the black-box fixtures at
   `~/Repos/Oberon/oberon-tools/tests/rope-*.test`. This is where
   `Ropes`'s own test cases come from — see `PLAN.md`'s "Testing
   approach". **Do not copy an expected outcome verbatim** where

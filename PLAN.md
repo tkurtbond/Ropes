@@ -47,7 +47,7 @@
   clamp-and-succeed behavior this plan deliberately replaces with
   `Ada.Strings.Index_Error`/`Length_Error` (see below), so the
   *expected outcome* changes even where the *scenario* carries over
-  unchanged. **`RopeTool` itself is being ported too**, as `examples/
+  unchanged. **`RopeTool` itself is ported too** (fully, as of Phase 7), as `examples/
   rope_tool` — see "Command-line tool (rope_tool)" below.
 
 ## Why this is a real port, not a transliteration
