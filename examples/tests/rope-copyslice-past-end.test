@@ -1,0 +1,11 @@
+# HIGH past the end of S: Index_Error, exactly as for slice.
+program rope_tool
+arg copyslice
+arg hello
+arg 2
+arg 9
+arg abcdefghij
+arg 1
+status 1
+output
+Error: LOW/HIGH out of range for S, or the slice does not fit in T at POS

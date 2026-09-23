@@ -1,0 +1,12 @@
+# Ropes.Copy_Slice (Rope.Mod's Blit): "world" (positions 7 through 11 of
+# S) copied into T at position 3, and the rest of T left as it was.
+program rope_tool
+arg copyslice
+arg hello world
+arg 7
+arg 11
+arg XXXXXXXXX
+arg 3
+status 0
+output
+XXworldXX

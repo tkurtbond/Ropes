@@ -2,6 +2,7 @@ with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Strings;
 with Ada.Strings.Fixed;
 with Ada.Strings.Maps;
+with Ada.Strings.Unbounded;
 with Ada.Text_IO;      use Ada.Text_IO;
 with Ropes;            use Ropes;
 with Ropes.Stream_IO;
@@ -113,6 +114,58 @@ package body Rope_Tool_Args is
          Set_Exit_Status (Failure);
          return False;
    end Slice_Argument_Handler;
+
+   --  --- copyslice S LOW HIGH T POS ---
+   --
+   --  Demonstrates Copy_Slice (Phase 15): unlike slice, the characters go
+   --  into part of an existing String, T, whose other characters are left
+   --  as they were -- which is what the output shows.
+
+   Copyslice_Count : Natural := 0;
+   Copyslice_S     : Rope;
+   Copyslice_Low   : Positive;
+   Copyslice_High  : Natural;
+   Copyslice_T     : Ada.Strings.Unbounded.Unbounded_String;
+
+   function Copyslice_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Copyslice_Count is
+         when 0 =>
+            Copyslice_S := From_String (Arg);
+
+         when 1 =>
+            Copyslice_Low := Positive'Value (Arg);
+
+         when 2 =>
+            Copyslice_High := Natural'Value (Arg);
+
+         when 3 =>
+            Copyslice_T := Ada.Strings.Unbounded.To_Unbounded_String (Arg);
+
+         when 4 =>
+            declare
+               T : String := Ada.Strings.Unbounded.To_String (Copyslice_T);
+            begin
+               Copy_Slice (Copyslice_S, Copyslice_Low, Copyslice_High, T, Positive'Value (Arg));
+               Put_Line (T);
+            end;
+
+         when others =>
+            null;
+      end case;
+      Copyslice_Count := Copyslice_Count + 1;
+      return True;
+   exception
+      when Constraint_Error        =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Index_Error =>
+         Put_Line (Standard_Error, "Error: LOW/HIGH out of range for S, or the slice does not fit in T at POS");
+         Set_Exit_Status (Failure);
+         return False;
+   end Copyslice_Argument_Handler;
 
    --  --- insert S BEFORE INS ---
 

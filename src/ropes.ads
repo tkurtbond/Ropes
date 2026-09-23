@@ -145,6 +145,29 @@ package Ropes is
    --  instead of a 0-based (start, len) pair, and Index_Error instead
    --  of clamping -- see PLAN.md's "Access and slicing".
 
+   procedure Copy_Slice (Source : Rope; Low : Positive; High : Natural; Target : in out String; Target_Low : Positive);
+   --  Copies Source's characters Low through High, inclusive, into
+   --  Target (Target_Low .. Target_Low + (High - Low)), leaving the rest
+   --  of Target untouched -- the same characters as
+   --  Target (Target_Low .. Target_Low + (High - Low)) := To_String
+   --  (Slice (Source, Low, High)), but copied once, straight out of the
+   --  leaves that overlap Low .. High, with no intermediate Rope and no
+   --  String temporary on the stack (so a range of any length can be
+   --  copied into, say, a heap-allocated String). Rope.Mod's Blit, with
+   --  Slice's inclusive 1-based Low/High instead of Blit's 0-based
+   --  (srcStart, len), and Target_Low an index into Target itself
+   --  (which need not start at 1). Phase 15; see PLAN.md.
+   --
+   --  Source's bounds are checked exactly as Slice checks them: nothing
+   --  is copied (not an error) if High < Low, even if Low = Length
+   --  (Source) + 1; Ada.Strings.Index_Error if Low - 1 > Length
+   --  (Source) or High > Length (Source). Ada.Strings.Index_Error too,
+   --  rather than the Constraint_Error the slice assignment above would
+   --  give, if a non-empty range does not fit in Target (Target_Low <
+   --  Target'First or Target_Low + (High - Low) > Target'Last). Every
+   --  check is made before anything is copied, so on Index_Error Target
+   --  is unchanged.
+
    function Insert (Source : Rope; Before : Positive; New_Item : Rope) return Rope;
    --  Source with New_Item spliced in just before index Before.
    --  Raises Ada.Strings.Index_Error if Before - 1 > Length (Source)

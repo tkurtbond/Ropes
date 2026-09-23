@@ -27,7 +27,8 @@ reworked with Ada idioms:
 The full API is in [`src/ropes.ads`](src/ropes.ads). It covers:
 construction (`From_String`, `From_Character`, `"&"`, `"*"`,
 `From_/To_Unbounded_String`, `To_String`), access (`Length`,
-`Is_Empty`, `Element`, `Slice`), editing (`Insert`, `Delete`,
+`Is_Empty`, `Element`, `Slice`, `Copy_Slice` into part of an existing
+`String`), editing (`Insert`, `Delete`,
 `Overwrite`, `Head`, `Tail`), comparison (`=`, `<`, `<=`, `>`, `>=`),
 searching (`Index`, `Contains`), `Split` (array-returning or
 callback), `Trim`, `Map`/`Map_Indexed`, case conversion
@@ -88,7 +89,7 @@ Build the library (a static library, `lib/libropes.a`):
 gprbuild -P ropes.gpr -p
 ```
 
-Build and run the unit tests (22 standalone programs, one per area,
+Build and run the unit tests (23 standalone programs, one per area,
 each printing `ok   - ...` / `FAIL - ...` per check):
 
 ```sh

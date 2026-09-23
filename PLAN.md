@@ -288,7 +288,7 @@ later phase to add). Same
 than hand-derived wherever the translation was non-mechanical — see
 "Testing approach" below for the two real divergences that caught
 (`bigcat`'s overflow behavior and `slice`'s past-the-end boundary).
-Currently `44 ok, 0 failed`; run via `cd examples &&
+Currently `47 ok, 0 failed`; run via `cd examples &&
 ./tests/run-tests.sh`.
 
 ## Core design
@@ -502,7 +502,23 @@ precedent than `Index`/`Trim`/`Slice` were.
 function Element (Source : Rope; Index : Positive) return Character;   -- Ada.Strings.Unbounded naming; Rope.Mod's Fetch
 function Is_Empty (Source : Rope) return Boolean;
 function Slice (Source : Rope; Low : Positive; High : Natural) return Rope;  -- inclusive bounds, Unbounded_String's own Slice convention/signature exactly; Rope.Mod's Substring(start, len)
+procedure Copy_Slice (Source : Rope; Low : Positive; High : Natural; Target : in out String; Target_Low : Positive);  -- Rope.Mod's Blit (Phase 15)
 ```
+
+`Rope.Mod`'s `Blit (r, srcStart, dst, dstStart, len)` — copy part of
+a rope into part of an existing `ARRAY OF CHAR` — was, until Phase 15,
+the one `Rope.Mod` operation this mapping never mentioned. Its
+idiomatic Ada equivalent needs no new operation at all: `Target
+(Target_Low .. Target_Low + (High - Low)) := To_String (Slice (Source,
+Low, High))`, the way `Ada.Strings.Unbounded` (which has no blit either)
+is used. But that copies twice (`Slice` builds a new rope, `To_String`
+flattens it) and puts the whole range on the stack as `To_String`'s
+temporary, so `Copy_Slice` does it once, straight out of the
+overlapping leaves. `Ada.Strings` was checked for a match first:
+`Ada.Strings.Fixed.Move` fills the *whole* target, justifying and
+padding it, and `Fixed.Overwrite`'s procedure form has truncate/
+`Length_Error` semantics — neither is "copy this range into part of an
+existing string, leaving the rest alone".
 
 `Slice` takes **inclusive `Low`/`High`**, matching
 `Ada.Strings.Unbounded.Slice` exactly (including its exact signature —
@@ -1644,6 +1660,41 @@ parameter's type.
   `Rope.Mod`'s name as `Escaped`, and printing via its since-removed
   `PrintRope`).
 
+- **Phase 15, done — `Copy_Slice`, `Rope.Mod`'s `Blit`.** At explicit
+  user request, after the user asked what `Ropes`'s equivalent of
+  `Blit` was and the answer turned out to be "none, and `PLAN.md`'s
+  mapping doesn't say" — see "Access and slicing" above for why the
+  slice-assignment idiom wasn't enough and why `Copy_Slice` isn't an
+  existing `Ada.Strings` name. `procedure Copy_Slice (Source; Low;
+  High; Target : in out String; Target_Low)`: `Slice`'s own inclusive
+  1-based bounds and `Index_Error` rules on the source side (an empty
+  range is a no-op, even at `Low = Length + 1`, and needn't fit in
+  `Target`); `Index_Error` too — not the `Constraint_Error` a slice
+  assignment would give — if a non-empty range doesn't fit in `Target`,
+  with every check made before anything is copied, so `Target` is
+  unchanged on error. `Target_Low` indexes `Target` itself, which need
+  not start at 1. The fit check is written as `High - Low >
+  Target'Last - Target_Low`, not `Target_Low + (High - Low) >
+  Target'Last`, so that a `Target_Low` near `Positive'Last` can't
+  overflow the check itself. Implemented by `Node_Copy`, `Node_Slice`'s
+  shape without building any nodes: O(len + depth), `Rope.Mod`'s
+  `BlitHelper` (Phase 14) translated.
+
+  `test_copy_slice.adb` (11 checks): into the middle of `Target`, into
+  a `Target` not starting at 1, every `Low`/`High` pair (empty ranges
+  included) across 17-character leaves against `To_String (Slice
+  (...))`, with sentinels either side; each `Index_Error` case leaving
+  `Target` unchanged, including `Target_Low = Positive'Last`; and 20
+  million characters into a heap-allocated `String`, which the
+  slice-assignment idiom's stack temporary couldn't do. Clean under
+  valgrind; hand-formatted, since `gnatpp` can't format its `[for I in
+  ... =>]` aggregate (the same limitation as `test_compare.adb`'s).
+  `rope_tool copyslice S LOW HIGH T POS` prints `T` after the copy, so
+  the untouched rest of `T` shows; fixtures `rope-copyslice.test`,
+  `rope-copyslice-no-fit.test`, `rope-copyslice-past-end.test`, and
+  `rope-help.test`/`rope-unknown-command.test` regenerated. `47 ok, 0
+  failed`.
+
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds
 the matching `rope_tool` subcommand(s) — see "Command-line tool
@@ -1771,5 +1822,5 @@ Oberon original: `rope-chars.test`, `rope-overwrite.test`,
 `rope-lines-stdin.test`, `rope-lines-missing.test`, for commands
 `RopeTool.Mod` never had to begin with. Run via `cd examples && ./tests/run-tests.sh`
 (`-v` per-test, `-o` also showing captured output, or name specific
-fixtures — see the script's own header comment); currently `44 ok, 0
+fixtures — see the script's own header comment); currently `47 ok, 0
 failed`.

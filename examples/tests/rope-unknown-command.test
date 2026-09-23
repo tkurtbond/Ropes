@@ -98,3 +98,6 @@ lines FILE  Read FILE (standard input if FILE is -) and print each line's length
 
 readfile FILE  Read all of FILE, byte for byte, and print its length, a space, and its contents escaped.
 
+
+copyslice S LOW HIGH T POS  Print T with S's characters LOW through HIGH (1-based, inclusive) copied into it at POS.
+

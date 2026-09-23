@@ -8,7 +8,7 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-14, Phases
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-15, Phases
 7-8, 11 and 13 stretch phases and Phases 9-10, 12 and 14 not really
 `Ada`-side changes — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
@@ -16,7 +16,8 @@ depth-triggered auto-rebalance — `Balance`/`Balance_Insert`/
 `Balance_Walk`/`Concat_Forest`, the Fibonacci-forest algorithm), plus
 `"&"`'s `Character`/`String` overloads, `From_String`/`From_Character`/
 `To_String`, `From_Unbounded_String`/`To_Unbounded_String`, `Element`,
-`Slice`, `Insert`, `Delete`, `Overwrite`/`Head`/`Tail`, the five
+`Slice`, `Copy_Slice` (Phase 15, `Rope.Mod`'s `Blit`), `Insert`,
+`Delete`, `Overwrite`/`Head`/`Tail`, the five
 comparison operators (`"="`/`"<"`/`"<="`/`">"`/`">="`), `Index`
 (`Rope`/`Character` patterns, each with a no-`From` and a
 `From`-bounded overload, both directions), `Contains` (a thin wrapper
@@ -41,10 +42,10 @@ the `Ropes.Text_IO` child package (`Put`/`Put_Line`/`Get_Line`).
 `test_unbounded.adb` (4), `test_repeat.adb` (8), `test_escape.adb`
 (5), `test_overwrite.adb` (6), `test_head_tail.adb` (10),
 `test_contains.adb` (9), `test_split_visitor.adb` (13), and
-`test_text_io.adb` (17), `test_stream_io.adb` (11) — 234 checks total — all pass clean, including under valgrind. Plus a
+`test_text_io.adb` (17), `test_stream_io.adb` (11), `test_copy_slice.adb` (11) — 245 checks total — all pass clean, including under valgrind. Plus a
 black-box `rope_tool` test suite, `examples/tests/` (`run-tests.sh` +
-44 `.test` fixtures, ported from
-`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `44 ok, 0 failed`.
+47 `.test` fixtures, ported from
+`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `47 ok, 0 failed`.
 `Balance`/`Max_Depth`/`Min_Length` are internal to `ropes.adb`, not
 public — `src/ropes-test_support.ads`/`.adb` is a small test-only
 child package (`function Depth`) so tests can confirm depth stays
@@ -267,8 +268,10 @@ true going forward).
 `cat`/`len`/`fetch`/`slice`/`insert`/`delete`/`overwrite`/`head`/`tail`/
 `cmp`/`index`/`rindex`/`indexchar`/`rindexchar`/`split`/`chars`/`trim`/
 `triml`/`trimr`/`upper`/`lower`/`capitalize`/`uncapitalize`/`repeat`/
-`make`/`bigcat`/`contains`/`escaped`/`lines`/`readfile`, matching all of
-`Ropes`'s API through Phase 13 (`readfile FILE` is Phase 13's
+`make`/`bigcat`/`contains`/`escaped`/`lines`/`readfile`/`copyslice`, matching
+all of `Ropes`'s API through Phase 15 (`copyslice S LOW HIGH T POS` is
+Phase 15's `Copy_Slice` demo, printing T after the copy so its
+untouched rest shows; `readfile FILE` is Phase 13's
 `Ropes.Stream_IO.Read_File` demo, printing the contents `Escape`d so
 that every byte shows in a fixture; `lines FILE` is Phase 11's `Ropes.Text_IO.Get_Line`
 demo, the one command that reads input — `-` for standard input; this

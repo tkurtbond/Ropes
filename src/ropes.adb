@@ -397,6 +397,36 @@ package body Ropes is
       end case;
    end Node_Slice;
 
+   --  Copies N's characters Start + 1 .. Start + Len (a 0-based offset
+   --  and a length, like Node_Slice's) into Target (T .. T + Len - 1),
+   --  advancing T past them. Precondition: Len > 0 and Start + Len <=
+   --  N.Len, and the target range lies within Target. Descends only into
+   --  the subtrees overlapping the range and copies straight out of each
+   --  leaf, so it is O(Len + depth), like Node_Slice but with no new
+   --  nodes built -- Rope.Mod's BlitHelper.
+   procedure Node_Copy (N : Node_Access; Start, Len : Natural; Target : in out String; T : in out Positive) is
+   begin
+      case N.Kind is
+         when Leaf_Kind =>
+            Target (T .. T + Len - 1) := N.Chars (N.Chars'First + Start .. N.Chars'First + Start + Len - 1);
+            T                         := T + Len;
+
+         when Concat_Kind =>
+            if Start < N.Left.Len then
+               declare
+                  Left_Len : constant Natural := Natural'Min (N.Left.Len - Start, Len);
+               begin
+                  Node_Copy (N.Left, Start, Left_Len, Target, T);
+                  if Len > Left_Len then
+                     Node_Copy (N.Right, 0, Len - Left_Len, Target, T);
+                  end if;
+               end;
+            else
+               Node_Copy (N.Right, Start - N.Left.Len, Len, Target, T);
+            end if;
+      end case;
+   end Node_Copy;
+
    --  A left-to-right walk over a tree's leaves, one leaf per
    --  Next_Leaf call, in amortized O(1) per leaf: a pre-order walk with
    --  an explicit stack of subtrees still to visit (Right pushed before
@@ -723,6 +753,26 @@ package body Ropes is
       end if;
       return Wrap (Node_Slice (D, Low - 1, High - Low + 1));
    end Slice;
+
+   procedure Copy_Slice (Source : Rope; Low : Positive; High : Natural; Target : in out String; Target_Low : Positive) is
+      D   : constant Node_Access := Data_Of (Source);
+      Len : constant Natural     := (if D = null then 0 else D.Len);
+      T   : Positive             := Target_Low;
+   begin
+      if Low - 1 > Len or else High > Len then
+         raise Ada.Strings.Index_Error;
+      end if;
+      if High < Low then
+         return;
+      end if;
+      --  Written as a subtraction, not Target_Low + (High - Low) >
+      --  Target'Last, so that a Target_Low near Positive'Last can't
+      --  overflow the check itself.
+      if Target_Low < Target'First or else High - Low > Target'Last - Target_Low then
+         raise Ada.Strings.Index_Error;
+      end if;
+      Node_Copy (D, Low - 1, High - Low + 1, Target, T);
+   end Copy_Slice;
 
    function Insert (Source : Rope; Before : Positive; New_Item : Rope) return Rope is
       Len : constant Natural := Length (Source);

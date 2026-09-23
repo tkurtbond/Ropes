@@ -1,0 +1,13 @@
+# All 5 characters of "hello" don't fit in the 3-character T: Copy_Slice
+# raises Ada.Strings.Index_Error before copying anything (where
+# Rope.Mod's Blit would HALT).
+program rope_tool
+arg copyslice
+arg hello
+arg 1
+arg 5
+arg abc
+arg 1
+status 1
+output
+Error: LOW/HIGH out of range for S, or the slice does not fit in T at POS

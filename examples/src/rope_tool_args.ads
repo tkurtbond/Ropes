@@ -114,6 +114,9 @@ package Rope_Tool_Args is
    --  --- readfile FILE --- (Ropes.Stream_IO.Read_File; no Rope.Mod/RopeTool.Mod counterpart before Phase 13)
    function Readfile_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
+   --  --- copyslice S LOW HIGH T POS --- (Ropes.Copy_Slice, Rope.Mod's Blit; Phase 15)
+   function Copyslice_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
    Commands : aliased Command_Array :=
      [Make_Command
        ("cat",
@@ -263,7 +266,13 @@ package Rope_Tool_Args is
         Make_Parser
           (Description =>
              "readfile FILE  Read all of FILE, byte for byte, and print its length, a space, and its contents escaped.",
-           Handler     => Readfile_Argument_Handler'Access, Options => null))];
+           Handler     => Readfile_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("copyslice",
+        Make_Parser
+          (Description =>
+             "copyslice S LOW HIGH T POS  Print T with S's characters LOW through HIGH (1-based, inclusive) copied into it at POS.",
+           Handler     => Copyslice_Argument_Handler'Access, Options => null))];
 
    Main_Parser : Parser :=
      Make_Parser
