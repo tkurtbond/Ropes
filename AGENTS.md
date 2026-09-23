@@ -8,8 +8,9 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-8, the last
-two both stretch phases): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-9, Phases
+7-8 both stretch phases and Phase 9 not an `Ada`-side change at all —
+see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
 depth-triggered auto-rebalance — `Balance`/`Balance_Insert`/
 `Balance_Walk`/`Concat_Forest`, the Fibonacci-forest algorithm), plus
@@ -62,6 +63,31 @@ this file's own conventions would otherwise rule out, treat it the
 same way: do it, and record *why* the ruling-out reasoning no longer
 applies (here: explicit override), not as if the reasoning was flawed
 all along.
+
+**Phase 9 fed Phase 8's additions back into `Rope.Mod` itself, not
+into this repo.** At explicit user request, `Overwrite`, `Head`/`Tail`,
+and a pattern-based `Contains` (`ContainsPattern`, named separately
+since Oberon-2 has no overloading to pair it with the existing
+char-based `Contains`) were ported back into
+`~/Repos/Oberon/oberon-tools/Rope.Mod` — translated into that module's
+own clamp-not-trap conventions, not copied verbatim from `Ropes`'s
+`Ada.Strings`-flavored exception behavior, the same "translate the
+scenario, not the assertion" discipline this repo's own `AGENTS.md`
+and `PLAN.md` state for the Oberon→Ada direction, just run in reverse.
+`RopeTest.Mod` grew from 134 to 164 checks; `RopeTool.Mod` gained
+`overwrite`/`head`/`tail`/`containspattern`; `tests/rope-selftest.test`,
+`rope-help.test`, and `rope-unknown-command.test` were regenerated
+from real runs rather than hand-edited, since each embeds the full
+check list or usage text verbatim. `oberon-tools`'s own test suite:
+`296 ok, 0 failed`; committed there as `512963b`. **Nothing in this
+repo changed as a result** — no `src/`/`test/`/`examples/` file is
+part of Phase 9 — so if a future session goes looking for what Phase 9
+"added" here, the answer is nothing; the change lives entirely in the
+sibling `oberon-tools` checkout. The operator overloads and
+`From_Unbounded_String`/`To_Unbounded_String` did **not** make the
+trip back (no Oberon-2 counterpart to either), nor did the
+Process-callback `Split` (it was already restoring `Rope.Mod`'s own
+pre-existing `Split` visitor, so there was nothing new to send back).
 
 **`"*"` is a real find, not in the original design sketch**: `Rope.Mod`'s
 `Repeat`/`Make` were originally sketched as functions of those names,
