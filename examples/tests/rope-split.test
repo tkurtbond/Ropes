@@ -1,0 +1,12 @@
+# A doubled separator produces an empty piece (a blank output line),
+# matching Python's str.split convention.
+program rope_tool
+arg split
+arg a,b,,c
+arg ,
+status 0
+output
+a
+b
+
+c

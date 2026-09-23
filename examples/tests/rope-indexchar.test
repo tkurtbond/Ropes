@@ -1,0 +1,9 @@
+# 0-based FROM=2 in the Oberon original becomes 1-based FROM=3 here.
+program rope_tool
+arg indexchar
+arg abcabc
+arg b
+arg 3
+status 0
+output
+5

@@ -1,0 +1,14 @@
+# 1_000_000_000 + 1_000_000_000 = 2_000_000_000, under Natural'Last
+# (2147483647), so this succeeds. Cheap even at this size: "*"'s binary
+# doubling shares subtrees instead of allocating a billion real
+# characters -- same intent as RopeTool.Mod's own bigcat, built on
+# Ropes."*" instead of Rope.Mod's Repeat.
+program rope_tool
+arg bigcat
+arg 1000000000
+arg x
+arg 1000000000
+arg y
+status 0
+output
+2000000000

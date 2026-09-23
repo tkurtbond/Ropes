@@ -1,0 +1,6 @@
+program rope_tool
+arg escaped
+arg a"b\c
+status 0
+output
+a\"b\\c

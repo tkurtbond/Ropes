@@ -1,0 +1,9 @@
+# 0-based index 6 in RopeTool.Mod's own fixture becomes 1-based index 7
+# here (Ropes.Element is 1-based, matching Ada.Strings.Unbounded).
+program rope_tool
+arg fetch
+arg hello world
+arg 7
+status 0
+output
+w

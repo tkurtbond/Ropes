@@ -1,0 +1,17 @@
+# RopeTool.Mod's own insert clamps a negative pos to the start
+# (Rope.Mod's Insert itself clamps); rope_tool's BEFORE is Positive, so
+# "-5" is not a representable index at all rather than a differently-
+# handled one -- Positive'Value ("-5") itself raises Constraint_Error
+# before Ropes.Insert is ever called. "--" still lets the leading "-"
+# of -5 through as a plain argument instead of being read as an
+# option, same as the Oberon original (confirmed against a real run:
+# Arg_Parser supports "--" the same way ArgParser does).
+program rope_tool
+arg insert
+arg hello world
+arg --
+arg -5
+arg X
+status 1
+output
+Error: not a valid index: "-5"

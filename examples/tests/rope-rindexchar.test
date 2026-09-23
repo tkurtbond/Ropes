@@ -1,0 +1,12 @@
+# 0-based BEFORE=3 in the Oberon original becomes 1-based FROM=4 here
+# -- PLAN.md's "Search" section notes IndexChar/RIndexChar's scenarios
+# translate directly for a length-1 pattern (0-based -> 1-based only),
+# unlike the multi-character rfind/rindex case below.
+program rope_tool
+arg rindexchar
+arg abcabc
+arg b
+arg 4
+status 0
+output
+2

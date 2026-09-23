@@ -1,0 +1,6 @@
+program rope_tool
+arg trimr
+arg   hi there  
+status 0
+output
+  hi there

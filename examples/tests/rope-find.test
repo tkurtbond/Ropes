@@ -1,0 +1,11 @@
+# Search at or after index 2 (1-based; 0-based index 1 in the Oberon
+# original), so the match at position 1 is skipped and the one at
+# position 4 is found instead.
+program rope_tool
+arg index
+arg abcabc
+arg abc
+arg 2
+status 0
+output
+4

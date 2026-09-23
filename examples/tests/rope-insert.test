@@ -1,0 +1,9 @@
+# 0-based BEFORE=6 in the Oberon original becomes 1-based BEFORE=7 here.
+program rope_tool
+arg insert
+arg hello world
+arg 7
+arg there
+status 0
+output
+hello thereworld

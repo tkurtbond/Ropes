@@ -1,0 +1,14 @@
+# RopeTool.Mod's remove S POS LEN (0-based start, len) becomes
+# rope_tool's delete S FROM THROUGH (1-based inclusive): POS=5,
+# LEN=100 (clamped) -> FROM=6, THROUGH=100, still clamped to Length
+# (Source) -- Ropes.Delete's own doc: THROUGH past the end clamps
+# (unlike FROM, which raises), matching Ada.Strings.Unbounded.Delete's
+# own asymmetry exactly. See PLAN.md's "Modification" section.
+program rope_tool
+arg delete
+arg hello, world
+arg 6
+arg 100
+status 0
+output
+hello

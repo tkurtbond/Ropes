@@ -1,0 +1,6 @@
+program rope_tool
+arg upper
+arg Hello, World!
+status 0
+output
+HELLO, WORLD!

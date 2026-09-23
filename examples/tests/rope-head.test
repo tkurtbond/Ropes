@@ -1,0 +1,9 @@
+# No Rope.Mod/RopeTool.Mod counterpart at all -- original, same as
+# rope-overwrite.test above.
+program rope_tool
+arg head
+arg hi
+arg 5
+status 0
+output
+hi   

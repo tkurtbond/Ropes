@@ -1,0 +1,10 @@
+# No RopeTool.Mod counterpart at all (see PLAN.md's Phase 5 entry) --
+# this scenario is original, not translated from anything.
+program rope_tool
+arg chars
+arg abc
+status 0
+output
+a
+b
+c
