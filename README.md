@@ -1,5 +1,7 @@
 # Ropes for Ada
 
+This software is developed with the aid of AI.
+
 `Ropes` is an Ada 2022 implementation of *ropes*, the immutable,
 tree-structured strings described by Hans-J. Boehm, Russ Atkinson, and
 Michael Plass in "Ropes: an Alternative to Strings" (*Software—Practice
