@@ -1312,6 +1312,35 @@ parameter's type.
   see "Testing approach" below for what that caught. `./tests/
   run-tests.sh` reports `38 ok, 0 failed`.
 
+- **Phase 9, done — not an `Ada`-side change.** Phase 8's own scope
+  expansion (`Overwrite`/`Head`/`Tail`, `Contains`) fed back into
+  `~/Repos/Oberon/oberon-tools/Rope.Mod`, the model this whole port is
+  based on: at explicit user request, `Overwrite`, `Head`/`Tail`, and
+  a `Contains` extended to a string/rope pattern (`ContainsPattern`,
+  named separately since Oberon-2 has no overloading to distinguish it
+  from the existing char-based `Contains`) were added there too,
+  translated back into `Rope.Mod`'s own clamp-not-trap conventions
+  rather than copied verbatim from `Ropes`'s Ada.Strings-flavored
+  exception behavior — the same "translate the scenario, not the
+  assertion" discipline this file's own "Sources being ported" section
+  states for the Ada→Oberon direction, applied in reverse. The Ada
+  port's other Phase 7/8 additions did **not** make the trip back: the
+  operator overloads and `From_Unbounded_String`/`To_Unbounded_String`
+  have no Oberon-2 counterpart (no operator overloading, no unbounded
+  string type), and the Process-callback `Split` Phase 8 added to
+  `Ropes` was itself restoring `Rope.Mod`'s own pre-existing `Split`
+  visitor, so there was nothing new to send back for that one.
+  `RopeTest.Mod` gained `CheckOverwrite`/`CheckHeadTail`/
+  `CheckContainsPattern` (134 → 164 checks); `RopeTool.Mod` gained
+  `overwrite`/`head`/`tail`/`containspattern`, each with its own
+  `tests/rope-*.test` fixture, plus `tests/rope-selftest.test`,
+  `rope-help.test` and `rope-unknown-command.test` regenerated from
+  real runs (each embeds the full check list or usage text verbatim,
+  so hand-editing would drift) — `tests/run-tests.sh` reports `296 ok,
+  0 failed`. Committed and pushed to `oberon-tools` as `512963b`; no
+  file in this repo changed as a result, so there is nothing under
+  `src/`/`test/`/`examples/` to point to for this phase.
+
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds
 the matching `rope_tool` subcommand(s) — see "Command-line tool
