@@ -264,8 +264,11 @@ harness itself unchanged, being already generic over `program`/
 `bindir`) plus `examples/tests/*.test` — 34 of the 35 Oberon originals
 translated (`rope-selftest.test` skipped: it drives the internal
 `RopeTest` binary, not `RopeTool`, and has no `rope_tool` counterpart
-at all) plus 4 new fixtures for Phase 8's own `chars`/`overwrite`/
-`head`/`tail`, which had no Oberon original to translate from. Same
+at all) plus 4 new fixtures for `chars`/`overwrite`/`head`/`tail`, none
+of which have a `RopeTool.Mod` counterpart to translate from (`chars`
+is Phase 5's addition, not Phase 8's — only its *fixture* is new here,
+built alongside the rest of this phase's suite rather than left for a
+later phase to add). Same
 "translate the scenario, not the expected outcome" discipline as
 `Ropes`'s own unit tests, checked against real `rope_tool` runs rather
 than hand-derived wherever the translation was non-mechanical — see
@@ -1351,9 +1354,13 @@ the matching `rope_tool` subcommand(s) — see "Command-line tool
 Everything in "Deferred / stretch" above is now done — Phase 7 closed
 out the rest of "Construction and concatenation" plus `Escape`, and
 Phase 8 added `Overwrite`/`Head`/`Tail`, `Contains`, and the
-Process-callback `Split`. What's left, gathered in one place for
-whichever future phase picks it up, rather than left scattered across
-"What's explicitly out of scope (v1)" and "Open questions" above:
+Process-callback `Split`. (Phase 9, below, doesn't change anything
+here — it fed Phase 8's additions back into `Rope.Mod`, not into
+`Ropes` itself, so this list is still current as of Phase 8, the last
+phase that touched this repo's own scope.) What's left, gathered in
+one place for whichever future phase picks it up, rather than left
+scattered across "What's explicitly out of scope (v1)" and "Open
+questions" above:
 
 - **Cord/paper features never in `Rope.Mod`'s own scope to begin
   with** (see "What's explicitly out of scope (v1)" above — this plan
