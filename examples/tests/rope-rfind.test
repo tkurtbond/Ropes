@@ -1,0 +1,16 @@
+# "World" occurs at 1-based index 8 and again at 15. Ropes.Index's
+# Backward direction requires a match to fit entirely within Source
+# (First .. From) -- one stricter than RopeTool.Mod's own rfind bound
+# by Pattern'Length - 1 (see PLAN.md's "Search" section) -- so FROM=13
+# is chosen directly against that formula (verified against a real
+# run, not derived by just shifting RopeTool.Mod's own FROM=13 by one)
+# rather than assumed to carry over unchanged; it happens to still
+# exclude the second match and find the first, same as the original.
+program rope_tool
+arg rindex
+arg Hello, World! World!
+arg World
+arg 13
+status 0
+output
+8

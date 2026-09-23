@@ -388,9 +388,20 @@ package body Rope_Tool_Args is
             Split_S := From_String (Arg);
 
          when 1 =>
-            for Piece of Split (Split_S, From_String (Arg)) loop
-               Put_Line (To_String (Piece));
-            end loop;
+            --  The Process-callback form (Phase 8), not the
+            --  array-returning one above -- demonstrates the addition
+            --  the same way chars below demonstrates Cursor/Iterable:
+            --  by actually using it, not leaving it to the test suite
+            --  alone.
+            declare
+               function Print_Piece (Piece : Rope) return Boolean is
+               begin
+                  Put_Line (To_String (Piece));
+                  return True;
+               end Print_Piece;
+            begin
+               Split (Split_S, From_String (Arg), Print_Piece'Access);
+            end;
 
          when others =>
             null;
@@ -573,8 +584,18 @@ package body Rope_Tool_Args is
       Bigcat_Count := Bigcat_Count + 1;
       return True;
    exception
-      when Constraint_Error =>
+      when Constraint_Error          =>
          Put_Line (Standard_Error, "Error: not a valid count: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Length_Error =>
+         --  New_Concat's overflow guard: N1 + N2 exceeds Natural'Last
+         --  -- Rope.Mod's own Cat HALTs(1) here instead of raising, so
+         --  this is the one place this CLI's error convention diverges
+         --  in kind (an exception, not a clamp), not just wording; see
+         --  PLAN.md's "Comparison"/overflow notes for the general
+         --  clamp-to-exception shift this whole port makes.
+         Put_Line (Standard_Error, "Error: combined length exceeds Natural'Last");
          Set_Exit_Status (Failure);
          return False;
    end Bigcat_Argument_Handler;
@@ -601,7 +622,7 @@ package body Rope_Tool_Args is
             Contains_Ch := Arg (Arg'First);
 
          when 2 =>
-            Put_Line (Boolean'Image (Index (Contains_S, Contains_Ch, Positive'Value (Arg), Ada.Strings.Forward) /= 0));
+            Put_Line (Boolean'Image (Contains (Contains_S, Contains_Ch, Positive'Value (Arg))));
 
          when others =>
             null;
@@ -623,5 +644,84 @@ package body Rope_Tool_Args is
       Put_Line (To_String (Escape (From_String (Arg))));
       return True;
    end Escaped_Argument_Handler;
+
+   --  --- overwrite S POS NEW ---
+
+   Overwrite_Count : Natural := 0;
+   Overwrite_S     : Rope;
+   Overwrite_Pos   : Positive;
+
+   function Overwrite_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Overwrite_Count is
+         when 0 =>
+            Overwrite_S := From_String (Arg);
+
+         when 1 =>
+            Overwrite_Pos := Positive'Value (Arg);
+
+         when 2 =>
+            Put_Line (To_String (Overwrite (Overwrite_S, Overwrite_Pos, From_String (Arg))));
+
+         when others =>
+            null;
+      end case;
+      Overwrite_Count := Overwrite_Count + 1;
+      return True;
+   exception
+      when Constraint_Error        =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Index_Error =>
+         --  Not necessarily Arg itself at fault -- POS, set on an
+         --  earlier call, could be the one out of range.
+         Put_Line (Standard_Error, "Error: POS out of range");
+         Set_Exit_Status (Failure);
+         return False;
+   end Overwrite_Argument_Handler;
+
+   --  --- head / tail S COUNT ---
+
+   Head_Count : Natural := 0;
+   Head_S     : Rope;
+
+   function Head_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      if Head_Count = 0 then
+         Head_S := From_String (Arg);
+      elsif Head_Count = 1 then
+         Put_Line (To_String (Head (Head_S, Natural'Value (Arg))));
+      end if;
+      Head_Count := Head_Count + 1;
+      return True;
+   exception
+      when Constraint_Error =>
+         Put_Line (Standard_Error, "Error: not a valid count: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+   end Head_Argument_Handler;
+
+   Tail_Count : Natural := 0;
+   Tail_S     : Rope;
+
+   function Tail_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      if Tail_Count = 0 then
+         Tail_S := From_String (Arg);
+      elsif Tail_Count = 1 then
+         Put_Line (To_String (Tail (Tail_S, Natural'Value (Arg))));
+      end if;
+      Tail_Count := Tail_Count + 1;
+      return True;
+   exception
+      when Constraint_Error =>
+         Put_Line (Standard_Error, "Error: not a valid count: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+   end Tail_Argument_Handler;
 
 end Rope_Tool_Args;

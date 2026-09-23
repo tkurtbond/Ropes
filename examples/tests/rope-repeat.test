@@ -1,0 +1,7 @@
+program rope_tool
+arg repeat
+arg xy
+arg 4
+status 0
+output
+xyxyxyxy

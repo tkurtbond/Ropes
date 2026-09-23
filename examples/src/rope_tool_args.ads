@@ -99,6 +99,15 @@ package Rope_Tool_Args is
    --  --- escaped S --- (Ropes.Escape)
    function Escaped_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
+   --  --- overwrite S POS NEW --- (Ropes.Overwrite; 1-based, no Rope.Mod/RopeTool.Mod counterpart -- see PLAN.md's "Deferred / stretch")
+   function Overwrite_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- head S COUNT --- (Ropes.Head, default Pad; no Rope.Mod/RopeTool.Mod counterpart)
+   function Head_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- tail S COUNT --- (Ropes.Tail, default Pad; no Rope.Mod/RopeTool.Mod counterpart)
+   function Tail_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
    Commands : aliased Command_Array :=
      [Make_Command
        ("cat",
@@ -221,7 +230,22 @@ package Rope_Tool_Args is
        ("escaped",
         Make_Parser
           (Description => "escaped S  Print S with special and non-printable characters escaped.",
-           Handler     => Escaped_Argument_Handler'Access, Options => null))];
+           Handler     => Escaped_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("overwrite",
+        Make_Parser
+          (Description => "overwrite S POS NEW  Print S with NEW overwriting it starting at index POS (1-based).",
+           Handler     => Overwrite_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("head",
+        Make_Parser
+          (Description => "head S COUNT  Print the first COUNT characters of S, space-padded if S is shorter.",
+           Handler     => Head_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("tail",
+        Make_Parser
+          (Description => "tail S COUNT  Print the last COUNT characters of S, space-padded if S is shorter.",
+           Handler     => Tail_Argument_Handler'Access, Options => null))];
 
    Main_Parser : Parser :=
      Make_Parser

@@ -1,0 +1,7 @@
+program rope_tool
+arg cmp
+arg zebra
+arg apple
+status 0
+output
+1

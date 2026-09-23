@@ -245,21 +245,34 @@ remaining five commands, all wrapped directly — `repeat`/`make` on
 `escaped` on `Ropes.Escape`), which **completes `rope_tool`'s port of
 `RopeTool.Mod`'s entire command set** — every `RopeTool.Mod` command
 now has a `rope_tool` counterpart, plus `chars` (Phase 5's, which
-doesn't have one going the other way).
+doesn't have one going the other way). Phase 8 added `overwrite`/
+`head`/`tail` (no `RopeTool.Mod` counterpart for any of the three,
+same demonstrate-it-anyway reasoning as `chars`), and re-pointed two
+already-existing subcommands at newly-added library functions rather
+than adding new ones: `contains` (added at Phase 7 wrapping `Index
+(...) /= 0` inline, before `Ropes.Contains` existed) now calls the real
+`Ropes.Contains`, and `split`'s `Rope`-separator case now demonstrates
+the new Process-callback `Split` overload (printing each piece as
+`Process` visits it) instead of only the array-returning form used
+before.
 
 `~/Repos/Oberon/oberon-tools/tests/rope-*.test` (see "Sources being
 ported" above) are black-box fixtures written against `RopeTool`, run
 via `tests/run-tests.sh`'s `program`/`arg`/`status`/`output` format.
-Once `rope_tool` covers enough of the command set to make it
-worthwhile, these are a plausible source for a `examples/tests/
-run-tests.sh`-style black-box test suite for `rope_tool` itself — same
-"translate the scenario, not the expected outcome" caveat as
-`Ropes`'s own tests (0-based → 1-based indices, `HALT`/clamp →
-`Ada.Strings.Index_Error`, `rope-unknown-command.test`'s and
-`rope-help.test`'s exact wording will differ since it's `Arg_Parser`'s
-`Usage`/error text, not `ArgParser`'s). Not committed to for any
-specific phase yet — revisit once there's enough surface to make a
-black-box suite worth the setup.
+**[Phase 8, done.]** Ported as `examples/tests/run-tests.sh` (the
+harness itself unchanged, being already generic over `program`/
+`bindir`) plus `examples/tests/*.test` — 34 of the 35 Oberon originals
+translated (`rope-selftest.test` skipped: it drives the internal
+`RopeTest` binary, not `RopeTool`, and has no `rope_tool` counterpart
+at all) plus 4 new fixtures for Phase 8's own `chars`/`overwrite`/
+`head`/`tail`, which had no Oberon original to translate from. Same
+"translate the scenario, not the expected outcome" discipline as
+`Ropes`'s own unit tests, checked against real `rope_tool` runs rather
+than hand-derived wherever the translation was non-mechanical — see
+"Testing approach" below for the two real divergences that caught
+(`bigcat`'s overflow behavior and `slice`'s past-the-end boundary).
+Currently `38 ok, 0 failed`; run via `cd examples &&
+./tests/run-tests.sh`.
 
 ## Core design
 
@@ -503,9 +516,30 @@ function Delete (Source : Rope; From, Through : Natural) return Rope;           
 ```
 
 Names and parameter shapes taken directly from
-`Ada.Strings.Unbounded.Insert`/`.Delete`. `Overwrite`/`Head`/`Tail`
-(which `Unbounded_String` also has, and `Rope.Mod` doesn't) are a
-plausible stretch addition — not in v1, see "Deferred / stretch" below.
+`Ada.Strings.Unbounded.Insert`/`.Delete`.
+
+```ada
+function Overwrite (Source : Rope; Position : Positive; New_Item : Rope) return Rope;
+function Head (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope;
+function Tail (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope;
+```
+
+**[Phase 8, done.]** `Overwrite`/`Head`/`Tail` (which
+`Unbounded_String` also has, and `Rope.Mod` doesn't) were reviewed and
+left out at Phase 7, then added anyway in Phase 8 at explicit user
+request — see "Deferred / stretch" below for the full reasoning on
+both sides of that call. Signatures and semantics are
+`Ada.Strings.Unbounded.Overwrite`/`Head`/`Tail`'s own, verified against
+GNAT's `a-strunb.ads` rather than assumed: `Overwrite` replaces the
+characters from `Position` onward with `New_Item`, extending `Source`
+if `New_Item` runs past its current end, and raises
+`Ada.Strings.Index_Error` if `Position - 1 > Length (Source)` (so
+`Position = Length (Source) + 1`, a pure append, is valid — the same
+boundary `Insert` already allows); `Head`/`Tail` take the first/last
+`Count` characters, padding on the right/left with `Pad` if `Count`
+exceeds `Length (Source)`. Function form only, like `Insert`/`Delete`
+above — there is no in-place `Rope`, `Rope` being immutable by
+construction.
 
 ### Comparison
 
@@ -613,9 +647,17 @@ one, so `RFind`'s own multi-character scenarios in `test_index.adb`
 use different `From`/expected values, chosen under the real formula,
 not copied from `Rope.Mod`'s numbers.
 
-`Contains (Source, Pattern) return Boolean` remains undecided —
-still not added; still low-stakes, still a plausible thin wrapper over
-`Index (...) /= 0` if a future phase wants it.
+`Contains (Source, Pattern) return Boolean` **[Phase 8, done.]** Added
+as the thin wrapper this section always said it would be — four
+overloads (`Rope`/`Character` pattern, each with/without `From`,
+mirroring `Index`'s own four), always `Going => Forward` (no `Going`
+parameter: "contains" is an existence question, not a search
+direction, and `Rope.Mod`'s own `Contains` — the `Character`/`From`
+overload's direct model — has no `Going` option either). Genuinely
+thin: the `Rope`-pattern overloads inherit `Index`'s own
+`Ada.Strings.Pattern_Error` on a `Null_Rope` `Pattern` rather than
+softening it to some other answer — verified by
+`test_contains.adb`'s own check for exactly that.
 
 ### Splitting
 
@@ -726,13 +768,24 @@ Sep_Width`), so if that position itself matches again, it's found
 immediately, producing the empty piece in between — this falls out of
 the walk's own structure, not an extra check.
 
-Only the array form is ported (`Rope.Mod`'s `SplitArray`); the
-push-based early-stopping `Visitor` form (`Split` in `Rope.Mod`) and
-the hand-rolled linked list form (`SplitList`) are dropped — see "Why
-this is a real port" above for why the list form specifically doesn't
-need porting. A lazy/early-stop iterator form is a plausible stretch
-addition if a caller ever needs to avoid materializing every piece of
-a huge split up front; not v1.
+Only the array form is ported in Phase 4 (`Rope.Mod`'s `SplitArray`);
+the push-based early-stopping `Visitor` form (`Split` in `Rope.Mod`)
+and the hand-rolled linked list form (`SplitList`) are dropped — see
+"Why this is a real port" above for why the list form specifically
+doesn't need porting. A lazy/early-stop iterator form is a plausible
+stretch addition if a caller ever needs to avoid materializing every
+piece of a huge split up front; not v1. **[Phase 8, done, as the
+`Visitor` form specifically]**: restored as `procedure Split (Source,
+Separator, Process : not null access function (Piece : Rope) return
+Boolean)`, one overload per separator kind (four total, matching the
+array form's own four), a real single-pass walk (not the array form's
+own count-then-build two passes) that calls `Process` on each piece
+left to right and stops — without visiting any further piece — the
+first time `Process` returns `False`, translating `Rope.Mod`'s own
+`WHILE more & ~last DO more := visit(NextPiece(...)) END` shape
+directly. The linked-list form (`SplitList`) stays dropped; nothing
+changed that would revisit "Why this is a real port"'s reasoning for
+it.
 
 ### Whitespace / trimming
 
@@ -883,6 +936,18 @@ parameter's type.
   `From_Unbounded_String`/`Escape`, which either complete `Rope.Mod`'s
   scope or (for `From_Unbounded_String`) fill a gap `Rope.Mod` can't
   have by construction (no unbounded string type in Oberon-2).
+  **Revisited and added in Phase 8**, at explicit user request rather
+  than this file's own "match `Rope.Mod`'s scope" instinct — the
+  Phase 7 reasoning above (no `Rope.Mod` counterpart, so no natural
+  ceiling to stop at) is still accurate, it was simply overridden by a
+  direct instruction to add these anyway. Signatures and semantics
+  match `Ada.Strings.Unbounded.Overwrite`/`Head`/`Tail` exactly
+  (verified against GNAT's `a-strunb.ads`, not assumed), function form
+  only (no in-place procedure form, same reason `Insert`/`Delete`
+  above have none). `rope_tool` gained `overwrite`/`head`/`tail`
+  anyway, with no `RopeTool.Mod` command to model them on, the same
+  "demonstrate the addition, `RopeTool.Mod` precedent or not" reasoning
+  `chars` established back at Phase 5.
 - `Escaped` (`Rope.Mod`'s backslash-escape utility) — kept as an idea,
   not committed to a name yet. Needs a clear doc note that Ada string
   *literals* don't use backslash escapes at all (quote-doubling is the
@@ -1177,6 +1242,73 @@ parameter's type.
   which completes `rope_tool`'s port of `RopeTool.Mod`'s entire command
   set (every `RopeTool.Mod` command now has a `rope_tool` counterpart,
   plus `chars`, which doesn't).
+- **Phase 8 (stretch), done.** Explicit user request to revisit and add
+  every "API surface not added" item this file's "Deferred / stretch"
+  section had on file, plus build the black-box `rope_tool` test suite
+  that section also flagged as never committed to a phase — both
+  deliberately expanding past `Rope.Mod`'s own scope rather than
+  completing it, unlike every phase before this one. `Overwrite`/
+  `Head`/`Tail` (Phase 7 reviewed and left these out for lack of a
+  `Rope.Mod` counterpart — see Phase 7's entry above — and that
+  reasoning still stands as a fact about scope; the user simply chose
+  to override it) are `Ada.Strings.Unbounded.Overwrite`/`Head`/`Tail`'s
+  own signatures and semantics, verified against GNAT's `a-strunb.ads`
+  — see "Modification" above. `Contains` (4 overloads mirroring
+  `Index`'s own 4, always implicitly `Going => Forward`, genuinely
+  inheriting `Index`'s own `Ada.Strings.Pattern_Error` on a `Null_Rope`
+  pattern) is a thin wrapper over `Index (...) /= 0` — see "Search"
+  above. The Process-callback `Split` overloads (`Rope`/`String`/
+  `Character`/`Character_Set` separators, matching the array-returning
+  overloads' own separator kinds) restore `Rope.Mod`'s own dropped
+  `Visitor`-based `Split`, translated as `procedure Split (Source,
+  Separator, Process : not null access function (Piece : Rope) return
+  Boolean)` — a true single-pass walk with no separate counting pass,
+  stopping early the first time `Process` returns `False` — see
+  "Splitting" above. `SplitList` stays dropped (nothing here needs a
+  linked-list result when `Rope_Array` and the callback form already
+  cover both "collect everything" and "stream without collecting").
+  New tests: `test_overwrite.adb` (6 checks), `test_head_tail.adb` (10),
+  `test_contains.adb` (9), `test_split_visitor.adb` (13, using nested
+  local functions captured via `'Access`, one per scenario, to exercise
+  `Process`'s stop-early behavior — the one `CheckSplit` scenario Phase
+  4's array-returning `test_split.adb` couldn't translate at all) — 38
+  new checks, 200 total, all pass, all valgrind-clean (0 definite/
+  indirect leaks across all four new binaries). `examples/rope_tool`
+  gained `overwrite`/`head`/`tail` (no `RopeTool.Mod` counterpart for
+  any of the three, same demonstrate-it-anyway reasoning `chars`
+  established at Phase 5); its existing `contains` subcommand (added at
+  Phase 7, before `Ropes.Contains` existed, backed by an inline `Index
+  (...) /= 0` call) now calls the real `Ropes.Contains` instead, so no
+  new subcommand was needed there to demonstrate this phase's addition
+  — it already had one, it just wasn't calling the library function
+  yet; and its existing `split` subcommand's `Rope`-separator case now
+  demonstrates the new Process-callback overload directly (printing
+  each piece as `Process` visits it) rather than only exercising the
+  array-returning form. Building the fixtures for the new black-box
+  suite (below) also caught a real, previously-unnoticed gap:
+  `Bigcat_Argument_Handler` had no handler for
+  `Ada.Strings.Length_Error` on `New_Concat`'s overflow guard, so
+  `bigcat` on inputs whose combined length exceeds `Natural'Last`
+  printed a raw `raised ADA.STRINGS.LENGTH_ERROR : ropes.adb:105`
+  instead of a clean `Error: ...` message consistent with every other
+  handler — fixed by adding that handler, the one place this phase
+  touched already-shipped Phase 7 code rather than adding new surface.
+
+  The tooling item — a black-box `rope_tool` test suite built from
+  `~/Repos/Oberon/oberon-tools/tests/rope-*.test` — is
+  `examples/tests/run-tests.sh` (a direct port of that repo's own
+  `tests/run-tests.sh`; the harness itself needed no changes at all,
+  being already generic over `program`/`bindir`) plus 38
+  `examples/tests/*.test` fixtures: 34 translated from the 35 Oberon
+  originals (`rope-selftest.test` skipped — it exercises the internal
+  `RopeTest` binary, not `RopeTool`, and `Ropes`'s own equivalent is
+  `cd test && ./test_<name>`, not a `rope_tool` fixture) plus 4 new
+  originals (`rope-chars.test`, `rope-overwrite.test`, `rope-head.test`,
+  `rope-tail.test`) for commands `RopeTool.Mod` never had to begin
+  with. Every fixture whose translation was anything but mechanical was
+  checked against a real `rope_tool` run rather than hand-derived —
+  see "Testing approach" below for what that caught. `./tests/
+  run-tests.sh` reports `38 ok, 0 failed`.
 
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds
@@ -1223,3 +1355,40 @@ wrong, a child node freed while still referenced from elsewhere) is
 possible here for the same underlying reason: manual reference
 counting has no compiler backstop the way GC-backed `Rope.Mod`/cord
 do.
+
+**Black-box `rope_tool` testing, `examples/tests/`. [Phase 8, done.]**
+Everything above is `Ropes`-the-library, exercised in-process; this is
+`rope_tool`-the-CLI, exercised as a subprocess, from
+`examples/tests/run-tests.sh` (a direct, unmodified-harness port of
+`~/Repos/Oberon/oberon-tools/tests/run-tests.sh`) against fixtures at
+`examples/tests/*.test`, one `program`/`arg`/`status`/`output` file per
+scenario. Sourced from `~/Repos/Oberon/oberon-tools/tests/rope-*.test`
+the same "translate the scenario, not the assertion" way the unit
+tests above are sourced from `RopeTest.Mod` — and translating these
+needed more care than most unit-test ports, because a fixture's
+expected outcome is a whole process's exit status and combined
+stdout/stderr, not one boolean assertion, so there's more surface for
+an unexamined behavioral difference to hide in. Two were caught only
+by actually running `rope_tool`, not by reasoning from the source
+rules: `rope-bigcat-overflow.test` initially assumed `RopeTool.Mod`'s
+own `HALT(1)`-with-no-output overflow behavior would translate to some
+`Ropes`-side clamp, but `New_Concat` actually raises
+`Ada.Strings.Length_Error`, an exception rather than a clamp — the one
+fixture where the *kind* of divergence, not just the wording, differs
+from the Oberon original (and running it surfaced the `bigcat` handler
+gap described in Phase 8's entry above); `rope-sub-past-end.test`
+initially tried `slice "hello world" 12 16` expecting an
+Oberon-style "past the end clamps to empty" result, but `High = 16 >
+Length = 11` actually raises `Index_Error` per "Access and slicing"
+above — the valid empty-`Slice` case is `High < Low` specifically
+(`slice "hello world" 12 11`, `Low = Length + 1`), not "`High` far past
+the end." `rope-selftest.test` was the one Oberon original skipped
+outright — it drives the internal `RopeTest` binary, which has no
+`rope_tool` counterpart at all; `cd test && ./test_<name>` is
+`Ropes`'s own equivalent, already covered above. Four fixtures have no
+Oberon original: `rope-chars.test`, `rope-overwrite.test`,
+`rope-head.test`, `rope-tail.test`, for commands `RopeTool.Mod` never
+had to begin with. Run via `cd examples && ./tests/run-tests.sh`
+(`-v` per-test, `-o` also showing captured output, or name specific
+fixtures — see the script's own header comment); currently `38 ok, 0
+failed`.

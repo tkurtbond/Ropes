@@ -1,12 +1,19 @@
---  Phase 4 checks: Split, all four overloads. See PLAN.md's phased
---  plan and Testing approach, and RopeTest.Mod's CheckSplit
---  (~/Repos/Oberon/oberon-tools/RopeTest.Mod). Rope.Mod's Split is a
---  visitor callback (and SplitList builds a linked list); Ropes.Split
---  just returns the array, matching Rope.Mod's own SplitArray instead
---  -- so CheckSplit's "stops early when visit returns FALSE" case and
---  SplitList's cases don't translate (no visitor/list API exists
---  here). Everything else -- piece count and contents, NIL source,
---  absent separator, empty separator -- translates directly.
+--  Phase 4 checks: Split, all four array-returning overloads. See
+--  PLAN.md's phased plan and Testing approach, and RopeTest.Mod's
+--  CheckSplit (~/Repos/Oberon/oberon-tools/RopeTest.Mod). Rope.Mod's
+--  Split is a visitor callback (and SplitList builds a linked list);
+--  these overloads just return the array, matching Rope.Mod's own
+--  SplitArray instead -- so CheckSplit's "stops early when visit
+--  returns FALSE" case and SplitList's cases don't translate here.
+--  Everything else -- piece count and contents, NIL source, absent
+--  separator, empty separator -- translates directly.
+--
+--  The Process-callback form (Phase 8, restoring Rope.Mod's Split
+--  visitor, including its "stops early" case) has its own file,
+--  test_split_visitor.adb -- these array-returning overloads and that
+--  Process-callback overload set share their search/walk logic, but
+--  are different subprograms with different tests, not a single
+--  overload family split across two files by accident.
 
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Strings.Maps; use Ada.Strings.Maps;

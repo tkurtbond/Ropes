@@ -1,0 +1,15 @@
+# RopeTool.Mod's own insert clamps a too-large pos to the end
+# (Rope.Mod's Insert itself clamps, giving "hello world!"); Ropes.Insert
+# instead raises Ada.Strings.Index_Error for BEFORE - 1 > Length
+# (Source) (BEFORE = Length (Source) + 1, i.e. 12, is the one valid
+# append position past the literal end; 100 is not) -- see PLAN.md's
+# "Modification" section on why Rope.Mod's clamping was not carried
+# over wholesale.
+program rope_tool
+arg insert
+arg hello world
+arg 100
+arg !
+status 1
+output
+Error: BEFORE out of range

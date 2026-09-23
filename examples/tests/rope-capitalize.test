@@ -1,0 +1,6 @@
+program rope_tool
+arg capitalize
+arg hello
+status 0
+output
+Hello

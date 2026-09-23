@@ -1,0 +1,11 @@
+# RopeTool.Mod's remove S POS LEN (0-based start, len) becomes
+# rope_tool's delete S FROM THROUGH (1-based inclusive): POS=5, LEN=2
+# -> FROM=6, THROUGH=7.
+program rope_tool
+arg delete
+arg hello, world
+arg 6
+arg 7
+status 0
+output
+helloworld

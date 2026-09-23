@@ -10,7 +10,8 @@ project Test is
    for Main use
      ("test_construction.adb", "test_balance.adb", "test_slice.adb", "test_insert.adb", "test_delete.adb",
       "test_compare.adb", "test_index.adb", "test_split.adb", "test_iterator.adb", "test_map.adb", "test_case.adb",
-      "test_trim.adb", "test_concat_overloads.adb", "test_unbounded.adb", "test_repeat.adb", "test_escape.adb");
+      "test_trim.adb", "test_concat_overloads.adb", "test_unbounded.adb", "test_repeat.adb", "test_escape.adb",
+      "test_overwrite.adb", "test_head_tail.adb", "test_contains.adb", "test_split_visitor.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use

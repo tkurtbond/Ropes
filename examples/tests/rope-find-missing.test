@@ -1,0 +1,10 @@
+# Ropes.Index returns 0 for "not found", not RopeTool.Mod's -1 (there
+# is no Natural equivalent of a negative sentinel).
+program rope_tool
+arg index
+arg hello world
+arg xyz
+arg 1
+status 0
+output
+0

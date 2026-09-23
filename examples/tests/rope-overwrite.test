@@ -1,0 +1,11 @@
+# No Rope.Mod/RopeTool.Mod counterpart at all (see PLAN.md's "Deferred
+# / stretch" section) -- this scenario is original, not translated
+# from anything.
+program rope_tool
+arg overwrite
+arg abcdef
+arg 2
+arg XY
+status 0
+output
+aXYdef

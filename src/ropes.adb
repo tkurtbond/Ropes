@@ -651,6 +651,39 @@ package body Ropes is
       return Slice (Source, 1, From - 1) & Slice (Source, Natural'Min (Through, Len) + 1, Len);
    end Delete;
 
+   function Overwrite (Source : Rope; Position : Positive; New_Item : Rope) return Rope is
+      Src_Len : constant Natural := Length (Source);
+   begin
+      if Position - 1 > Src_Len then
+         raise Ada.Strings.Index_Error;
+      end if;
+      declare
+         Tail_Start : constant Positive := Position + Length (New_Item);
+      begin
+         if Tail_Start <= Src_Len then
+            return Slice (Source, 1, Position - 1) & New_Item & Slice (Source, Tail_Start, Src_Len);
+         end if;
+         return Slice (Source, 1, Position - 1) & New_Item;
+      end;
+   end Overwrite;
+
+   function Head (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope is
+   begin
+      if Count <= Length (Source) then
+         return Slice (Source, 1, Count);
+      end if;
+      return Source & (Count - Length (Source)) * Pad;
+   end Head;
+
+   function Tail (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope is
+      Src_Len : constant Natural := Length (Source);
+   begin
+      if Count <= Src_Len then
+         return Slice (Source, Src_Len - Count + 1, Src_Len);
+      end if;
+      return (Count - Src_Len) * Pad & Source;
+   end Tail;
+
    function "=" (Left, Right : Rope) return Boolean is (Compare (Data_Of (Left), Data_Of (Right)) = 0);
 
    function "<" (Left, Right : Rope) return Boolean is (Compare (Data_Of (Left), Data_Of (Right)) < 0);
@@ -789,6 +822,16 @@ package body Ropes is
       end case;
    end Index;
 
+   function Contains (Source, Pattern : Rope) return Boolean is (Index (Source, Pattern) /= 0);
+
+   function Contains (Source, Pattern : Rope; From : Positive) return Boolean is
+     (Index (Source, Pattern, From, Ada.Strings.Forward) /= 0);
+
+   function Contains (Source : Rope; Pattern : Character) return Boolean is (Index (Source, Pattern) /= 0);
+
+   function Contains (Source : Rope; Pattern : Character; From : Positive) return Boolean is
+     (Index (Source, Pattern, From, Ada.Strings.Forward) /= 0);
+
    ------------------------------------------------------------------
    --  Splitting.
    --
@@ -919,6 +962,110 @@ package body Ropes is
          Result (Count) := Slice (Source, Start, S_Len);
          return Result;
       end;
+   end Split;
+
+   ------------------------------------------------------------------
+   --  Splitting, Process-callback form: Rope.Mod's own Visitor-based
+   --  Split, restored (see PLAN.md's "Deferred / stretch" section) as
+   --  a genuine single pass -- unlike the array-returning overloads
+   --  above, there is no separate counting pass first, and never more
+   --  than one piece alive at a time. Each mirrors its array-returning
+   --  counterpart's own "find the next occurrence at or after position
+   --  P" search, just walked once instead of twice, and stopping as
+   --  soon as either the last piece is visited or Process returns
+   --  False -- Rope.Mod's own "WHILE more & ~last DO more :=
+   --  visit(NextPiece(...)) END" shape, translated directly.
+   ------------------------------------------------------------------
+
+   procedure Split (Source : Rope; Separator : Rope; Process : not null access function (Piece : Rope) return Boolean) is
+      Sep_Len : constant Natural := Length (Separator);
+      Start   : Positive         := 1;
+      Found   : Natural;
+      More    : Boolean;
+   begin
+      if Sep_Len = 0 then
+         More := Process (Source);
+         return;
+      end if;
+      loop
+         Found := Index (Source, Separator, Start, Ada.Strings.Forward);
+         if Found = 0 then
+            More := Process (Slice (Source, Start, Length (Source)));
+            exit;
+         end if;
+         More := Process (Slice (Source, Start, Found - 1));
+         exit when not More;
+         Start := Found + Sep_Len;
+      end loop;
+   end Split;
+
+   procedure Split (Source : Rope; Separator : String; Process : not null access function (Piece : Rope) return Boolean) is
+   begin
+      Split (Source, From_String (Separator), Process);
+   end Split;
+
+   procedure Split (Source : Rope; Separator : Character; Process : not null access function (Piece : Rope) return Boolean) is
+      S_Len : constant Natural := Length (Source);
+
+      function Find_Next (From : Positive) return Natural is
+      begin
+         for I in From .. S_Len loop
+            if Element (Source, I) = Separator then
+               return I;
+            end if;
+         end loop;
+         return 0;
+      end Find_Next;
+
+      Start : Positive := 1;
+      Found : Natural;
+      More  : Boolean;
+   begin
+      loop
+         Found := Find_Next (Start);
+         if Found = 0 then
+            More := Process (Slice (Source, Start, S_Len));
+            exit;
+         end if;
+         More := Process (Slice (Source, Start, Found - 1));
+         exit when not More;
+         Start := Found + 1;
+      end loop;
+   end Split;
+
+   procedure Split
+     (Source : Rope; Separator : Ada.Strings.Maps.Character_Set; Process : not null access function (Piece : Rope) return Boolean)
+   is
+      S_Len : constant Natural := Length (Source);
+
+      function Find_Next (From : Positive) return Natural is
+      begin
+         for I in From .. S_Len loop
+            if Ada.Strings.Maps.Is_In (Element (Source, I), Separator) then
+               return I;
+            end if;
+         end loop;
+         return 0;
+      end Find_Next;
+
+      Start : Positive := 1;
+      Found : Natural;
+      More  : Boolean;
+   begin
+      if Ada.Strings.Maps."=" (Separator, Ada.Strings.Maps.Null_Set) then
+         More := Process (Source);
+         return;
+      end if;
+      loop
+         Found := Find_Next (Start);
+         if Found = 0 then
+            More := Process (Slice (Source, Start, S_Len));
+            exit;
+         end if;
+         More := Process (Slice (Source, Start, Found - 1));
+         exit when not More;
+         Start := Found + 1;
+      end loop;
    end Split;
 
    ------------------------------------------------------------------

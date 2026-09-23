@@ -1,0 +1,18 @@
+# RopeTool.Mod's own sub clamps a start past the end to the empty rope
+# (0-based start=100); rope_tool's slice S LOW HIGH uses LOW = Length
+# (Source) + 1 = 12 (the one valid "past the literal end" position,
+# matching Ropes.Slice's own Null_Rope-not-an-error boundary when
+# High < Low -- see PLAN.md's "Access and slicing") with HIGH < LOW, so
+# this is still an empty rope, printed as a blank output line, same
+# outcome as the original for a differently-chosen boundary value (100
+# itself would raise Index_Error here -- see PLAN.md's "Modification"
+# section on why Rope.Mod's permissive clamping was not carried over
+# wholesale).
+program rope_tool
+arg slice
+arg hello world
+arg 12
+arg 11
+status 0
+output
+

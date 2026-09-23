@@ -17,6 +17,10 @@ test/test_concat_overloads
 test/test_unbounded
 test/test_repeat
 test/test_escape
+test/test_overwrite
+test/test_head_tail
+test/test_contains
+test/test_split_visitor
 examples/obj/
 examples/rope_tool
 

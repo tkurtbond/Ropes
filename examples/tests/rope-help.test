@@ -1,0 +1,93 @@
+program rope_tool
+arg -h
+status 0
+output
+rope_tool [options] command arguments...
+
+Command-line demo of Ropes: each subcommand builds one or two ropes from its string arguments and prints the result of one Ropes operation.
+
+-h, --help                    Display this help message and exit.
+
+cat A B  Print the concatenation of A and B.
+
+
+len S  Print the length of S.
+
+
+fetch S I  Print the character of S at index I (1-based).
+
+
+slice S LOW HIGH  Print the slice of S from LOW through HIGH, inclusive (1-based).
+
+
+insert S BEFORE INS  Print S with INS inserted before index BEFORE (1-based).
+
+
+delete S FROM THROUGH  Print S with FROM through THROUGH removed, inclusive (1-based).
+
+
+cmp A B  Print -1, 0 or 1: how A compares to B.
+
+
+index S PATTERN FROM  Print the index of PATTERN in S at or after FROM (1-based), or 0.
+
+
+rindex S PATTERN FROM  Print the index of the last PATTERN in S at or before FROM (1-based), or 0.
+
+
+indexchar S CH FROM  Print the index of CH in S at or after FROM (1-based), or 0.
+
+
+rindexchar S CH FROM  Print the index of CH in S at or before FROM (1-based), or 0.
+
+
+split S SEP  Print each piece of S split on SEP, one per line.
+
+
+chars S  Print each character of S, one per line ("for Ch of S loop").
+
+
+trim S  Print S with leading and trailing whitespace removed.
+
+
+triml S  Print S with leading whitespace removed.
+
+
+trimr S  Print S with trailing whitespace removed.
+
+
+upper S  Print S with ASCII letters uppercased.
+
+
+lower S  Print S with ASCII letters lowercased.
+
+
+capitalize S  Print S with its first character uppercased (ASCII only).
+
+
+uncapitalize S  Print S with its first character lowercased (ASCII only).
+
+
+repeat S N  Print N concatenated copies of S.
+
+
+make LEN CH  Print a rope of LEN copies of CH.
+
+
+bigcat N1 CH1 N2 CH2  Print the length of N1 copies of CH1 concatenated with N2 copies of CH2.
+
+
+contains S CH FROM  Print TRUE or FALSE: whether CH occurs in S at or after FROM.
+
+
+escaped S  Print S with special and non-printable characters escaped.
+
+
+overwrite S POS NEW  Print S with NEW overwriting it starting at index POS (1-based).
+
+
+head S COUNT  Print the first COUNT characters of S, space-padded if S is shorter.
+
+
+tail S COUNT  Print the last COUNT characters of S, space-padded if S is shorter.
+

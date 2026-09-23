@@ -1,0 +1,12 @@
+# RopeTool.Mod's own remove clamps a negative pos to 0; rope_tool's
+# FROM is Positive, so "-5" is not a representable index at all, same
+# reasoning as rope-insert-negative-pos.test above.
+program rope_tool
+arg delete
+arg hello, world
+arg --
+arg -5
+arg 5
+status 1
+output
+Error: not a valid index: "-5"

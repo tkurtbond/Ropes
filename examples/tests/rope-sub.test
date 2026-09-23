@@ -1,0 +1,10 @@
+# RopeTool.Mod's sub S START LEN (0-based start, len) becomes rope_tool's
+# slice S LOW HIGH (1-based inclusive): START=6, LEN=5 -> LOW=7, HIGH=11.
+program rope_tool
+arg slice
+arg hello world
+arg 7
+arg 11
+status 0
+output
+world

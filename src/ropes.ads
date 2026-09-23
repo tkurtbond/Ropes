@@ -7,17 +7,19 @@
 --  PLAN.md for the full design rationale and AGENTS.md for house
 --  conventions specific to this codebase.
 --
---  This is Phase 1 through 7 -- the whole of PLAN.md's phased
---  implementation plan: the Rope/Node skeleton, reference counting,
---  the smallest useful slice of the API (Length, Is_Empty, "&",
---  From_String/To_String, Element), "&"'s automatic depth-bounded
+--  This is Phase 1 through 8 -- the whole of PLAN.md's phased
+--  implementation plan (Phases 7 and 8 both stretch phases, beyond
+--  matching Rope.Mod's own scope): the Rope/Node skeleton, reference
+--  counting, the smallest useful slice of the API (Length, Is_Empty,
+--  "&", From_String/To_String, Element), "&"'s automatic depth-bounded
 --  rebalancing, Slice/Insert/Delete, the five comparison operators,
 --  Index and Split, Cursor-based iteration ("for Ch of Some_Rope
 --  loop"), Trim, Map/Map_Indexed, To_Upper/To_Lower,
---  Capitalize/Uncapitalize, and now the remaining "&"/From_.../"*"
---  construction conveniences (From_Character, the Character/String "&"
---  overloads, From_Unbounded_String/To_Unbounded_String, "*") plus
---  Escape. See PLAN.md before adding to this package.
+--  Capitalize/Uncapitalize, the remaining "&"/From_.../"*" construction
+--  conveniences (From_Character, the Character/String "&" overloads,
+--  From_Unbounded_String/To_Unbounded_String, "*"), Escape, and now
+--  Overwrite/Head/Tail, Contains, and the Process-callback form of
+--  Split. See PLAN.md before adding to this package.
 --
 --  A Rope is an immutable value: every operation returns a new Rope
 --  rather than modifying an existing one, so Ropes may be freely
@@ -139,6 +141,26 @@ package Ropes is
    --  Rope.Mod's Remove, unclamped except where Ada.Strings.Unbounded
    --  itself still clamps (Through past the end).
 
+   function Overwrite (Source : Rope; Position : Positive; New_Item : Rope) return Rope;
+   --  Source with the characters from Position onward replaced by
+   --  New_Item, extending Source if New_Item runs past its current end
+   --  -- Ada.Strings.Unbounded.Overwrite's own signature and semantics
+   --  exactly (function form only: there is no in-place Rope, the same
+   --  reason Insert/Delete above have no procedure form either).
+   --  Raises Ada.Strings.Index_Error if Position - 1 > Length (Source)
+   --  -- Position = Length (Source) + 1 (append) is valid, matching
+   --  Insert above. No Rope.Mod counterpart (Oberon-2's Rope has no
+   --  positional-replace operation at all) -- see PLAN.md's "Deferred
+   --  / stretch" section for why this was added anyway.
+
+   function Head (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope;
+   function Tail (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope;
+   --  The first (Head) or last (Tail) Count characters of Source,
+   --  padded on the right (Head) or left (Tail) with Pad if Count
+   --  exceeds Length (Source) -- Ada.Strings.Unbounded.Head/Tail's own
+   --  signatures and semantics exactly (function form only, as
+   --  Overwrite above). No Rope.Mod counterpart, same as Overwrite.
+
    function "=" (Left, Right : Rope) return Boolean;
    function "<" (Left, Right : Rope) return Boolean;
    function "<=" (Left, Right : Rope) return Boolean;
@@ -175,6 +197,20 @@ package Ropes is
    --  IndexChar/RIndexChar. No empty-pattern case; the same From/Going
    --  boundary rules apply.
 
+   function Contains (Source, Pattern : Rope) return Boolean;
+   function Contains (Source, Pattern : Rope; From : Positive) return Boolean;
+   function Contains (Source : Rope; Pattern : Character) return Boolean;
+   function Contains (Source : Rope; Pattern : Character; From : Positive) return Boolean;
+   --  Whether Pattern occurs anywhere in Source (or at/after From, for
+   --  the From overloads) -- a thin wrapper over Index (...) /= 0,
+   --  always Going => Forward (there is no Going parameter here:
+   --  "contains" is an existence question, not a search direction, and
+   --  Rope.Mod's own Contains -- the Character/From overload's direct
+   --  model -- has no Going option either). Genuinely a thin wrapper:
+   --  the Rope overloads inherit Index's own Ada.Strings.Pattern_Error
+   --  on a Null_Rope Pattern rather than softening it to some other
+   --  answer.
+
    type Rope_Array is array (Positive range <>) of Rope;
 
    function Split (Source : Rope; Separator : Rope) return Rope_Array;
@@ -193,6 +229,26 @@ package Ropes is
    --  Character_Set overload does not collapse adjacent matches: N
    --  consecutive separator characters produce N - 1 empty pieces
    --  between them, one split per character.
+
+   procedure Split (Source : Rope; Separator : Rope; Process : not null access function (Piece : Rope) return Boolean);
+   procedure Split (Source : Rope; Separator : String; Process : not null access function (Piece : Rope) return Boolean);
+   procedure Split (Source : Rope; Separator : Character; Process : not null access function (Piece : Rope) return Boolean);
+   procedure Split
+     (Source : Rope; Separator : Ada.Strings.Maps.Character_Set; Process : not null access function (Piece : Rope) return Boolean);
+   --  As the Split functions above, but calling Process on each piece
+   --  left to right instead of collecting them into a Rope_Array --
+   --  Rope.Mod's own Visitor-based Split, dropped from the earlier
+   --  Splitting phase in favor of only the array form, restored here
+   --  now that there is a real motivating use (see PLAN.md's "Deferred
+   --  / stretch" section): unlike the array form above, this never
+   --  materializes more than one piece at a time and never makes the
+   --  array form's separate counting pass, so it stays cheap even for
+   --  a huge Source where most pieces are never needed. Stops early --
+   --  without visiting any further pieces -- the first time Process
+   --  returns False; returns normally once every piece has been
+   --  visited (whether or not the last call to Process returned True,
+   --  same as Rope.Mod's own Split: there is nothing left to stop
+   --  early from at that point).
 
    type Cursor is private;
 

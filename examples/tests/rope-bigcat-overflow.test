@@ -1,0 +1,17 @@
+# 1_200_000_000 + 1_200_000_000 = 2_400_000_000, over Natural'Last
+# (2147483647). RopeTool.Mod's own Cat overflow guard HALTs(1) with no
+# output (run-tests.sh's original strip() drops the Oberon runtime's
+# "Terminated by Halt(1)." line); Ropes.New_Concat instead raises
+# Ada.Strings.Length_Error, which rope_tool's bigcat handler catches
+# and turns into a clean "Error: ..." message -- an exception, not a
+# clamp, so this is one of the few fixtures where the *kind* of
+# divergence (not just the wording) differs from the Oberon original.
+program rope_tool
+arg bigcat
+arg 1200000000
+arg x
+arg 1200000000
+arg y
+status 1
+output
+Error: combined length exceeds Natural'Last

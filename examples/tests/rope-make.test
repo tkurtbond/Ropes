@@ -1,0 +1,7 @@
+program rope_tool
+arg make
+arg 5
+arg z
+status 0
+output
+zzzzz
