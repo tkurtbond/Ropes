@@ -155,7 +155,8 @@ if a real need shows up; they are not part of this plan.
 ## Package layout
 
 ```
-Ropes/
+Ropes/                   -- repo root (github.com/tkurtbond/Ropes)
+  README.md, AGENTS.md, PLAN.md
   ropes.gpr              -- library project
   src/
     ropes.ads / .adb      -- the whole public API; one package, matching
@@ -169,6 +170,8 @@ Ropes/
     src/
       rope_tool.adb              -- main procedure
       rope_tool_args.ads / .adb  -- command definitions (see below)
+    tests/
+      run-tests.sh, *.test       -- black-box rope_tool suite (see Testing)
 ```
 
 One flat package, not a `Ropes.*` hierarchy — `Rope.Mod` is a single
@@ -1431,8 +1434,9 @@ Mirrors `alibfyaml`'s `test/` convention (see its `AGENTS.md`): one
 `test_*.adb` per concern, each its own standalone `Main` in `test.gpr`
 (not a single monolithic test runner), printing `ok   - <label>` /
 `FAIL - <label>` per check and a trailing summary line. No `AUnit`
-dependency — nothing else in this repo (`ulid_try`, `uuid_test`, the
-`alibfyaml`/`besm2_fmt`/`ova_fmt` family) pulls one in either, and a
+dependency — none of this user's related Ada projects (`ulid_try`/
+`uuid_test` in `~/Repos/Ada/ada-experiments`, where `Ropes` began, or
+the `alibfyaml`/`besm2_fmt`/`ova_fmt` family) pulls one in either, and a
 library this size doesn't need the extra machinery.
 
 **Source the actual test cases from `RopeTest.Mod` and

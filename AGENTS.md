@@ -279,8 +279,9 @@ valgrind --leak-check=full --show-leak-kinds=definite,indirect --error-exitcode=
 ```
 
 Format with `gnatpp -M132` (matches this user's other Ada projects —
-see recent commits in this repo's git log). No formatter config file
-exists elsewhere in this tree; `-M132` is passed on the command line.
+e.g. `~/Repos/Ada/ada-experiments`' git log, where `Ropes` lived
+before moving to this standalone repo). No formatter config file
+exists in this repo; `-M132` is passed on the command line.
 
 ## Conventions specific to this codebase
 
