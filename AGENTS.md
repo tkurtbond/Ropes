@@ -8,7 +8,7 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-16, Phases
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-18, Phases
 7-8, 11 and 13 stretch phases and Phases 9-10, 12 and 14 not really
 `Ada`-side changes — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
@@ -18,7 +18,8 @@ depth-triggered auto-rebalance — `Balance`/`Balance_Insert`/
 `To_String`, `From_Unbounded_String`/`To_Unbounded_String`, `Element`,
 `Slice`, `Copy_Slice` (Phase 15, `Rope.Mod`'s `Blit`), `Insert`,
 (Phase 16: `String` overloads of `Index`/`Contains`/`Insert`/`Overwrite` and of
-all five comparison operators, both operand orders),
+all five comparison operators, both operand orders; Phase 17:
+`Replace_Slice`, `Index` with a `Character_Set`, and `Count`),
 `Delete`, `Overwrite`/`Head`/`Tail`, the five
 comparison operators (`"="`/`"<"`/`"<="`/`">"`/`">="`), `Index`
 (`Rope`/`Character` patterns, each with a no-`From` and a
@@ -44,10 +45,11 @@ the `Ropes.Text_IO` child package (`Put`/`Put_Line`/`Get_Line`).
 `test_unbounded.adb` (4), `test_repeat.adb` (8), `test_escape.adb`
 (5), `test_overwrite.adb` (6), `test_head_tail.adb` (10),
 `test_contains.adb` (9), `test_split_visitor.adb` (13), and
-`test_text_io.adb` (17), `test_stream_io.adb` (11), `test_copy_slice.adb` (11), `test_string_overloads.adb` (25) — 270 checks total — all pass clean, including under valgrind. Plus a
+`test_text_io.adb` (17), `test_stream_io.adb` (11), `test_copy_slice.adb` (11), `test_string_overloads.adb` (25), `test_replace_slice.adb` (10),
+`test_index_set.adb` (10), `test_count.adb` (10), `test_search_walk.adb` (31) — 331 checks total — all pass clean, including under valgrind. Plus a
 black-box `rope_tool` test suite, `examples/tests/` (`run-tests.sh` +
-47 `.test` fixtures, ported from
-`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `47 ok, 0 failed`.
+58 `.test` fixtures, mostly ported from
+`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `58 ok, 0 failed`.
 `Balance`/`Max_Depth`/`Min_Length` are internal to `ropes.adb`, not
 public — `src/ropes-test_support.ads`/`.adb` is a small test-only
 child package (`function Depth`) so tests can confirm depth stays
@@ -239,6 +241,35 @@ as a follow-up request. `rope_tool`'s `insert`/`overwrite`/`cmp` now
 pass their argument straight to these overloads (`contains` stays
 `Character`-based, matching `RopeTool.Mod`'s own).
 
+**Phase 17 added `Replace_Slice`, `Index` with a `Character_Set`,
+and `Count`** — the next three from the same "what's missing from
+`Ada.Strings.Fixed`/`Unbounded`" list, at explicit user request. Each
+matches `Ada.Strings.Unbounded`'s own signature, and each test uses
+`Ada.Strings.Fixed` itself as the oracle across multi-leaf ropes,
+exception cases included. Two things worth knowing: (1) **the
+`From`-bounded `Index` overloads follow GNAT, not the RM's wording** —
+RM A.4.3(56.2/3, 58.5/3) says `Index_Error` whenever `From` is outside
+`Source'Range`, but GNAT's `a-strsea.adb` raises only for `Forward`
+with `From < 'First` (impossible for a rope) and `Backward` with `From
+> 'Last`. `Ropes` already did this for `Rope`/`Character` patterns;
+the new `Character_Set` overload does the same, and `ropes.ads` now
+says so. (2) **`Count` clashes with `Ada.Text_IO.Count`** — with both
+packages use-visible, a bare `Count` is hidden (RM 8.4(11)), as it
+would be for `Ada.Strings.Unbounded.Count`; `rope_tool` writes
+`Ropes.Count`, and `test_count.adb` doesn't `use Ada.Text_IO`.
+
+**Phase 18 made every `Index` and `Count` walk leaves instead of
+calling `Fetch` per character** (25–130× faster on 2-million-character
+ropes), on a `Leaf_Walk` that now has a direction and can start
+anywhere (`Start_Walk_At`), and documented why the `From` rule follows
+GNAT rather than the RM (see `ropes.ads`'s `Index` comment and
+PLAN.md's "`From` past the end"). **A walk copied mid-search is how a
+pattern match crossing leaves is checked without losing the scan's
+place** — `Leaf_Walk` is a plain record, so `V_Walk : Leaf_Walk := W`
+is the whole trick. **Proving a search test can fail is part of
+writing it**: `test_search_walk.adb` was checked by planting three
+bugs, one at a time, and seeing it fail each.
+
 **Phase 14 made `Rope.Mod`'s `Blit` and `Escaped` linear and renamed
 `Escaped` to `Escape`** (`oberon-tools` `a41f0a7`) — the two
 per-character-`Fetch` operations Phase 12 had left alone there. Only
@@ -288,8 +319,12 @@ true going forward).
 `cat`/`len`/`fetch`/`slice`/`insert`/`delete`/`overwrite`/`head`/`tail`/
 `cmp`/`index`/`rindex`/`indexchar`/`rindexchar`/`split`/`chars`/`trim`/
 `triml`/`trimr`/`upper`/`lower`/`capitalize`/`uncapitalize`/`repeat`/
-`make`/`bigcat`/`contains`/`escaped`/`lines`/`readfile`/`copyslice`, matching
-all of `Ropes`'s API through Phase 15 (`copyslice S LOW HIGH T POS` is
+`make`/`bigcat`/`contains`/`escaped`/`lines`/`readfile`/`copyslice`/
+`replaceslice`/`count`/`countset`/`indexset`/`rindexset`, matching
+all of `Ropes`'s API through Phase 17 (Phase 17's five are
+`Replace_Slice`/`Count`/`Index`-with-a-`Character_Set` demos, each set
+given as a string of its members, `indexset`/`rindexset` split by
+`Going` like `index`/`rindex`; `copyslice S LOW HIGH T POS` is
 Phase 15's `Copy_Slice` demo, printing T after the copy so its
 untouched rest shows; `readfile FILE` is Phase 13's
 `Ropes.Stream_IO.Read_File` demo, printing the contents `Escape`d so

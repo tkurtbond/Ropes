@@ -1,0 +1,9 @@
+# The last l or o.
+program rope_tool
+arg rindexset
+arg hello world
+arg lo
+arg 11
+status 0
+output
+10

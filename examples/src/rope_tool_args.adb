@@ -857,4 +857,140 @@ package body Rope_Tool_Args is
          return False;
    end Readfile_Argument_Handler;
 
+   --  --- replaceslice S LOW HIGH BY ---
+
+   Replaceslice_Count : Natural := 0;
+   Replaceslice_S     : Rope;
+   Replaceslice_Low   : Positive;
+   Replaceslice_High  : Natural;
+
+   function Replaceslice_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Replaceslice_Count is
+         when 0 =>
+            Replaceslice_S := From_String (Arg);
+
+         when 1 =>
+            Replaceslice_Low := Positive'Value (Arg);
+
+         when 2 =>
+            Replaceslice_High := Natural'Value (Arg);
+
+         when 3 =>
+            Ropes.Text_IO.Put_Line (Replace_Slice (Replaceslice_S, Replaceslice_Low, Replaceslice_High, Arg));
+
+         when others =>
+            null;
+      end case;
+      Replaceslice_Count := Replaceslice_Count + 1;
+      return True;
+   exception
+      when Constraint_Error        =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Index_Error =>
+         --  LOW, set on an earlier call, is the one out of range.
+         Put_Line (Standard_Error, "Error: LOW out of range");
+         Set_Exit_Status (Failure);
+         return False;
+   end Replaceslice_Argument_Handler;
+
+   --  --- count S PATTERN ---
+   --
+   --  Ropes.Count is written qualified here and in countset below:
+   --  with both Ada.Text_IO and Ropes use-visible, a bare Count is
+   --  hidden by Ada.Text_IO's own Count type (RM 8.4(11)) -- the same
+   --  clash a client of Ada.Strings.Unbounded.Count gets.
+
+   Count_Count : Natural := 0;
+   Count_S     : Rope;
+
+   function Count_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      if Count_Count = 0 then
+         Count_S := From_String (Arg);
+      elsif Count_Count = 1 then
+         Put_Line (Ada.Strings.Fixed.Trim (Natural'Image (Ropes.Count (Count_S, Arg)), Ada.Strings.Both));
+      end if;
+      Count_Count := Count_Count + 1;
+      return True;
+   exception
+      when Ada.Strings.Pattern_Error =>
+         Put_Line (Standard_Error, "Error: PATTERN must not be empty");
+         Set_Exit_Status (Failure);
+         return False;
+   end Count_Argument_Handler;
+
+   --  --- countset S CHARS ---
+
+   Countset_Count : Natural := 0;
+   Countset_S     : Rope;
+
+   function Countset_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      if Countset_Count = 0 then
+         Countset_S := From_String (Arg);
+      elsif Countset_Count = 1 then
+         Put_Line
+           (Ada.Strings.Fixed.Trim (Natural'Image (Ropes.Count (Countset_S, Ada.Strings.Maps.To_Set (Arg))), Ada.Strings.Both));
+      end if;
+      Countset_Count := Countset_Count + 1;
+      return True;
+   end Countset_Argument_Handler;
+
+   --  --- indexset / rindexset S CHARS FROM ---
+   --
+   --  One Ropes.Index (Character_Set) overload with a fixed Going,
+   --  split into two commands like index/rindex.
+
+   Indexset_Count : Natural := 0;
+   Indexset_S     : Rope;
+   Indexset_Set   : Ada.Strings.Maps.Character_Set;
+
+   function Indexset_Handler (Arg : String; Going : Ada.Strings.Direction) return Boolean is
+   begin
+      case Indexset_Count is
+         when 0 =>
+            Indexset_S := From_String (Arg);
+
+         when 1 =>
+            Indexset_Set := Ada.Strings.Maps.To_Set (Arg);
+
+         when 2 =>
+            Put_Line
+              (Ada.Strings.Fixed.Trim
+                 (Natural'Image (Index (Indexset_S, Indexset_Set, Positive'Value (Arg), Going => Going)), Ada.Strings.Both));
+
+         when others =>
+            null;
+      end case;
+      Indexset_Count := Indexset_Count + 1;
+      return True;
+   exception
+      when Constraint_Error        =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Index_Error =>
+         Put_Line (Standard_Error, "Error: FROM out of range");
+         Set_Exit_Status (Failure);
+         return False;
+   end Indexset_Handler;
+
+   function Indexset_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      return Indexset_Handler (Arg, Ada.Strings.Forward);
+   end Indexset_Argument_Handler;
+
+   function Rindexset_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      return Indexset_Handler (Arg, Ada.Strings.Backward);
+   end Rindexset_Argument_Handler;
+
 end Rope_Tool_Args;

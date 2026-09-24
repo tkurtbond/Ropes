@@ -206,6 +206,18 @@ package Ropes is
    --  Ada.Strings.Unbounded.Overwrite itself takes. Same as Overwrite
    --  (Source, Position, From_String (New_Item)).
 
+   function Replace_Slice (Source : Rope; Low : Positive; High : Natural; By : Rope) return Rope;
+   function Replace_Slice (Source : Rope; Low : Positive; High : Natural; By : String) return Rope;
+   --  Source with the characters from Low through High, inclusive,
+   --  replaced by By -- Ada.Strings.Unbounded.Replace_Slice's own
+   --  signature and semantics (function form only, as Overwrite
+   --  above). If High >= Low, the result is Slice (Source, 1, Low - 1)
+   --  & By & the rest of Source after High; a High past the end is
+   --  clamped to Length (Source), not an error. If High < Low, the
+   --  result is Insert (Source, Low, By). Raises
+   --  Ada.Strings.Index_Error if Low - 1 > Length (Source), in either
+   --  case. No Rope.Mod counterpart.
+
    function Head (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope;
    function Tail (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope;
    --  The first (Head) or last (Tail) Count characters of Source,
@@ -253,15 +265,48 @@ package Ropes is
    --  Pattern does not occur. Raises Ada.Strings.Pattern_Error if
    --  Pattern is Null_Rope, matching Ada.Strings.Fixed.Index exactly
    --  -- NOT Rope.Mod's Find, which instead treats an empty pattern as
-   --  matching at "from". The From overload matches
-   --  Ada.Strings.Fixed.Index's own From-bounded overload exactly,
-   --  including its asymmetry: Forward never raises for an
-   --  out-of-range From (Source (From .. Length (Source)) is simply
-   --  empty, so the search just finds nothing), but Backward raises
-   --  Ada.Strings.Index_Error if From > Length (Source); and if Source
-   --  itself is Null_Rope, both overloads return 0 immediately, even
-   --  when Pattern is also Null_Rope (Source's emptiness is checked
-   --  before Pattern's) -- see PLAN.md's "Search" section.
+   --  matching at "from".
+   --
+   --  The From overload searches Source (From .. Length (Source))
+   --  (Forward) or Source (1 .. From) (Backward). If Source is
+   --  Null_Rope it returns 0 at once, even when Pattern is also
+   --  Null_Rope (Source's emptiness is checked before Pattern's).
+   --  Otherwise, a From past the end of Source is handled as GNAT's
+   --  Ada.Strings.Fixed.Index handles it, which is NOT what the RM
+   --  says:
+   --
+   --  * The RM (A.4.3(56.2/3), and 58.5/3 for the Character_Set
+   --    overloads; the same since Ada 2005) says Index_Error whenever
+   --    From is not in Source'Range, in either direction.
+   --
+   --  * GNAT (a-strsea.adb) checks only the bound its direction
+   --    needs, then searches a slice: Forward raises only if From <
+   --    Source'First, and otherwise returns Index (Source (From ..
+   --    Source'Last), ...), which for From > Source'Last is a null
+   --    slice, and so 0; Backward raises only if From > Source'Last.
+   --    From is Positive and a rope starts at 1, so for a rope
+   --    Forward never raises.
+   --
+   --  So here, as with GNAT, Forward with From > Length (Source)
+   --  returns 0, where the RM says Index_Error; Backward with From >
+   --  Length (Source) raises Ada.Strings.Index_Error, as both say.
+   --  Ropes follows GNAT because that is what a caller moving from
+   --  Ada.Strings.Fixed/Unbounded under GNAT actually gets, and
+   --  because it is what makes the usual scan loop -- search, then
+   --  search again from just past the match -- work without a guard
+   --  when the match ends the rope (Split and Count here rely on it).
+   --  Every From overload of Index (Rope, String, Character and
+   --  Character_Set) follows this same rule. See PLAN.md's "Search"
+   --  section.
+   --
+   --  Time, for every Index overload: O(depth) to reach From, then
+   --  linear in the characters scanned, walking Source's leaves in
+   --  place. A pattern search is the same naive algorithm as GNAT's
+   --  Ada.Strings.Fixed.Index -- test each candidate's first
+   --  character (last, Backward), then compare the rest -- so O(n m)
+   --  at worst for a length-m pattern, and near O(n) when the
+   --  pattern's first character is uncommon. A Rope Pattern of more
+   --  than one leaf is first copied into a String on the heap.
 
    function Index (Source : Rope; Pattern : String; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
    function Index
@@ -279,6 +324,36 @@ package Ropes is
    --  As above, searching for a single Character instead -- Rope.Mod's
    --  IndexChar/RIndexChar. No empty-pattern case; the same From/Going
    --  boundary rules apply.
+
+   function Index
+     (Source : Rope; Set : Ada.Strings.Maps.Character_Set; Test : Ada.Strings.Membership := Ada.Strings.Inside;
+      Going  : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+   function Index
+     (Source : Rope; Set : Ada.Strings.Maps.Character_Set; From : Positive; Test : Ada.Strings.Membership := Ada.Strings.Inside;
+      Going  : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+   --  The index of the first (Going => Forward) or last (Going =>
+   --  Backward) character of Source that is in Set (Test => Inside)
+   --  or not in Set (Test => Outside), or 0 if there is none --
+   --  Ada.Strings.Unbounded's own Character_Set Index. The From
+   --  overload follows the same boundary rules as the Rope overload
+   --  above -- GNAT's, not the RM's, as explained there: 0 for a
+   --  Null_Rope Source; Forward returns 0 for From > Length (Source),
+   --  where the RM (A.4.3(58.5/3)) says Index_Error; Backward raises
+   --  Ada.Strings.Index_Error if From > Length (Source).
+
+   function Count (Source : Rope; Pattern : Rope) return Natural;
+   function Count (Source : Rope; Pattern : String) return Natural;
+   --  The number of nonoverlapping occurrences of Pattern in Source,
+   --  counted left to right, each search starting just after the
+   --  previous match -- Ada.Strings.Unbounded.Count. Raises
+   --  Ada.Strings.Pattern_Error if Pattern is empty (Null_Rope or
+   --  ""), even when Source is also empty, as GNAT's Count does. Time
+   --  as for Index, plus O(depth) per occurrence found.
+
+   function Count (Source : Rope; Set : Ada.Strings.Maps.Character_Set) return Natural;
+   --  The number of characters of Source that are in Set --
+   --  Ada.Strings.Unbounded.Count's Character_Set overload. Linear in
+   --  Length (Source).
 
    function Contains (Source, Pattern : Rope) return Boolean;
    function Contains (Source, Pattern : Rope; From : Positive) return Boolean;

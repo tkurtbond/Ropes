@@ -1,0 +1,8 @@
+# The l's and o's of "hello world".
+program rope_tool
+arg countset
+arg hello world
+arg lo
+status 0
+output
+5

@@ -1,0 +1,10 @@
+# LOW past Length + 1 raises Ada.Strings.Index_Error.
+program rope_tool
+arg replaceslice
+arg hello
+arg 7
+arg 9
+arg X
+status 1
+output
+Error: LOW out of range

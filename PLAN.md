@@ -288,7 +288,7 @@ later phase to add). Same
 than hand-derived wherever the translation was non-mechanical — see
 "Testing approach" below for the two real divergences that caught
 (`bigcat`'s overflow behavior and `slice`'s past-the-end boundary).
-Currently `47 ok, 0 failed`; run via `cd examples &&
+Currently `58 ok, 0 failed`; run via `cd examples &&
 ./tests/run-tests.sh`.
 
 ## Core design
@@ -548,6 +548,8 @@ function Insert (Source : Rope; Before : Positive; New_Item : Rope) return Rope;
 function Delete (Source : Rope; From, Through : Natural) return Rope;             -- Rope.Mod's Remove
 function Insert (Source : Rope; Before : Positive; New_Item : String) return Rope;       -- Phase 16
 function Overwrite (Source : Rope; Position : Positive; New_Item : String) return Rope; -- Phase 16
+function Replace_Slice (Source : Rope; Low : Positive; High : Natural; By : Rope) return Rope;   -- Phase 17
+function Replace_Slice (Source : Rope; Low : Positive; High : Natural; By : String) return Rope; -- Phase 17
 ```
 
 Names and parameter shapes taken directly from
@@ -611,6 +613,17 @@ function Index
 
 --  Phase 16: Pattern : String, with and without From -- for Index
 --  and for Contains.
+
+--  Phase 17:
+function Index
+  (Source : Rope; Set : Ada.Strings.Maps.Character_Set; Test : Ada.Strings.Membership := Ada.Strings.Inside;
+   Going  : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+function Index
+  (Source : Rope; Set : Ada.Strings.Maps.Character_Set; From : Positive; Test : Ada.Strings.Membership := Ada.Strings.Inside;
+   Going  : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+function Count (Source : Rope; Pattern : Rope) return Natural;
+function Count (Source : Rope; Pattern : String) return Natural;
+function Count (Source : Rope; Set : Ada.Strings.Maps.Character_Set) return Natural;
 ```
 
 Collapses `Rope.Mod`'s four functions (`Find`, `RFind`, `IndexChar`,
@@ -674,6 +687,69 @@ the search just finds nothing (`From < Source'First` can't happen
 here since `From : Positive` and `Source'First` is always `1`).
 `Backward` raises `Ada.Strings.Index_Error` if `From > Length
 (Source)`.
+
+#### `From` past the end: the RM, GNAT, and `Ropes`
+
+That asymmetry is **GNAT's, not the RM's** — not noticed when it was
+first written down above (it was checked against `a-strsea.adb` only),
+and spelled out at Phase 17's user request:
+
+- **The RM** says `Index_Error` whenever `From` is not in
+  `Source'Range`, in either direction: A.4.3(56.2/3) for a pattern,
+  58.5/3 for a `Character_Set`. It has said so since Ada 2005
+  (56.2/2, 58.5/2, when the `From` overloads were added by
+  AI95-00301). The only later change, AI05-0056, put "If Source is the
+  null string, Index returns 0" in front of that check (AARM
+  A.4.3(109.e/3)); it didn't touch the non-empty case. The AARM gives
+  no rationale that would allow a `Forward` search from past the end.
+- **GNAT** (`a-strsea.adb`, the same in GNAT 8.3.1, 13 and 16, the
+  versions checked) implements each `From` overload as "check one
+  bound, then search a slice":
+
+  ```ada
+  if Source'Length = 0 then
+     return 0;                               --  AI05-0056
+  elsif Going = Forward then
+     if From < Source'First then raise Index_Error; end if;
+     return Index (Source (From .. Source'Last), Pattern, Forward, Mapping);
+  else
+     if From > Source'Last then raise Index_Error; end if;
+     return Index (Source (Source'First .. From), Pattern, Backward, Mapping);
+  end if;
+  ```
+
+  Each direction checks only the bound that its slice needs to be
+  legal. For `Forward` with `From > Source'Last`, `Source (From ..
+  Source'Last)` is a null slice — legal Ada, since a null range's
+  bounds needn't lie in the index range — so the search finds nothing
+  and returns 0 instead of raising. (`Backward` with `From <
+  Source'First` can't be reached with a `Positive` `From` and a string
+  starting at 1.) `Ada.Strings.Unbounded`'s `Index` delegates to
+  these, so it behaves the same.
+- **`Ropes` follows GNAT** in every `From` overload of `Index`
+  (`Rope`, `String`, `Character` and `Character_Set` patterns):
+  `Forward` with `From > Length (Source)` returns 0; `Backward` with
+  `From > Length (Source)` raises `Index_Error`. Why:
+  1. **It's what callers actually get.** The design goal (see "Why
+     this is a real port") is that someone who knows `Ada.Strings`
+     can guess `Ropes`'s behavior. Under GNAT, the only Ada compiler
+     this project builds with, what they have observed is GNAT's rule,
+     and a program that works with `Unbounded_String.Index` should
+     keep working with `Ropes.Index`.
+  2. **Scan loops rely on it.** "Find, then search again from just
+     past the match" reaches `From = Length (Source) + 1` whenever a
+     match ends the rope. `Split` does exactly this, as did `Count`
+     before its early exit, and with the RM's rule every such loop
+     would need a guard.
+  3. **The tests use GNAT's `Ada.Strings.Fixed` as their oracle**
+     (`test_index_set.adb`, `test_string_overloads.adb`), which only
+     works if the two agree, `Index_Error` cases included.
+
+  The cost is that `Ropes` isn't RM-conformant here, and a future
+  GNAT that fixes its check would make `Ropes` differ from it. If that
+  happens, or if strict conformance becomes the goal, the change is
+  one rule applied to all the `From` overloads together, plus guards
+  in `Split`'s loops — not a change to one overload.
 
 `Rope.Mod`'s `RFind`'s own bound convention does **not** carry over
 unchanged: `RFind`'s `before` clamps so that a match's *start*
@@ -780,11 +856,10 @@ a nested `Find_Next` function that closes over that overload's own
 - `Separator : Character` — `Find_Next` calls the `Index` (`Pattern :
   Character`) overload; `Sep_Width => 1`. No empty case.
 - `Separator : Ada.Strings.Maps.Character_Set` — `Find_Next` is a
-  small nested linear scan using `Ada.Strings.Maps.Is_In` (there is no
-  public `Character_Set`-based `Index` to call — `Ropes`'s public
-  `Index` only has `Rope`/`Character` pattern overloads, so this one
-  case doesn't reuse `Index` the way the other three reuse either
-  `Index` or the `Rope` `Split` overload); `Sep_Width => 1`. Empty case
+  small nested linear scan using `Ada.Strings.Maps.Is_In` (when
+  written, there was no public `Character_Set`-based `Index` to call —
+  Phase 17 added one, but this scan was left as it is rather than
+  rewritten onto it); `Sep_Width => 1`. Empty case
   is `Ada.Strings.Maps.Null_Set`.
 
 Binding `Find_Next` as a **generic formal subprogram** (not an
@@ -1739,6 +1814,102 @@ parameter's type.
   all. `rope_tool contains` stays `Character`-based, matching
   `RopeTool.Mod`'s own `contains`.
 
+- **Phase 17, done — `Replace_Slice`, `Index` with a `Character_Set`,
+  `Count`.** At explicit user request, the next three from the same
+  list of `Ada.Strings.Fixed`/`Unbounded` gaps. No `Rope.Mod`
+  counterpart for any of them. Signatures and semantics are
+  `Ada.Strings.Unbounded`'s, checked against the RM (A.4.3, which A.4.5
+  defers to) and GNAT's `a-strunb.adb`/`a-strsea.adb`:
+  - `Replace_Slice (Source, Low, High, By)`, `By` a `Rope` or a
+    `String`: `Index_Error` if `Low - 1 > Length (Source)`; for `High
+    >= Low`, `Slice (1, Low - 1) & By & ` the rest after `High`, a
+    `High` past the end clamped; for `High < Low`, `Insert (Source,
+    Low, By)`. A composition of `Slice`/`"&"`/`Insert`, so O(log n)
+    new nodes plus `By`.
+  - `Index (Source, Set, [From,] Test, Going)`: `Rope.Mod` has nothing
+    set-based. The `From` rules are the existing `Index` overloads'
+    ones, i.e. GNAT's rather than the RM's literal wording (the RM says
+    `Index_Error` for any `From` outside `Source'Range`; GNAT, and
+    `Ropes`, return 0 for a `Forward` search from past the end) —
+    checked in `a-strsea.adb` before deciding, not assumed, and now
+    stated in `ropes.ads`. `Fetch` per character, like the
+    `Character` overload, so O(n log n) — until Phase 18.
+  - `Count (Source, Pattern)`, `Pattern` a `Rope` or a `String`:
+    nonoverlapping, left to right, by repeated `From`-bounded `Index`;
+    `Pattern_Error` for an empty pattern even on an empty `Source`, as
+    GNAT checks it first. The loop stops once a match reaches the end
+    rather than computing `Found + Length (Pattern)`, which would
+    overflow for a match ending at `Natural'Last`. `Count (Source,
+    Set)` is one `Process_Chunks` pass, linear.
+
+  `Count` is hidden by `Ada.Text_IO.Count` wherever both are
+  use-visible (RM 8.4(11)), the same as `Ada.Strings.Unbounded.Count`
+  — found when `rope_tool_args.adb`, which has `use Ada.Text_IO`,
+  failed to compile; it writes `Ropes.Count`.
+
+  `test_replace_slice.adb`, `test_index_set.adb`, `test_count.adb`
+  (10 checks each): hand-picked cases, plus `Ada.Strings.Fixed` as the
+  oracle over 17-character-leaf ropes — every `Low`/`High` pair (with
+  `Index_Error` raised exactly when `Fixed` raises it); every `From`,
+  `Test` and `Going` for four sets (same); every pattern of lengths
+  1–6 from a string of overlapping `a`/`b` runs. Clean under valgrind.
+  `rope_tool` gained `replaceslice`, `count`, `countset`, `indexset`,
+  `rindexset` (a set given as a string of its members, `To_Set`), 11
+  new fixtures generated from real runs, and
+  `rope-help.test`/`rope-unknown-command.test` regenerated: `58 ok, 0
+  failed`.
+
+- **Phase 18, done — the `From` rule documented; `Index` and `Count`
+  made linear.** At explicit user request. First, the `From`-past-the-
+  end behavior was written up properly — the RM's rule, GNAT's
+  implementation, and why `Ropes` follows GNAT — in `ropes.ads`'s
+  `Index` comment and "Search"'s new "`From` past the end" subsection,
+  after checking the Ada 2005 and 2022 RMs, the AARM (which gives no
+  rationale beyond AI05-0056's empty-`Source` case), and GNAT 8.3.1,
+  13 and 16's `a-strsea.adb`. Checking also showed that `Split`'s own
+  loops rely on the GNAT rule.
+
+  Second, every search stopped calling `Fetch` (a descent from the
+  root) per character. `Leaf_Walk` gained a direction and
+  `Start_Walk_At`, which starts a walk at any position in one O(depth)
+  descent, pushing the far-side sibling at each step (the right one
+  when going `Forward`, the left one going `Backward`), within the same
+  `Depth + 1` stack bound. On it:
+  - `Scan`, a generic over a character test, is `Index` for a
+    `Character` and for a `Character_Set`: one pass over the leaves,
+    in place.
+  - `Find` is the pattern `Index` for a `String` pattern: it tests each
+    candidate's first character (last, `Backward`) and compares the
+    rest as one slice when it fits in the leaf, or a run at a time on a
+    *copy* of the walk when it crosses into later leaves. The naive
+    algorithm, as in GNAT's own `Ada.Strings.Search.Index` — no KMP —
+    so O(n m) at worst. A `Rope` pattern is used in place if it's a
+    single leaf, and otherwise copied onto the heap (`Flatten`, via
+    `Node_Copy`), not the stack, since a pattern can be as long as any
+    rope. The `String` overloads call it directly instead of building a
+    rope with `From_String` first.
+  - `Count` loops over `Find`, flattening a `Rope` pattern once, not
+    once per occurrence.
+
+  On 2-million-character ropes (the library built as usual, `-O0
+  -gnatVa`): `Index` for a `Character` 0.28 s → 0.008 s, for a
+  `Character_Set` 0.27 s → 0.010 s, for a `String` 0.35–0.40 s →
+  0.008–0.017 s; `Count` of a `String` with 200,000 matches 0.32 s →
+  0.046 s, and over 1000-character leaves 0.25 s → 0.003 s.
+
+  `test_search_walk.adb` (31 checks): the same text built five ways
+  (left-built, right-built, by scattered `Insert`s, one leaf, and by
+  `"*"`, whose subtrees are shared), 9-character leaves, a text of
+  mostly `a`s and `b`s so that most candidates are partial matches
+  crossing leaves; every `Index` overload from every `From`, both
+  directions, `Index_Error` included, `Count` for patterns up to seven
+  leaves long, and `Rope` patterns long enough to be flattened — all
+  against `Ada.Strings.Fixed`. Three deliberately planted bugs (a
+  crossing match resuming at the wrong offset, a `Backward` walk
+  pushing in `Forward` order, an off-by-one `Forward` bound) each
+  failed it. Every `test_*` clean under valgrind. No `rope_tool`
+  change: no new operation to demonstrate.
+
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds
 the matching `rope_tool` subcommand(s) — see "Command-line tool
@@ -1866,5 +2037,5 @@ Oberon original: `rope-chars.test`, `rope-overwrite.test`,
 `rope-lines-stdin.test`, `rope-lines-missing.test`, for commands
 `RopeTool.Mod` never had to begin with. Run via `cd examples && ./tests/run-tests.sh`
 (`-v` per-test, `-o` also showing captured output, or name specific
-fixtures — see the script's own header comment); currently `47 ok, 0
+fixtures — see the script's own header comment); currently `58 ok, 0
 failed`.

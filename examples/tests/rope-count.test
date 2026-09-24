@@ -1,0 +1,9 @@
+# Nonoverlapping: "aba" occurs at 1, 3 and 5, but the one at 3
+# overlaps the one at 1, so only 1 and 5 count.
+program rope_tool
+arg count
+arg abababa
+arg aba
+status 0
+output
+2

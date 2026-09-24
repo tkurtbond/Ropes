@@ -1,0 +1,10 @@
+# Characters 7 through 11 ("world") replaced by "there".
+program rope_tool
+arg replaceslice
+arg hello world
+arg 7
+arg 11
+arg there
+status 0
+output
+hello there

@@ -427,36 +427,86 @@ package body Ropes is
       end case;
    end Node_Copy;
 
-   --  A left-to-right walk over a tree's leaves, one leaf per
-   --  Next_Leaf call, in amortized O(1) per leaf: a pre-order walk with
-   --  an explicit stack of subtrees still to visit (Right pushed before
-   --  Left, so Left comes off first). That stack never holds more than
-   --  Depth + 1 entries, and every concat node's Depth is set by
-   --  New_Concat, so Size => Root.Depth + 1 always suffices.
+   --  A walk over a tree's leaves, one leaf per Next_Leaf call, in
+   --  amortized O(1) per leaf: a pre-order walk with an explicit stack
+   --  of subtrees still to visit. Left to right (Going => Forward:
+   --  Right pushed before Left, so Left comes off first), or right to
+   --  left (Backward: the mirror image). The stack holds at most one
+   --  subtree per level below the root, plus one -- Depth + 1 entries
+   --  -- and every concat node's Depth is set by New_Concat, so Size =>
+   --  Root.Depth + 1 always suffices. A walk has a leaf left to return
+   --  exactly when Top > 0 (every subtree on the stack is non-empty).
    type Node_Stack is array (Positive range <>) of Node_Access;
 
    type Leaf_Walk (Size : Positive) is record
       Stack : Node_Stack (1 .. Size);
-      Top   : Natural := 0;
+      Top   : Natural               := 0;
+      Going : Ada.Strings.Direction := Ada.Strings.Forward;
    end record;
 
+   --  Starts a left-to-right walk over all of Root's leaves.
    procedure Start_Walk (W : in out Leaf_Walk; Root : Node_Access) is
    begin
       W.Stack (1) := Root;
       W.Top       := 1;
+      W.Going     := Ada.Strings.Forward;
    end Start_Walk;
 
-   --  Precondition: the walk has a leaf left to return.
+   --  Starts a walk in direction Going from the character at 1-based
+   --  position Pos of Root: Leaf is the leaf holding it, at Leaf.Chars
+   --  (Offset), and Next_Leaf then returns the leaves after (Forward)
+   --  or before (Backward) Leaf, in order. One descent from the root,
+   --  pushing the subtree on the far side of each step -- the right
+   --  one when stepping left, going Forward, and the left one when
+   --  stepping right, going Backward -- so O(depth), and within the
+   --  same Depth + 1 bound. Precondition: Pos in 1 .. Root.Len.
+   procedure Start_Walk_At
+     (W      : in out Leaf_Walk; Root : Node_Access; Pos : Positive; Going : Ada.Strings.Direction; Leaf : out Node_Access;
+      Offset :    out Positive)
+   is
+      use type Ada.Strings.Direction;
+      N   : Node_Access := Root;
+      Rel : Positive    := Pos;  --  Pos, relative to N.
+   begin
+      W.Top   := 0;
+      W.Going := Going;
+      while N.Kind = Concat_Kind loop
+         if Rel <= N.Left.Len then
+            if Going = Ada.Strings.Forward then
+               W.Top           := W.Top + 1;
+               W.Stack (W.Top) := N.Right;
+            end if;
+            N := N.Left;
+         else
+            if Going = Ada.Strings.Backward then
+               W.Top           := W.Top + 1;
+               W.Stack (W.Top) := N.Left;
+            end if;
+            Rel := Rel - N.Left.Len;
+            N   := N.Right;
+         end if;
+      end loop;
+      Leaf   := N;
+      Offset := Rel;
+   end Start_Walk_At;
+
+   --  Precondition: the walk has a leaf left to return (W.Top > 0).
    procedure Next_Leaf (W : in out Leaf_Walk; Leaf : out Node_Access) is
+      use type Ada.Strings.Direction;
       N : Node_Access;
    begin
       loop
          N     := W.Stack (W.Top);
          W.Top := W.Top - 1;
          exit when N.Kind = Leaf_Kind;
-         W.Stack (W.Top + 1) := N.Right;
-         W.Stack (W.Top + 2) := N.Left;
-         W.Top               := W.Top + 2;
+         if W.Going = Ada.Strings.Forward then
+            W.Stack (W.Top + 1) := N.Right;
+            W.Stack (W.Top + 2) := N.Left;
+         else
+            W.Stack (W.Top + 1) := N.Left;
+            W.Stack (W.Top + 2) := N.Right;
+         end if;
+         W.Top := W.Top + 2;
       end loop;
       Leaf := N;
    end Next_Leaf;
@@ -858,6 +908,21 @@ package body Ropes is
    function Overwrite (Source : Rope; Position : Positive; New_Item : String) return Rope is
      (Overwrite (Source, Position, From_String (New_Item)));
 
+   function Replace_Slice (Source : Rope; Low : Positive; High : Natural; By : Rope) return Rope is
+      Len : constant Natural := Length (Source);
+   begin
+      if Low - 1 > Len then
+         raise Ada.Strings.Index_Error;
+      end if;
+      if High < Low then
+         return Insert (Source, Low, By);
+      end if;
+      return Slice (Source, 1, Low - 1) & By & Slice (Source, Natural'Min (High, Len) + 1, Len);
+   end Replace_Slice;
+
+   function Replace_Slice (Source : Rope; Low : Positive; High : Natural; By : String) return Rope is
+     (Replace_Slice (Source, Low, High, From_String (By)));
+
    function Head (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope is
    begin
       if Count <= Length (Source) then
@@ -911,66 +976,271 @@ package body Ropes is
 
    ------------------------------------------------------------------
    --  Search.
+   --
+   --  Every search walks Source's leaves in its own direction with a
+   --  Leaf_Walk started at From (Start_Walk_At), scanning each leaf's
+   --  Chars in place: O(depth) to reach From's leaf, then O(1) per
+   --  character -- not a Fetch from the root per character, which
+   --  (until Phase 18) made every search O(n log n) and a pattern
+   --  search O(n m log n). A pattern search tests each candidate's
+   --  first character (last, going Backward) before comparing the rest,
+   --  as a single slice comparison when the candidate lies within one
+   --  leaf and a run at a time, on a copy of the walk, when it crosses
+   --  into the next ones: O(n m) in the worst case, the same naive
+   --  algorithm as GNAT's own Ada.Strings.Search.Index, but close to
+   --  O(n) when the pattern's first character is uncommon.
    ------------------------------------------------------------------
 
-   function Index
-     (Source : Rope; Pattern : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural
-   is
-      S_D   : constant Node_Access := Data_Of (Source);
-      P_D   : constant Node_Access := Data_Of (Pattern);
-      S_Len : constant Natural     := (if S_D = null then 0 else S_D.Len);
-      P_Len : constant Natural     := (if P_D = null then 0 else P_D.Len);
+   --  The index of the first (Forward: at or after From) or last
+   --  (Backward: at or before From) character of the rope S_D for which
+   --  Matches is True, or 0. Precondition: S_D /= null and From in 1 ..
+   --  S_D.Len.
+   generic
+      with function Matches (Ch : Character) return Boolean;
+   function Scan (S_D : Node_Access; From : Positive; Going : Ada.Strings.Direction) return Natural;
 
-      --  Whether Pattern matches Source starting at the 1-based
-      --  position Start.
-      function Match_At (Start : Positive) return Boolean is
+   function Scan (S_D : Node_Access; From : Positive; Going : Ada.Strings.Direction) return Natural is
+      W    : Leaf_Walk (S_D.Depth + 1);
+      Leaf : Node_Access;
+      Off  : Positive;
+      Base : Natural;  --  Leaf.Chars (I) is the rope's character Base + I.
+   begin
+      Start_Walk_At (W, S_D, From, Going, Leaf, Off);
+      Base := From - Off;
+      case Going is
+         when Ada.Strings.Forward =>
+            loop
+               for I in Off .. Leaf.Len loop
+                  if Matches (Leaf.Chars (I)) then
+                     return Base + I;
+                  end if;
+               end loop;
+               exit when W.Top = 0;
+               Base := Base + Leaf.Len;
+               Next_Leaf (W, Leaf);
+               Off := 1;
+            end loop;
+
+         when Ada.Strings.Backward =>
+            loop
+               for I in reverse 1 .. Off loop
+                  if Matches (Leaf.Chars (I)) then
+                     return Base + I;
+                  end if;
+               end loop;
+               exit when W.Top = 0;
+               Next_Leaf (W, Leaf);
+               Base := Base - Leaf.Len;
+               Off  := Leaf.Len;
+            end loop;
+      end case;
+      return 0;
+   end Scan;
+
+   --  The From-bounded pattern Index, for a non-empty Pattern with any
+   --  bounds: the start of the first occurrence starting at or after
+   --  From (Forward), or of the last one lying wholly within 1 .. From
+   --  (Backward), or 0. Precondition: S_D /= null, Pattern /= "", and
+   --  From <= S_D.Len if Going = Backward.
+   function Find (S_D : Node_Access; Pattern : String; From : Positive; Going : Ada.Strings.Direction) return Natural is
+      S_Len : constant Positive := S_D.Len;
+      P_Len : constant Positive := Pattern'Length;
+      W     : Leaf_Walk (S_D.Depth + 1);
+      Leaf  : Node_Access;
+      Off   : Positive;
+      Base  : Natural;  --  Leaf.Chars (I) is the rope's character Base + I.
+
+      --  Whether Pattern occurs starting at Leaf.Chars (I), running on
+      --  into the leaves after Leaf as needed -- which exist: the caller
+      --  only asks when the occurrence would end within the rope.
+      function Matches_Forward (I : Positive) return Boolean is
       begin
-         for K in 0 .. P_Len - 1 loop
-            if Fetch (S_D, Start + K) /= Fetch (P_D, K + 1) then
-               return False;
+         if P_Len <= Leaf.Len - I + 1 then
+            return Leaf.Chars (I .. I + (P_Len - 1)) = Pattern;
+         end if;
+         declare
+            V_Walk : Leaf_Walk   := W;
+            V_Leaf : Node_Access := Leaf;
+            V_Off  : Positive    := I;
+            K      : Positive    := Pattern'First;  --  Next Pattern character to compare.
+            Left   : Natural     := P_Len;          --  Pattern characters still to compare.
+         begin
+            loop
+               declare
+                  Run : constant Positive := Natural'Min (V_Leaf.Len - V_Off + 1, Left);
+               begin
+                  if V_Leaf.Chars (V_Off .. V_Off + (Run - 1)) /= Pattern (K .. K + (Run - 1)) then
+                     return False;
+                  end if;
+                  Left := Left - Run;
+                  exit when Left = 0;
+                  K := K + Run;
+               end;
+               Next_Leaf (V_Walk, V_Leaf);
+               V_Off := 1;
+            end loop;
+            return True;
+         end;
+      end Matches_Forward;
+
+      --  Whether Pattern occurs ending at Leaf.Chars (I), running back
+      --  into the leaves before Leaf as needed -- which exist, as above.
+      function Matches_Backward (I : Positive) return Boolean is
+      begin
+         if P_Len <= I then
+            return Leaf.Chars (I - (P_Len - 1) .. I) = Pattern;
+         end if;
+         declare
+            V_Walk : Leaf_Walk   := W;
+            V_Leaf : Node_Access := Leaf;
+            V_Off  : Positive    := I;
+            K      : Positive    := Pattern'Last;  --  Next Pattern character to compare.
+            Left   : Natural     := P_Len;         --  Pattern characters still to compare.
+         begin
+            loop
+               declare
+                  Run : constant Positive := Natural'Min (V_Off, Left);
+               begin
+                  if V_Leaf.Chars (V_Off - (Run - 1) .. V_Off) /= Pattern (K - (Run - 1) .. K) then
+                     return False;
+                  end if;
+                  Left := Left - Run;
+                  exit when Left = 0;
+                  K := K - Run;
+               end;
+               Next_Leaf (V_Walk, V_Leaf);
+               V_Off := V_Leaf.Len;
+            end loop;
+            return True;
+         end;
+      end Matches_Backward;
+   begin
+      case Going is
+         when Ada.Strings.Forward =>
+            --  Occurrences can start at From .. Last_Start.
+            if P_Len > S_Len or else From > S_Len - P_Len + 1 then
+               return 0;
             end if;
-         end loop;
-         return True;
-      end Match_At;
+            declare
+               First      : constant Character := Pattern (Pattern'First);
+               Last_Start : constant Positive  := S_Len - P_Len + 1;
+            begin
+               Start_Walk_At (W, S_D, From, Going, Leaf, Off);
+               Base := From - Off;
+               loop
+                  declare
+                     Hi : constant Positive := Natural'Min (Leaf.Len, Last_Start - Base);
+                  begin
+                     for I in Off .. Hi loop
+                        if Leaf.Chars (I) = First and then Matches_Forward (I) then
+                           return Base + I;
+                        end if;
+                     end loop;
+                     exit when Base + Hi = Last_Start;
+                  end;
+                  Base := Base + Leaf.Len;
+                  Next_Leaf (W, Leaf);
+                  Off := 1;
+               end loop;
+            end;
+
+         when Ada.Strings.Backward =>
+            --  Occurrences can end at P_Len .. From.
+            if From < P_Len then
+               return 0;
+            end if;
+            declare
+               Last : constant Character := Pattern (Pattern'Last);
+            begin
+               Start_Walk_At (W, S_D, From, Going, Leaf, Off);
+               Base := From - Off;
+               loop
+                  declare
+                     Lo : constant Positive := Integer'Max (1, P_Len - Base);
+                  begin
+                     for I in reverse Lo .. Off loop
+                        if Leaf.Chars (I) = Last and then Matches_Backward (I) then
+                           return Base + I - P_Len + 1;
+                        end if;
+                     end loop;
+                     exit when Base + Lo = P_Len;
+                  end;
+                  Next_Leaf (W, Leaf);
+                  Base := Base - Leaf.Len;
+                  Off  := Leaf.Len;
+               end loop;
+            end;
+      end case;
+      return 0;
+   end Find;
+
+   --  A multi-leaf pattern, flattened for Find: onto the heap rather
+   --  than the stack, since a pattern can be as long as any rope.
+   type String_Access is access String;
+
+   procedure Free is new Ada.Unchecked_Deallocation (String, String_Access);
+
+   --  Precondition: P_D /= null.
+   function Flatten (P_D : Node_Access) return String_Access is
+      Result : constant String_Access := new String (1 .. P_D.Len);
+      T      : Positive               := 1;
+   begin
+      Node_Copy (P_D, 0, P_D.Len, Result.all, T);
+      return Result;
+   end Flatten;
+
+   function Index
+     (Source : Rope; Pattern : String; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural
+   is
+      use type Ada.Strings.Direction;
+      S_D : constant Node_Access := Data_Of (Source);
    begin
       --  Source's emptiness is checked, and short-circuits, before
       --  Pattern's -- verified against GNAT's a-strsea.adb: the
       --  From-bounded Ada.Strings.Search.Index returns 0 immediately
       --  for an empty Source, even when Pattern is also empty (the
       --  Pattern_Error check lives in the *other*, no-From overload,
-      --  reached only once Source is known non-empty).
-      if S_Len = 0 then
+      --  reached only once Source is known non-empty). Then From is
+      --  checked GNAT's way, not the RM's: see ropes.ads and PLAN.md's
+      --  "Search".
+      if S_D = null then
          return 0;
       end if;
-      if P_Len = 0 then
+      if Pattern'Length = 0 then
          raise Ada.Strings.Pattern_Error;
       end if;
+      if Going = Ada.Strings.Backward and then From > S_D.Len then
+         raise Ada.Strings.Index_Error;
+      end if;
+      return Find (S_D, Pattern, From, Going);
+   end Index;
 
-      case Going is
-         when Ada.Strings.Forward =>
-            --  From < Source'First can't happen (From is Positive,
-            --  Source'First is always 1), so Forward never raises --
-            --  it just searches the possibly-empty tail Source (From
-            --  .. S_Len) and returns 0 if nothing matches, exactly
-            --  like the real Ada.Strings.Search.Index.
-            for Start in From .. S_Len - P_Len + 1 loop
-               if Match_At (Start) then
-                  return Start;
-               end if;
-            end loop;
-            return 0;
-
-         when Ada.Strings.Backward =>
-            if From > S_Len then
-               raise Ada.Strings.Index_Error;
-            end if;
-            for Start in reverse 1 .. From - P_Len + 1 loop
-               if Match_At (Start) then
-                  return Start;
-               end if;
-            end loop;
-            return 0;
-      end case;
+   function Index
+     (Source : Rope; Pattern : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural
+   is
+      P_D : constant Node_Access := Data_Of (Pattern);
+   begin
+      if Is_Empty (Source) then
+         return 0;
+      end if;
+      if P_D = null then
+         raise Ada.Strings.Pattern_Error;
+      end if;
+      if P_D.Kind = Leaf_Kind then
+         return Index (Source, P_D.Chars, From, Going);
+      end if;
+      declare
+         Flat   : String_Access := Flatten (P_D);
+         Result : Natural;
+      begin
+         Result := Index (Source, Flat.all, From, Going);
+         Free (Flat);
+         return Result;
+      exception
+         when others =>
+            Free (Flat);
+            raise;
+      end;
    end Index;
 
    function Index (Source : Rope; Pattern : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural is
@@ -993,42 +1263,44 @@ package body Ropes is
       end case;
    end Index;
 
-   function Index
-     (Source : Rope; Pattern : String; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural is
-     (Index (Source, From_String (Pattern), From, Going));
-
    function Index (Source : Rope; Pattern : String; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural is
-     (Index (Source, From_String (Pattern), Going));
-
-   function Index
-     (Source : Rope; Pattern : Character; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural
-   is
-      S_D   : constant Node_Access := Data_Of (Source);
-      S_Len : constant Natural     := (if S_D = null then 0 else S_D.Len);
    begin
-      if S_Len = 0 then
+      --  As the Rope overload just above.
+      if Pattern'Length = 0 then
+         raise Ada.Strings.Pattern_Error;
+      end if;
+      if Is_Empty (Source) then
          return 0;
       end if;
       case Going is
          when Ada.Strings.Forward =>
-            for I in From .. S_Len loop
-               if Fetch (S_D, I) = Pattern then
-                  return I;
-               end if;
-            end loop;
-            return 0;
-
+            return Index (Source, Pattern, 1, Going);
          when Ada.Strings.Backward =>
-            if From > S_Len then
-               raise Ada.Strings.Index_Error;
-            end if;
-            for I in reverse 1 .. From loop
-               if Fetch (S_D, I) = Pattern then
-                  return I;
-               end if;
-            end loop;
-            return 0;
+            return Index (Source, Pattern, Length (Source), Going);
       end case;
+   end Index;
+
+   function Index
+     (Source : Rope; Pattern : Character; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural
+   is
+      S_D : constant Node_Access := Data_Of (Source);
+
+      function Is_Pattern (Ch : Character) return Boolean is (Ch = Pattern);
+
+      function Scan_For_Pattern is new Scan (Is_Pattern);
+   begin
+      if S_D = null then
+         return 0;
+      end if;
+      if From > S_D.Len then
+         case Going is
+            when Ada.Strings.Forward =>
+               return 0;
+            when Ada.Strings.Backward =>
+               raise Ada.Strings.Index_Error;
+         end case;
+      end if;
+      return Scan_For_Pattern (S_D, From, Going);
    end Index;
 
    function Index (Source : Rope; Pattern : Character; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural is
@@ -1043,6 +1315,114 @@ package body Ropes is
             return Index (Source, Pattern, Length (Source), Going);
       end case;
    end Index;
+
+   function Index
+     (Source : Rope; Set : Ada.Strings.Maps.Character_Set; From : Positive; Test : Ada.Strings.Membership := Ada.Strings.Inside;
+      Going  : Ada.Strings.Direction := Ada.Strings.Forward) return Natural
+   is
+      use type Ada.Strings.Membership;
+
+      S_D  : constant Node_Access := Data_Of (Source);
+      Want : constant Boolean     := Test = Ada.Strings.Inside;
+
+      function Passes (Ch : Character) return Boolean is (Ada.Strings.Maps.Is_In (Ch, Set) = Want);
+
+      function Scan_For_Set is new Scan (Passes);
+   begin
+      if S_D = null then
+         return 0;
+      end if;
+      if From > S_D.Len then
+         case Going is
+            when Ada.Strings.Forward =>
+               return 0;
+            when Ada.Strings.Backward =>
+               raise Ada.Strings.Index_Error;
+         end case;
+      end if;
+      return Scan_For_Set (S_D, From, Going);
+   end Index;
+
+   function Index
+     (Source : Rope; Set : Ada.Strings.Maps.Character_Set; Test : Ada.Strings.Membership := Ada.Strings.Inside;
+      Going  : Ada.Strings.Direction := Ada.Strings.Forward) return Natural
+   is
+   begin
+      if Is_Empty (Source) then
+         return 0;
+      end if;
+      case Going is
+         when Ada.Strings.Forward =>
+            return Index (Source, Set, 1, Test, Going);
+         when Ada.Strings.Backward =>
+            return Index (Source, Set, Length (Source), Test, Going);
+      end case;
+   end Index;
+
+   function Count (Source : Rope; Pattern : String) return Natural is
+      S_D    : constant Node_Access := Data_Of (Source);
+      P_Len  : constant Natural     := Pattern'Length;
+      Result : Natural              := 0;
+      From   : Positive             := 1;
+      Found  : Natural;
+   begin
+      if P_Len = 0 then
+         raise Ada.Strings.Pattern_Error;
+      end if;
+      if S_D = null then
+         return 0;
+      end if;
+      loop
+         Found := Find (S_D, Pattern, From, Ada.Strings.Forward);
+         exit when Found = 0;
+         Result := Result + 1;
+         --  A match reaching the end leaves no room for another; stop
+         --  there rather than compute Found + P_Len, which overflows
+         --  if that end is Natural'Last.
+         exit when Found - 1 + P_Len = S_D.Len;
+         From := Found + P_Len;
+      end loop;
+      return Result;
+   end Count;
+
+   function Count (Source : Rope; Pattern : Rope) return Natural is
+      P_D : constant Node_Access := Data_Of (Pattern);
+   begin
+      if P_D = null then
+         raise Ada.Strings.Pattern_Error;
+      end if;
+      if P_D.Kind = Leaf_Kind then
+         return Count (Source, P_D.Chars);
+      end if;
+      declare
+         Flat   : String_Access := Flatten (P_D);
+         Result : Natural;
+      begin
+         Result := Count (Source, Flat.all);
+         Free (Flat);
+         return Result;
+      exception
+         when others =>
+            Free (Flat);
+            raise;
+      end;
+   end Count;
+
+   function Count (Source : Rope; Set : Ada.Strings.Maps.Character_Set) return Natural is
+      Result : Natural := 0;
+
+      procedure Count_Chunk (Chunk : String) is
+      begin
+         for Ch of Chunk loop
+            if Ada.Strings.Maps.Is_In (Ch, Set) then
+               Result := Result + 1;
+            end if;
+         end loop;
+      end Count_Chunk;
+   begin
+      Process_Chunks (Source, Count_Chunk'Access);
+      return Result;
+   end Count;
 
    function Contains (Source, Pattern : Rope) return Boolean is (Index (Source, Pattern) /= 0);
 

@@ -1,0 +1,11 @@
+# A forward search from past the end finds nothing rather than raising
+# -- GNAT's behavior, which the RM's A.4.3(58.5/3) words differently;
+# see ropes.ads.
+program rope_tool
+arg indexset
+arg hello
+arg z
+arg 99
+status 0
+output
+0

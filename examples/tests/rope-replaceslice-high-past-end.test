@@ -1,0 +1,10 @@
+# A HIGH past the end is clamped to the length, not an error.
+program rope_tool
+arg replaceslice
+arg hello
+arg 2
+arg 99
+arg X
+status 0
+output
+hX

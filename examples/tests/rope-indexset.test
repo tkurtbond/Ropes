@@ -1,0 +1,9 @@
+# The first space or w.
+program rope_tool
+arg indexset
+arg hello world
+arg  w
+arg 1
+status 0
+output
+6

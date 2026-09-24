@@ -100,3 +100,18 @@ readfile FILE  Read all of FILE, byte for byte, and print its length, a space, a
 
 copyslice S LOW HIGH T POS  Print T with S's characters LOW through HIGH (1-based, inclusive) copied into it at POS.
 
+
+replaceslice S LOW HIGH BY  Print S with its characters LOW through HIGH (1-based, inclusive) replaced by BY.
+
+
+count S PATTERN  Print the number of nonoverlapping occurrences of PATTERN in S.
+
+
+countset S CHARS  Print the number of characters of S that are any of CHARS.
+
+
+indexset S CHARS FROM  Print the index of the first character at or after FROM in S that is any of CHARS, or 0.
+
+
+rindexset S CHARS FROM  Print the index of the last character at or before FROM in S that is any of CHARS, or 0.
+

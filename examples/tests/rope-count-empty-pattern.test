@@ -1,0 +1,8 @@
+# An empty PATTERN raises Ada.Strings.Pattern_Error.
+program rope_tool
+arg count
+arg abc
+arg
+status 1
+output
+Error: PATTERN must not be empty

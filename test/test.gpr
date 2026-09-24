@@ -15,7 +15,11 @@ project Test is
       "test_text_io.adb",
       "test_stream_io.adb",
       "test_copy_slice.adb",
-      "test_string_overloads.adb");
+      "test_string_overloads.adb",
+      "test_replace_slice.adb",
+      "test_index_set.adb",
+      "test_count.adb",
+      "test_search_walk.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use

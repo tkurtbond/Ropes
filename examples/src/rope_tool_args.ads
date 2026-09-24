@@ -117,6 +117,20 @@ package Rope_Tool_Args is
    --  --- copyslice S LOW HIGH T POS --- (Ropes.Copy_Slice, Rope.Mod's Blit; Phase 15)
    function Copyslice_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
+   --  --- replaceslice S LOW HIGH BY --- (Ropes.Replace_Slice, String By; Phase 17)
+   function Replaceslice_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- count S PATTERN --- (Ropes.Count, String pattern; Phase 17)
+   function Count_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- countset S CHARS --- (Ropes.Count, Character_Set To_Set (CHARS); Phase 17)
+   function Countset_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- indexset / rindexset S CHARS FROM --- (Ropes.Index, Character_Set To_Set (CHARS), Test => Inside,
+   --  Going => Forward/Backward; Phase 17)
+   function Indexset_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+   function Rindexset_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
    Commands : aliased Command_Array :=
      [Make_Command
        ("cat",
@@ -272,7 +286,35 @@ package Rope_Tool_Args is
         Make_Parser
           (Description =>
              "copyslice S LOW HIGH T POS  Print T with S's characters LOW through HIGH (1-based, inclusive) copied into it at POS.",
-           Handler     => Copyslice_Argument_Handler'Access, Options => null))];
+           Handler     => Copyslice_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("replaceslice",
+        Make_Parser
+          (Description =>
+             "replaceslice S LOW HIGH BY  Print S with its characters LOW through HIGH (1-based, inclusive) replaced by BY.",
+           Handler     => Replaceslice_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("count",
+        Make_Parser
+          (Description => "count S PATTERN  Print the number of nonoverlapping occurrences of PATTERN in S.",
+           Handler     => Count_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("countset",
+        Make_Parser
+          (Description => "countset S CHARS  Print the number of characters of S that are any of CHARS.",
+           Handler     => Countset_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("indexset",
+        Make_Parser
+          (Description =>
+             "indexset S CHARS FROM  Print the index of the first character at or after FROM in S that is any of CHARS, or 0.",
+           Handler     => Indexset_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("rindexset",
+        Make_Parser
+          (Description =>
+             "rindexset S CHARS FROM  Print the index of the last character at or before FROM in S that is any of CHARS, or 0.",
+           Handler     => Rindexset_Argument_Handler'Access, Options => null))];
 
    Main_Parser : Parser :=
      Make_Parser

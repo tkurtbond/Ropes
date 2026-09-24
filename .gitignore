@@ -25,6 +25,10 @@ test/test_text_io
 test/test_stream_io
 test/test_copy_slice
 test/test_string_overloads
+test/test_replace_slice
+test/test_index_set
+test/test_count
+test/test_search_walk
 examples/obj/
 examples/rope_tool
 

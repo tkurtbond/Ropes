@@ -1,0 +1,11 @@
+# HIGH < LOW: nothing is removed, and BY is inserted before LOW, like
+# insert.
+program rope_tool
+arg replaceslice
+arg hello
+arg 3
+arg 2
+arg XX
+status 0
+output
+heXXllo
