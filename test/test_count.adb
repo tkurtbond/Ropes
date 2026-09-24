@@ -1,5 +1,5 @@
 --  Phase 17 checks: Count, Ada.Strings.Unbounded.Count's Pattern and
---  Character_Set overloads. No Rope.Mod counterpart. The oracle is
+--  Character_Set overloads. No Ropes.Mod counterpart. The oracle is
 --  Ada.Strings.Fixed.Count, run over a rope of several leaves, so that
 --  both occurrences and set members fall across leaf boundaries.
 

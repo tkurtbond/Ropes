@@ -1,7 +1,7 @@
 --  Text_IO for Ropes -- Put/Put_Line/Get_Line on Rope, mirroring
 --  Ada.Text_IO.Unbounded_IO's subprograms for Unbounded_String exactly
 --  (and GNAT's own name for that package, Ada.Strings.Unbounded.Text_IO,
---  which is where this child package's name comes from). No Rope.Mod
+--  which is where this child package's name comes from). No Ropes.Mod
 --  counterpart -- Phase 11, at explicit user request; see PLAN.md.
 --
 --  A child package rather than part of Ropes itself, so programs that

@@ -1,6 +1,6 @@
 --  Phase 6 checks: To_Upper/To_Lower/Capitalize/Uncapitalize. See
 --  PLAN.md's phased plan and Testing approach, and RopeTest.Mod's
---  CheckAsciiCase (~/Repos/Oberon/oberon-tools/RopeTest.Mod) --
+--  CheckAsciiCase (~/Repos/Oberon/Ropes/RopeTest.Mod) --
 --  UppercaseAscii/LowercaseAscii/CapitalizeAscii/UncapitalizeAscii
 --  translate directly to To_Upper/To_Lower/Capitalize/Uncapitalize
 --  (see ropes.ads's doc comment for the renaming). A couple of extra

@@ -1,6 +1,6 @@
 # All 5 characters of "hello" don't fit in the 3-character T: Copy_Slice
 # raises Ada.Strings.Index_Error before copying anything (where
-# Rope.Mod's Blit would HALT).
+# Ropes.Mod's Blit would HALT).
 program rope_tool
 arg copyslice
 arg hello

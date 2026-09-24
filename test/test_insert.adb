@@ -1,9 +1,9 @@
 --  Phase 3 checks: Insert. See PLAN.md's phased plan and Testing
 --  approach, and RopeTest.Mod's CheckInsert
---  (~/Repos/Oberon/oberon-tools/RopeTest.Mod), which this is sourced
---  from -- translated to 1-based Before (Rope.Mod's Insert takes a
+--  (~/Repos/Oberon/Ropes/RopeTest.Mod), which this is sourced
+--  from -- translated to 1-based Before (Ropes.Mod's Insert takes a
 --  0-based pos; Oberon pos N = our Before N + 1) and to
---  Ada.Strings.Index_Error where Rope.Mod clamped. One of
+--  Ada.Strings.Index_Error where Ropes.Mod clamped. One of
 --  CheckInsert's cases has no equivalent here: Before is Positive, so
 --  "a negative pos" isn't a representable call, not just a
 --  differently-handled one.

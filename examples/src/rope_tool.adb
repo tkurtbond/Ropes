@@ -1,5 +1,5 @@
 --  rope_tool -- command-line demo of Ropes, the Ada port of
---  RopeTool.Mod (~/Repos/Oberon/oberon-tools/RopeTool.Mod). See
+--  RopeTool.Mod (~/Repos/Oberon/Ropes/RopeTool.Mod). See
 --  PLAN.md's "Command-line tool (rope_tool)" section for how this
 --  fits the phased implementation plan, and Rope_Tool_Args for the
 --  actual command definitions.

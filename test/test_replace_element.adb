@@ -1,5 +1,5 @@
 --  Phase 23 checks: Replace_Element, Ada.Strings.Unbounded's own, as a
---  function. No Rope.Mod counterpart. The oracle is
+--  function. No Ropes.Mod counterpart. The oracle is
 --  Ada.Strings.Unbounded.Replace_Element (a procedure) on the same
 --  text, over a rope of 9-character leaves (9 + 9 > 16, the short-leaf
 --  merge threshold, so they stay separate) and one built by "*", whose

@@ -1,15 +1,15 @@
 --  Ropes -- an Ada port of Boehm/Atkinson/Plass ropes ("Ropes: an
 --  Alternative to Strings", Software--Practice and Experience 25(12),
 --  1315-1330, 1995), following the scope and engineering choices of
---  the Oberon-2 port at ~/Repos/Oberon/oberon-tools/Rope.Mod (a
+--  the Oberon-2 port at ~/Repos/Oberon/Ropes/Ropes.Mod (a
 --  "core" rope: flat leaves and concatenation nodes only), reworked
---  with Ada idioms in place of Rope.Mod's Oberon-2 ones. See
+--  with Ada idioms in place of Ropes.Mod's Oberon-2 ones. See
 --  PLAN.md for the full design rationale and AGENTS.md for house
 --  conventions specific to this codebase.
 --
 --  This is Phase 1 through 8 -- the whole of PLAN.md's phased
 --  implementation plan (Phases 7 and 8 both stretch phases, beyond
---  matching Rope.Mod's own scope): the Rope/Node skeleton, reference
+--  matching Ropes.Mod's own scope): the Rope/Node skeleton, reference
 --  counting, the smallest useful slice of the API (Length, Is_Empty,
 --  "&", From_String/To_String, Element), "&"'s automatic depth-bounded
 --  rebalancing, Slice/Insert/Delete, the five comparison operators,
@@ -56,18 +56,18 @@ package Ropes is
 
    function "&" (Left, Right : Rope) return Rope;
    --  Concatenation. O(1) amortized, except when both operands are
-   --  short flat leaves (Rope.Mod's short-leaf merge, ported as-is):
+   --  short flat leaves (Ropes.Mod's short-leaf merge, ported as-is):
    --  then the result is copied into one new leaf instead of adding a
    --  tree level, so that repeated single-character "&" does not grow
    --  an ever-deeper skinny tree. Raises Ada.Strings.Length_Error if
    --  the combined length would exceed Natural'Last.
    --
    --  If the result's tree depth would reach an internal bound, it is
-   --  automatically rebalanced (Rope.Mod's Cat/Balance, the
+   --  automatically rebalanced (Ropes.Mod's Cat/Balance, the
    --  Fibonacci-forest algorithm) so that Element/Slice/etc. stay
    --  logarithmic even after many incremental "&" calls -- see
    --  PLAN.md's "Balancing" section. Transparent to callers; there is
-   --  no public Balance or Depth to call directly (unlike Rope.Mod).
+   --  no public Balance or Depth to call directly (unlike Ropes.Mod).
 
    function "&" (Left : Rope; Right : Character) return Rope;
    function "&" (Left : Character; Right : Rope) return Rope;
@@ -84,7 +84,7 @@ package Ropes is
    --  Null_Rope if Source is empty.
 
    function From_Character (Source : Character) return Rope;
-   --  A one-character Rope -- Rope.Mod's FromChar.
+   --  A one-character Rope -- Ropes.Mod's FromChar.
 
    function To_String (Source : Rope) return String;
    --  "" if Source is Null_Rope.
@@ -100,7 +100,7 @@ package Ropes is
    --  is only valid during that call, so copy it if it needs to
    --  outlive the call.
    --
-   --  No Rope.Mod counterpart (Phase 11, at explicit user request --
+   --  No Ropes.Mod counterpart (Phase 11, at explicit user request --
    --  see PLAN.md): the general primitive for writing a rope anywhere
    --  -- a file (Ropes.Text_IO is built on this), a stream, a hash --
    --  without To_String's full O(Length) copy, which lives on the stack
@@ -111,7 +111,7 @@ package Ropes is
 
    function From_Unbounded_String (Source : Ada.Strings.Unbounded.Unbounded_String) return Rope;
    function To_Unbounded_String (Source : Rope) return Ada.Strings.Unbounded.Unbounded_String;
-   --  No Rope.Mod counterpart (Oberon-2 has no unbounded string type)
+   --  No Ropes.Mod counterpart (Oberon-2 has no unbounded string type)
    --  -- added because Ada does, and a rope library that cannot
    --  interop with the type most Ada code already uses for "a string
    --  that grows" would be an odd omission.
@@ -125,12 +125,12 @@ package Ropes is
    --  instead of inventing separate Repeat/Make names (see AGENTS.md's
    --  "Reuse Ada.Strings vocabulary" convention) -- discovered only at
    --  Phase 7 implementation time; PLAN.md's original design sketch
-   --  had named these Repeat/Make after Rope.Mod's own names, before
-   --  this match was found. The Rope overload is Rope.Mod's Repeat:
+   --  had named these Repeat/Make after Ropes.Mod's own names, before
+   --  this match was found. The Rope overload is Ropes.Mod's Repeat:
    --  O(log Left) via binary doubling (Piece := Piece & Piece), sharing
    --  subtrees rather than copying characters, so even Left in the
    --  billions is cheap -- not Left successive "&" calls. The Character
-   --  overload is Rope.Mod's Make, implemented as Left * From_Character
+   --  overload is Ropes.Mod's Make, implemented as Left * From_Character
    --  (Right).
 
    function "*" (Left : Natural; Right : String) return Rope;
@@ -147,7 +147,7 @@ package Ropes is
    --  Ada.Strings.Unbounded.Slice exactly, including its edge cases:
    --  Null_Rope (not an error) if High < Low, even if Low = Length
    --  (Source) + 1; raises Ada.Strings.Index_Error if Low - 1 >
-   --  Length (Source) or High > Length (Source). Rope.Mod's
+   --  Length (Source) or High > Length (Source). Ropes.Mod's
    --  Substring (start, len), but with inclusive 1-based Low/High
    --  instead of a 0-based (start, len) pair, and Index_Error instead
    --  of clamping -- see PLAN.md's "Access and slicing".
@@ -160,7 +160,7 @@ package Ropes is
    --  (Slice (Source, Low, High)), but copied once, straight out of the
    --  leaves that overlap Low .. High, with no intermediate Rope and no
    --  String temporary on the stack (so a range of any length can be
-   --  copied into, say, a heap-allocated String). Rope.Mod's Blit, with
+   --  copied into, say, a heap-allocated String). Ropes.Mod's Blit, with
    --  Slice's inclusive 1-based Low/High instead of Blit's 0-based
    --  (srcStart, len), and Target_Low an index into Target itself
    --  (which need not start at 1). Phase 15; see PLAN.md.
@@ -179,7 +179,7 @@ package Ropes is
    --  Source with New_Item spliced in just before index Before.
    --  Raises Ada.Strings.Index_Error if Before - 1 > Length (Source)
    --  -- Before = Length (Source) + 1 (append) is valid, matching
-   --  Ada.Strings.Unbounded.Insert. Rope.Mod's Insert, unclamped.
+   --  Ada.Strings.Unbounded.Insert. Ropes.Mod's Insert, unclamped.
 
    function Insert (Source : Rope; Before : Positive; New_Item : String) return Rope;
    --  As above, with a String New_Item -- the form
@@ -193,7 +193,7 @@ package Ropes is
    --  Length (Source) (also not an error). Raises
    --  Ada.Strings.Index_Error only if From <= Through and From - 1 >
    --  Length (Source) -- matches Ada.Strings.Unbounded.Delete exactly.
-   --  Rope.Mod's Remove, unclamped except where Ada.Strings.Unbounded
+   --  Ropes.Mod's Remove, unclamped except where Ada.Strings.Unbounded
    --  itself still clamps (Through past the end).
 
    function Overwrite (Source : Rope; Position : Positive; New_Item : Rope) return Rope;
@@ -204,7 +204,7 @@ package Ropes is
    --  reason Insert/Delete above have no procedure form either).
    --  Raises Ada.Strings.Index_Error if Position - 1 > Length (Source)
    --  -- Position = Length (Source) + 1 (append) is valid, matching
-   --  Insert above. No Rope.Mod counterpart (Oberon-2's Rope has no
+   --  Insert above. No Ropes.Mod counterpart (Oberon-2's Rope has no
    --  positional-replace operation at all) -- see PLAN.md's "Deferred
    --  / stretch" section for why this was added anyway.
 
@@ -223,7 +223,7 @@ package Ropes is
    --  clamped to Length (Source), not an error. If High < Low, the
    --  result is Insert (Source, Low, By). Raises
    --  Ada.Strings.Index_Error if Low - 1 > Length (Source), in either
-   --  case. No Rope.Mod counterpart.
+   --  case. No Ropes.Mod counterpart.
 
    function Replace_Element (Source : Rope; Index : Positive; By : Character) return Rope;
    --  Source with the character at Index replaced by By --
@@ -231,7 +231,7 @@ package Ropes is
    --  procedure there, and Rope is immutable; see Overwrite above).
    --  Raises Ada.Strings.Index_Error if Index > Length (Source), as
    --  Element does -- unlike Overwrite or Replace_Slice, it never
-   --  appends. No Rope.Mod counterpart.
+   --  appends. No Ropes.Mod counterpart.
 
    function Head (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope;
    function Tail (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope;
@@ -239,7 +239,7 @@ package Ropes is
    --  padded on the right (Head) or left (Tail) with Pad if Count
    --  exceeds Length (Source) -- Ada.Strings.Unbounded.Head/Tail's own
    --  signatures and semantics exactly (function form only, as
-   --  Overwrite above). No Rope.Mod counterpart, same as Overwrite.
+   --  Overwrite above). No Ropes.Mod counterpart, same as Overwrite.
 
    function "=" (Left, Right : Rope) return Boolean;
    function "<" (Left, Right : Rope) return Boolean;
@@ -247,7 +247,7 @@ package Ropes is
    function ">" (Left, Right : Rope) return Boolean;
    function ">=" (Left, Right : Rope) return Boolean;
    --  Lexicographic, character by character, then by length on a
-   --  common prefix -- Rope.Mod's Compare/Equal, exposed as the
+   --  common prefix -- Ropes.Mod's Compare/Equal, exposed as the
    --  standard operators instead of a -1/0/1 function. "=" replaces
    --  the predefined (pointer-identity-based) equality that a private
    --  type wrapping a Controlled component would otherwise get. Time
@@ -297,7 +297,7 @@ package Ropes is
    --  Ada.Strings.Equal_Case_Insensitive, Less_Case_Insensitive and
    --  Hash_Case_Insensitive fold it. All four are linear in the length
    --  compared or hashed, and the two comparisons take O(1) for two
-   --  ropes sharing a root, as "=" does. No Rope.Mod counterpart.
+   --  ropes sharing a root, as "=" does. No Ropes.Mod counterpart.
 
    function Index
      (Source  : Rope; Pattern : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward;
@@ -309,7 +309,7 @@ package Ropes is
    --  or last (Going => Backward) occurrence in Source, or 0 if
    --  Pattern does not occur. Raises Ada.Strings.Pattern_Error if
    --  Pattern is Null_Rope, matching Ada.Strings.Fixed.Index exactly
-   --  -- NOT Rope.Mod's Find, which instead treats an empty pattern as
+   --  -- NOT Ropes.Mod's Find, which instead treats an empty pattern as
    --  matching at "from".
    --
    --  The From overload searches Source (From .. Length (Source))
@@ -396,7 +396,7 @@ package Ropes is
    function Index (Source : Rope; Pattern : Character; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
    function Index
      (Source : Rope; Pattern : Character; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
-   --  As above, searching for a single Character instead -- Rope.Mod's
+   --  As above, searching for a single Character instead -- Ropes.Mod's
    --  IndexChar/RIndexChar. No empty-pattern case; the same From/Going
    --  boundary rules apply.
 
@@ -477,7 +477,7 @@ package Ropes is
    --  the From overloads) -- a thin wrapper over Index (...) /= 0,
    --  always Going => Forward (there is no Going parameter here:
    --  "contains" is an existence question, not a search direction, and
-   --  Rope.Mod's own Contains -- the Character/From overload's direct
+   --  Ropes.Mod's own Contains -- the Character/From overload's direct
    --  model -- has no Going option either). Genuinely a thin wrapper:
    --  the Rope and String overloads inherit Index's own
    --  Ada.Strings.Pattern_Error on an empty Pattern (Null_Rope or "")
@@ -494,10 +494,10 @@ package Ropes is
    --  Source split at each non-overlapping occurrence of Separator,
    --  Python str.split's convention: always exactly one more piece
    --  than the number of occurrences, so a leading, trailing, or
-   --  doubled separator yields an empty piece (Rope.Mod's Split, but
+   --  doubled separator yields an empty piece (Ropes.Mod's Split, but
    --  returning the pieces instead of visiting them through a
    --  callback). An empty Separator (Null_Rope or "") never splits --
-   --  Source is the array's one element -- matching Rope.Mod exactly;
+   --  Source is the array's one element -- matching Ropes.Mod exactly;
    --  the Character overload has no empty case; the Character_Set
    --  overload's empty case is Ada.Strings.Maps.Null_Set. The
    --  Character_Set overload does not collapse adjacent matches: N
@@ -511,7 +511,7 @@ package Ropes is
      (Source : Rope; Separator : Ada.Strings.Maps.Character_Set; Process : not null access function (Piece : Rope) return Boolean);
    --  As the Split functions above, but calling Process on each piece
    --  left to right instead of collecting them into a Rope_Array --
-   --  Rope.Mod's own Visitor-based Split, dropped from the earlier
+   --  Ropes.Mod's own Visitor-based Split, dropped from the earlier
    --  Splitting phase in favor of only the array form, restored here
    --  now that there is a real motivating use (see PLAN.md's "Deferred
    --  / stretch" section): unlike the array form above, this never
@@ -521,7 +521,7 @@ package Ropes is
    --  without visiting any further pieces -- the first time Process
    --  returns False; returns normally once every piece has been
    --  visited (whether or not the last call to Process returned True,
-   --  same as Rope.Mod's own Split: there is nothing left to stop
+   --  same as Ropes.Mod's own Split: there is nothing left to stop
    --  early from at that point).
 
    type Cursor is private;
@@ -532,7 +532,7 @@ package Ropes is
    function Element (Source : Rope; Position : Cursor) return Character;
    --  Cursor-based traversal, giving "for Ch of Some_Rope loop ...
    --  end loop;" via the Iterable aspect on Rope's own declaration
-   --  above -- Rope.Mod's
+   --  above -- Ropes.Mod's
    --  heap-allocated Iterator object and its Get/Incr/Decr/Goto/Move/
    --  Peek/Source methods, replaced with the functional shape the
    --  Iterable aspect requires: Next returns a new Cursor rather than
@@ -540,22 +540,22 @@ package Ropes is
    --  explicitly, so a Cursor never needs to carry its own reference
    --  back to the rope or keep anything alive by itself -- it is only
    --  ever valid for use with the Rope it came from, same as any
-   --  Ada.Containers Cursor. Rope.Mod's arbitrary-position Peek/Goto/
+   --  Ada.Containers Cursor. Ropes.Mod's arbitrary-position Peek/Goto/
    --  Move/Decr/Source have no counterpart here; this is forward-only
    --  traversal, the Iterable aspect's whole scope.
    --
    --  First and Next each locate and cache the leaf covering the
-   --  Cursor's position (Rope.Mod's Iterator.Locate) as part of
+   --  Cursor's position (Ropes.Mod's Iterator.Locate) as part of
    --  producing their result, so Element/Has_Element are O(1) reads of
    --  an already-valid cache; Next itself is O(1) when the new
    --  position is still within the same leaf as the old one, and only
    --  pays Locate's O(log n) descent from the root on a leaf crossing
-   --  -- the same amortized behavior Rope.Mod's Iterator has, just
+   --  -- the same amortized behavior Ropes.Mod's Iterator has, just
    --  produced functionally instead of by mutating a heap object in
    --  place.
 
    Whitespace : constant Ada.Strings.Maps.Character_Set;
-   --  Space, tab, line feed, form feed, carriage return -- Rope.Mod's
+   --  Space, tab, line feed, form feed, carriage return -- Ropes.Mod's
    --  IsSpace set.
 
    function Trim
@@ -565,7 +565,7 @@ package Ropes is
    --  in Right removed. Matches Ada.Strings.Fixed.Trim's two-
    --  Character_Set overload exactly (not the single-Trim_End-plus-
    --  blanks-only overload -- that one only trims a literal space,
-   --  and Rope.Mod's IsSpace covers five characters). Rope.Mod's
+   --  and Ropes.Mod's IsSpace covers five characters). Ropes.Mod's
    --  TrimLeft/TrimRight/Trim collapse into this one function, the
    --  same way Index collapsed Find/RFind/IndexChar/RIndexChar: a
    --  caller who wants only-left or only-right trimming passes
@@ -578,7 +578,7 @@ package Ropes is
    --  Source with Convert applied to every character, in increasing
    --  index order; Null_Rope if Source is Null_Rope. The result has
    --  the same tree shape as Source (same internal Depth, no
-   --  rebalancing needed) -- Rope.Mod's Map/Mapi, Map_Indexed renamed
+   --  rebalancing needed) -- Ropes.Mod's Map/Mapi, Map_Indexed renamed
    --  from Mapi for clarity and taking a 1-based Positive index
    --  (matching this package's indexing convention) instead of
    --  Mapi's 0-based LONGINT.
@@ -599,7 +599,7 @@ package Ropes is
    --  Character_Mapping_Function parameter here is since Phase 25),
    --  where the RM leaves the null case unsaid and GNAT's
    --  Ada.Strings.Fixed.Translate has an (unchecked) Mapping /= null
-   --  precondition. No Rope.Mod counterpart.
+   --  precondition. No Ropes.Mod counterpart.
 
    function To_Upper (Source : Rope) return Rope;
    function To_Lower (Source : Rope) return Rope;
@@ -608,7 +608,7 @@ package Ropes is
    --  left unchanged -- implemented as Map using
    --  Ada.Characters.Handling.To_Upper/To_Lower (Character) as the
    --  conversion function, reusing Ada.Characters.Handling's own
-   --  names and behavior instead of Rope.Mod's hand-rolled
+   --  names and behavior instead of Ropes.Mod's hand-rolled
    --  UppercaseAscii/LowercaseAscii (UpperChar/LowerChar's own A..Z/
    --  a..z range checks).
 
@@ -616,7 +616,7 @@ package Ropes is
    function Uncapitalize (Source : Rope) return Rope;
    --  Source with its first character (ASCII only) uppercased,
    --  respectively lowercased; the rest of Source is unchanged.
-   --  Null_Rope if Source is Null_Rope. Rope.Mod's
+   --  Null_Rope if Source is Null_Rope. Ropes.Mod's
    --  CapitalizeAscii/UncapitalizeAscii, renamed to drop the
    --  redundant "Ascii" suffix -- same reasoning as To_Upper/To_Lower
    --  above: there is no non-ASCII variant here to disambiguate from.
@@ -629,7 +629,7 @@ package Ropes is
    --  return replaced by their two-character backslash escapes, and
    --  any other non-printable character (Character'Pos < 32 or >= 127)
    --  replaced by a backslash followed by its three-digit decimal code
-   --  -- Rope.Mod's Escaped, renamed (and renamed Escape in Rope.Mod
+   --  -- Ropes.Mod's Escaped, renamed (and renamed Escape in Ropes.Mod
    --  too, at Phase 14; see PLAN.md): Ada string *literals* have no
    --  backslash-escape syntax at all (quote-doubling is the only
    --  escape Ada source has), so this is purely a debug/display
@@ -638,7 +638,7 @@ package Ropes is
    --  without "Escaped"'s passive-participle ambiguity or a
    --  "To_..._String"-shaped name implying a String result -- this
    --  still returns a Rope, printed like any other (rope_tool uses
-   --  Ropes.Text_IO.Put_Line, RopeTool.Mod uses Rope.Write).
+   --  Ropes.Text_IO.Put_Line, RopeTool.Mod uses Ropes.Write).
 
 private
 

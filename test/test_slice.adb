@@ -1,9 +1,9 @@
 --  Phase 3 checks: Slice. See PLAN.md's phased plan and Testing
 --  approach, and RopeTest.Mod's CheckSubstring
---  (~/Repos/Oberon/oberon-tools/RopeTest.Mod), which this is sourced
---  from -- translated to inclusive 1-based Low/High (Rope.Mod's
+--  (~/Repos/Oberon/Ropes/RopeTest.Mod), which this is sourced
+--  from -- translated to inclusive 1-based Low/High (Ropes.Mod's
 --  Substring takes a 0-based (start, len) pair instead) and to
---  Ada.Strings.Index_Error where Rope.Mod clamped. Two of
+--  Ada.Strings.Index_Error where Ropes.Mod clamped. Two of
 --  CheckSubstring's cases have no equivalent here at all: Low is
 --  Positive, so "a negative start" isn't a representable call, not
 --  just a differently-handled one.
@@ -53,7 +53,7 @@ begin
    --  last 6 of the left leaf) then "abcd" (the first 4 of the right).
    Check (To_String (Slice (R, 11, 20)) = "012345abcd", "Slice spanning two tree nodes");
 
-   --  Rope.Mod's Substring(r, start, len) always clamps an
+   --  Ropes.Mod's Substring(r, start, len) always clamps an
    --  over-length end to Length(r); Ropes does not -- see PLAN.md's
    --  "Access and slicing".
    Check_Index_Error (R, 21, 1_000, "Slice: High past the end raises Index_Error, not clamped");

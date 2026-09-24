@@ -1,7 +1,7 @@
 --  Phase 7 checks: Escape. See PLAN.md's phased plan and "Case
 --  mapping"/escaping design notes, and RopeTest.Mod's CheckEscaped
---  (~/Repos/Oberon/oberon-tools/RopeTest.Mod), which this is sourced
---  from -- Rope.Mod's Escaped renamed Escape (see ropes.ads's doc
+--  (~/Repos/Oberon/Ropes/RopeTest.Mod), which this is sourced
+--  from -- Ropes.Mod's Escaped renamed Escape (see ropes.ads's doc
 --  comment). One extra check beyond RopeTest.Mod's own scenarios
 --  exercises the \NNN three-digit-decimal-code form for a
 --  non-printable character outside the five two-character escapes,

@@ -1,6 +1,6 @@
 --  Phase 25 checks: the Mapping parameter of Index, Count and Contains
 --  -- Ada.Strings.Unbounded's own Character_Mapping (defaulting to
---  Identity) and Character_Mapping_Function forms. No Rope.Mod
+--  Identity) and Character_Mapping_Function forms. No Ropes.Mod
 --  counterpart. The oracle is GNAT's Ada.Strings.Fixed.Index and Count
 --  with the same Mapping, on the same text, over ropes of two leaf
 --  chunkings (9 and 17 characters; 9 + 9 > 16, the short-leaf merge

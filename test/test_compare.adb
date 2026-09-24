@@ -1,10 +1,10 @@
 --  Phase 3 checks: the five comparison operators. See PLAN.md's
 --  phased plan and Testing approach, and RopeTest.Mod's
---  CheckCompareFindRepeat (~/Repos/Oberon/oberon-tools/RopeTest.Mod)
+--  CheckCompareFindRepeat (~/Repos/Oberon/Ropes/RopeTest.Mod)
 --  -- just its Compare/Equal cases; Find and Repeat are later phases.
---  Translated from Rope.Mod's -1/0/1 Compare and boolean Equal to the
+--  Translated from Ropes.Mod's -1/0/1 Compare and boolean Equal to the
 --  five standard operators (see ropes.ads); a couple of extra "<="/
---  ">=" reflexivity checks are added since Rope.Mod itself never
+--  ">=" reflexivity checks are added since Ropes.Mod itself never
 --  exercised those two directly (only Compare/Equal existed there).
 --  Check_Leaf_Boundaries/Check_Large were added at Phase 11, when
 --  Compare became a leaf-run walk: the original checks all compare

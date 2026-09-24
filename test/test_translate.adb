@@ -1,6 +1,6 @@
 --  Phase 22 checks: Translate with a Character_Mapping or a
 --  Character_Mapping_Function, Ada.Strings.Unbounded.Translate's two
---  function forms. No Rope.Mod
+--  function forms. No Ropes.Mod
 --  counterpart. The oracle is Ada.Strings.Fixed.Translate on the same
 --  text, over a rope of 9-character leaves (9 + 9 > 16, the short-leaf
 --  merge threshold, so they stay separate) and one built by "*", whose

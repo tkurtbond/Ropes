@@ -1,10 +1,10 @@
 --  Phase 2 checks: the depth-triggered auto-rebalance layered onto
---  "&" (Rope.Mod's Cat/Balance, the Fibonacci-forest algorithm). See
+--  "&" (Ropes.Mod's Cat/Balance, the Fibonacci-forest algorithm). See
 --  PLAN.md's phased plan and Testing approach, and RopeTest.Mod's
 --  CheckStressAndBalance
---  (~/Repos/Oberon/oberon-tools/RopeTest.Mod), which this is sourced
+--  (~/Repos/Oberon/Ropes/RopeTest.Mod), which this is sourced
 --  from -- translated to 1-based indexing, and using
---  Ropes.Test_Support.Depth in place of Rope.Mod's public Depth/
+--  Ropes.Test_Support.Depth in place of Ropes.Mod's public Depth/
 --  MaxDepth/Balance/IsBalanced (none of which Ropes exposes publicly
 --  -- see ropes-test_support.ads).
 

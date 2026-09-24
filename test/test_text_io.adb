@@ -1,6 +1,6 @@
 --  Phase 11 checks: Process_Chunks and Ropes.Text_IO (Put/Put_Line/
 --  Get_Line). See PLAN.md's phased plan. No RopeTest.Mod counterpart to
---  source these from (Rope.Mod has no output operations) -- the
+--  source these from (Ropes.Mod has no output operations) -- the
 --  scenarios target this phase's own claims instead: chunks concatenate
 --  to To_String, a rope far larger than the stack round-trips through a
 --  file, and Get_Line handles lines around its internal 4096-character

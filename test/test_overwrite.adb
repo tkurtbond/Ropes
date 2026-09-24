@@ -1,5 +1,5 @@
 --  Phase 8 checks: Overwrite. See PLAN.md's phased plan and "Deferred
---  / stretch" section -- no Rope.Mod counterpart (Oberon-2's Rope has
+--  / stretch" section -- no Ropes.Mod counterpart (Oberon-2's Rope has
 --  no positional-replace operation), so these scenarios are original,
 --  written directly against Ada.Strings.Unbounded.Overwrite's own
 --  documented semantics (verified from GNAT's a-strunb.ads, not

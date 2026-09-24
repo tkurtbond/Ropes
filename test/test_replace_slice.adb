@@ -1,5 +1,5 @@
 --  Phase 17 checks: Replace_Slice, Ada.Strings.Unbounded.Replace_Slice's
---  function form. No Rope.Mod counterpart. The oracle is
+--  function form. No Ropes.Mod counterpart. The oracle is
 --  Ada.Strings.Fixed.Replace_Slice, whose semantics
 --  Ada.Strings.Unbounded's are defined by (RM A.4.5), run over every
 --  Low/High pair around a rope of several leaves -- including the

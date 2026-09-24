@@ -1,5 +1,5 @@
 # RopeTool.Mod's own insert clamps a negative pos to the start
-# (Rope.Mod's Insert itself clamps); rope_tool's BEFORE is Positive, so
+# (Ropes.Mod's Insert itself clamps); rope_tool's BEFORE is Positive, so
 # "-5" is not a representable index at all rather than a differently-
 # handled one -- Positive'Value ("-5") itself raises Constraint_Error
 # before Ropes.Insert is ever called. "--" still lets the leading "-"

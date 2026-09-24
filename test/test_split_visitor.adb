@@ -1,7 +1,7 @@
 --  Phase 8 checks: the Process-callback form of Split (all four
 --  separator overloads). See PLAN.md's phased plan, "Deferred /
 --  stretch" section, and RopeTest.Mod's CheckSplit
---  (~/Repos/Oberon/oberon-tools/RopeTest.Mod) -- specifically its
+--  (~/Repos/Oberon/Ropes/RopeTest.Mod) -- specifically its
 --  "stops early when visit returns FALSE" scenario (StopAfterTwo),
 --  which test_split.adb's own header comment explicitly noted didn't
 --  translate back when only the array-returning Split existed. The

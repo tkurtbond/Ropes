@@ -1,12 +1,12 @@
 --  Phase 3 checks: Delete. See PLAN.md's phased plan and Testing
 --  approach, and RopeTest.Mod's CheckRemove
---  (~/Repos/Oberon/oberon-tools/RopeTest.Mod), which this is sourced
---  from -- translated to 1-based inclusive From/Through (Rope.Mod's
+--  (~/Repos/Oberon/Ropes/RopeTest.Mod), which this is sourced
+--  from -- translated to 1-based inclusive From/Through (Ropes.Mod's
 --  Remove takes a 0-based (pos, len) pair) and to
---  Ada.Strings.Index_Error where Rope.Mod clamped a too-large From.
+--  Ada.Strings.Index_Error where Ropes.Mod clamped a too-large From.
 --  Delete's own "Through < From is always a no-op, even when From is
 --  out of range" rule (matching Ada.Strings.Unbounded.Delete exactly
---  -- see ropes.ads) covers what Rope.Mod's "clamps a too-large pos"
+--  -- see ropes.ads) covers what Ropes.Mod's "clamps a too-large pos"
 --  and "clamps a negative len" cases were separately testing; "clamps
 --  a negative pos" has no equivalent at all, since From is Positive.
 
@@ -49,7 +49,7 @@ begin
    Check (To_String (Delete (R, 6, 7)) = "helloworld", "Delete from the middle");
    Check (To_String (Delete (R, 1, 7)) = "world", "Delete from the start");
 
-   --  Rope.Mod's Remove(r, pos, len) clamps a too-large len to
+   --  Ropes.Mod's Remove(r, pos, len) clamps a too-large len to
    --  Length(r) - pos; Ropes clamps Through the same way (unlike
    --  Slice's High, which raises Index_Error instead -- see
    --  ropes.ads's Delete comment for why they differ).

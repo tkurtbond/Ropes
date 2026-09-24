@@ -10,7 +10,7 @@ leaves joined by concatenation nodes. That makes concatenation,
 slicing, insertion and deletion cheap on long strings, because they
 share structure with the original rope instead of copying characters.
 
-It is a port of the Oberon-2 `Rope.Mod` module (from `oberon-tools`),
+It is a port of the Oberon-2 `Ropes.Mod` module (from `oberon-ropes`),
 reworked with Ada idioms:
 
 - **Immutable values.** Every operation returns a new `Rope`, so
@@ -144,12 +144,14 @@ gprbuild -P rope_tool.gpr -p
 ## Further reading
 
 - [`PLAN.md`](PLAN.md) covers the design rationale, how each
-  `Rope.Mod` operation maps to Ada, and the phased implementation
+  `Ropes.Mod` operation maps to Ada, and the phased implementation
   history.
 - [`AGENTS.md`](AGENTS.md) has working notes: how to build and test,
   the codebase's conventions, and the lessons learned along the way.
-- [`oberon-tools`](https://github.com/tkurtbond/oberon-tools)'s
-  `Rope.Mod` is the Oberon-2 original. Many of this port's additions
+- [`oberon-ropes`](https://github.com/tkurtbond/oberon-ropes)'s
+  `Ropes.Mod` is the Oberon-2 original. It was `Rope.Mod` in
+  [`oberon-tools`](https://github.com/tkurtbond/oberon-tools) until
+  2026-09-24. Many of this port's additions
   have been ported back to it.
 
 This project began in

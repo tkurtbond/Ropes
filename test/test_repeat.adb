@@ -5,7 +5,7 @@
 --  CheckOverflowGuard -- this is where these two operators' checks
 --  come from, since PLAN.md ended up naming them "*" (matching
 --  Ada.Strings.Fixed's own "*" (Natural, Character/String) operators)
---  rather than Rope.Mod's Repeat/Make names; see ropes.ads's doc
+--  rather than Ropes.Mod's Repeat/Make names; see ropes.ads's doc
 --  comment on "*" for why. The MAX(LONGINT) boundary in
 --  CheckOverflowGuard translates to Natural'Last here.
 

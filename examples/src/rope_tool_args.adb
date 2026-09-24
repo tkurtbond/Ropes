@@ -467,13 +467,13 @@ package body Rope_Tool_Args is
    --  --- chars S ---
    --  A direct demo of Ropes.Cursor and the Iterable aspect (see
    --  PLAN.md's "Iteration" section) -- the Ada replacement for
-   --  Rope.Mod's own Iterator type -- rather than a wrapped operation
-   --  like every other command here. Rope.Mod itself has two
+   --  Ropes.Mod's own Iterator type -- rather than a wrapped operation
+   --  like every other command here. Ropes.Mod itself has two
    --  character-level iteration APIs, Iterate (a push-based Visitor
    --  callback with early-stop support) and the Iterator type (a
    --  stateful Get/Incr/Decr/Goto/Move/Peek/Source cursor); both
    --  existed there all along -- it was RopeTool.Mod that had no
-   --  subcommand demonstrating either one, not Rope.Mod lacking the
+   --  subcommand demonstrating either one, not Ropes.Mod lacking the
    --  capability. Since fixed (oberon-tools commit 6676de6): RopeTool.Mod
    --  now has iterate/iterator subcommands that print a rope's
    --  characters one per line, the same output chars produces here.
@@ -652,7 +652,7 @@ package body Rope_Tool_Args is
          return False;
       when Ada.Strings.Length_Error =>
          --  New_Concat's overflow guard: N1 + N2 exceeds Natural'Last
-         --  -- Rope.Mod's own Cat HALTs(1) here instead of raising, so
+         --  -- Ropes.Mod's own Cat HALTs(1) here instead of raising, so
          --  this is the one place this CLI's error convention diverges
          --  in kind (an exception, not a clamp), not just wording; see
          --  PLAN.md's "Comparison"/overflow notes for the general
@@ -793,7 +793,7 @@ package body Rope_Tool_Args is
    --  Put_Line: each line is read whole, however long, without a
    --  buffer as long as the line. FILE = "-" reads Current_Input via
    --  the no-File overload; anything else is opened and read via the
-   --  File overload. No Rope.Mod/RopeTool.Mod counterpart (Rope.Mod has
+   --  File overload. No Ropes.Mod/RopeTool.Mod counterpart (Ropes.Mod has
    --  no I/O at all). Needs an Arg_Parser that passes a bare "-" on as
    --  an argument (arg_parser 264a098 and later); older ones silently
    --  dropped it, so this handler never saw it.

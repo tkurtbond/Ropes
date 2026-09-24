@@ -3,7 +3,7 @@ with Ada.Unchecked_Deallocation;
 
 package body Ropes is
 
-   --  Rope.Mod's ShortLeafLength: Cat merges two flat leaves into one
+   --  Ropes.Mod's ShortLeafLength: Cat merges two flat leaves into one
    --  instead of adding a Concat node when their combined length is
    --  at most this. Tunable; not derived from anything but taste.
    Short_Leaf_Length : constant := 16;
@@ -95,7 +95,7 @@ package body Ropes is
    --  Left and Right must both be non-null. Takes its own reference
    --  to each (Incr_Ref) -- the caller's own references, if any, are
    --  untouched. Raises Ada.Strings.Length_Error instead of silently
-   --  wrapping on overflow, unlike Rope.Mod's AddLen, which HALTs
+   --  wrapping on overflow, unlike Ropes.Mod's AddLen, which HALTs
    --  because voc's LONGINT wraps silently and Ada's does not need
    --  the same workaround -- see PLAN.md.
    function New_Concat (Left, Right : Node_Access) return Node_Access is
@@ -114,7 +114,7 @@ package body Ropes is
    end New_Concat;
 
    --  Plain concatenation: the short-leaf merge special cases from
-   --  the paper (Rope.Mod's SimpleCat), with no depth check and no
+   --  the paper (Ropes.Mod's SimpleCat), with no depth check and no
    --  rebalancing -- that is Phase 2's job, layered on top of this.
    --  Left and Right are borrowed; the result is a fresh owned
    --  reference.
@@ -153,7 +153,7 @@ package body Ropes is
    end New_Simple_Cat;
 
    ------------------------------------------------------------------
-   --  Balancing: Rope.Mod's Fibonacci-forest rebalance (itself ported
+   --  Balancing: Ropes.Mod's Fibonacci-forest rebalance (itself ported
    --  from cord's cordbscs.c), triggered from "&" whenever a
    --  concatenation's result gets too deep. See PLAN.md's "Balancing"
    --  section. Every Node_Access parameter below follows the same
@@ -163,7 +163,7 @@ package body Ropes is
    --  Grows the same Fibonacci-like sequence as Min_Length below (A =
    --  Min_Length (D - 1), B = Min_Length (D)) until the next term
    --  would exceed Natural'Last, and returns the last index
-   --  successfully computed -- Rope.Mod's InitMinLength/MaxDepth, but
+   --  successfully computed -- Ropes.Mod's InitMinLength/MaxDepth, but
    --  sized to Standard.Natural's actual range instead of a hardcoded
    --  44 assuming a 32-bit LONGINT.
    function Compute_Max_Depth return Natural is
@@ -335,7 +335,7 @@ package body Ropes is
       end case;
    end Fetch;
 
-   --  Rope.Mod's Iterator.Locate, minus its leaf-cache short-circuit
+   --  Ropes.Mod's Iterator.Locate, minus its leaf-cache short-circuit
    --  (callers -- First/Next below -- check that themselves, since
    --  only they have the old Cursor's cache to check against): the
    --  leaf node covering the 1-based position I of the subtree rooted
@@ -360,11 +360,11 @@ package body Ropes is
       end case;
    end Locate_Leaf;
 
-   --  Rope.Mod's SubstrHelper: the (0-based) slice N (Start .. Start +
+   --  Ropes.Mod's SubstrHelper: the (0-based) slice N (Start .. Start +
    --  Len - 1). Precondition: N /= null, Len > 0, Start + Len <=
    --  N.Len. N is borrowed; the result is a fresh owned reference --
    --  sharing N itself (via Incr_Ref, no copy) when the requested
-   --  range is the whole of N, at any node kind (Rope.Mod only takes
+   --  range is the whole of N, at any node kind (Ropes.Mod only takes
    --  this shortcut for a Concat node, always copying a Leaf even for
    --  its own full range; sharing it too is a strict improvement, not
    --  a scope change, since a Rope leaf is just as immutable).
@@ -403,7 +403,7 @@ package body Ropes is
    --  N.Len, and the target range lies within Target. Descends only into
    --  the subtrees overlapping the range and copies straight out of each
    --  leaf, so it is O(Len + depth), like Node_Slice but with no new
-   --  nodes built -- Rope.Mod's BlitHelper.
+   --  nodes built -- Ropes.Mod's BlitHelper.
    procedure Node_Copy (N : Node_Access; Start, Len : Natural; Target : in out String; T : in out Positive) is
    begin
       case N.Kind is
@@ -535,7 +535,7 @@ package body Ropes is
       return 0;
    end Folded_Runs;
 
-   --  Rope.Mod's Compare: <0, 0 or >0, like strcmp -- lexicographic by
+   --  Ropes.Mod's Compare: <0, 0 or >0, like strcmp -- lexicographic by
    --  character, then by length. Left and Right are borrowed
    --  (possibly null). Compare_Runs says how two runs (below) compare:
    --  Compare, the one "=" and "<" use, is the instance with
@@ -649,7 +649,7 @@ package body Ropes is
       end if;
    end Compare;
 
-   --  Rope.Mod's MapHelper: N with Convert applied to every character,
+   --  Ropes.Mod's MapHelper: N with Convert applied to every character,
    --  in increasing index order. Built via New_Concat directly, not
    --  New_Simple_Cat -- the result must have exactly N's own tree
    --  shape (same Depth, no rebalancing needed, per Map/Map_Indexed's
@@ -686,7 +686,7 @@ package body Ropes is
    end Map_Node;
 
    --  As Map_Node, but Convert is also passed each character's
-   --  1-based index in the whole rope -- Rope.Mod's MapiHelper, with
+   --  1-based index in the whole rope -- Ropes.Mod's MapiHelper, with
    --  Next_Index threaded through the recursion in place of MapiHelper's
    --  VAR idx parameter (an in out parameter here for the same reason:
    --  it must keep counting across the boundary between N.Left and
@@ -827,7 +827,7 @@ package body Ropes is
 
    function "*" (Left : Natural; Right : String) return Rope is (Left * From_String (Right));
 
-   --  Rope.Mod's Repeat: O(log Left) by binary doubling -- Piece :=
+   --  Ropes.Mod's Repeat: O(log Left) by binary doubling -- Piece :=
    --  Piece & Piece repeatedly, accumulating Result & Piece on each odd
    --  bit of Left (the standard binary-exponentiation shape). Every
    --  doubling shares Piece's existing tree via "&" (which Incr_Refs
@@ -1796,9 +1796,9 @@ package body Ropes is
    ------------------------------------------------------------------
    --  Splitting.
    --
-   --  Rope.Mod's CountPieces/NextPiece, done as one two-pass walk per
+   --  Ropes.Mod's CountPieces/NextPiece, done as one two-pass walk per
    --  overload below (count, then build) instead of a single dynamic
-   --  pass, matching Rope.Mod's own two-pass CountPieces + SplitArray
+   --  pass, matching Ropes.Mod's own two-pass CountPieces + SplitArray
    --  shape. Each overload supplies its own "find the next occurrence
    --  at or after position P" search, Find_Next, on the From-bounded
    --  Index above for its kind of separator (0 for a P past the end,
@@ -1922,7 +1922,7 @@ package body Ropes is
    end Split;
 
    ------------------------------------------------------------------
-   --  Splitting, Process-callback form: Rope.Mod's own Visitor-based
+   --  Splitting, Process-callback form: Ropes.Mod's own Visitor-based
    --  Split, restored (see PLAN.md's "Deferred / stretch" section) as
    --  a genuine single pass -- unlike the array-returning overloads
    --  above, there is no separate counting pass first, and never more
@@ -1930,7 +1930,7 @@ package body Ropes is
    --  counterpart's own "find the next occurrence at or after position
    --  P" search, just walked once instead of twice, and stopping as
    --  soon as either the last piece is visited or Process returns
-   --  False -- Rope.Mod's own "WHILE more & ~last DO more :=
+   --  False -- Ropes.Mod's own "WHILE more & ~last DO more :=
    --  visit(NextPiece(...)) END" shape, translated directly.
    ------------------------------------------------------------------
 
@@ -2045,14 +2045,14 @@ package body Ropes is
       if Position.Leaf /= null and then New_Pos >= Position.Leaf_Start and then New_Pos < Position.Leaf_Start + Position.Leaf.Len
       then
          --  New_Pos is still covered by the same leaf as Position --
-         --  O(1), no descent needed, Rope.Mod's Locate's own
+         --  O(1), no descent needed, Ropes.Mod's Locate's own
          --  cache-hit shortcut.
          Result.Leaf       := Position.Leaf;
          Result.Leaf_Start := Position.Leaf_Start;
       elsif New_Pos <= Length (Source) then
          --  Crossing into a new leaf (or this is Next's first call
          --  after a Cursor built some other way) -- an O(log n)
-         --  descent from the root, same as a cache miss in Rope.Mod's
+         --  descent from the root, same as a cache miss in Ropes.Mod's
          --  Locate.
          Locate_Leaf (Data_Of (Source), New_Pos, 0, Result.Leaf, Result.Leaf_Start);
       end if;
@@ -2154,13 +2154,13 @@ package body Ropes is
       return From_String ([Ada.Characters.Handling.To_Lower (Element (Source, 1))]) & Slice (Source, 2, Length (Source));
    end Uncapitalize;
 
-   --  Rope.Mod's EscapeChar, unrolled into Escape's loop directly
-   --  (Rope.Mod's own separate EscapeChar/Escaped pair exists only
+   --  Ropes.Mod's EscapeChar, unrolled into Escape's loop directly
+   --  (Ropes.Mod's own separate EscapeChar/Escaped pair exists only
    --  because Oberon-2 has no local functions inside a loop; a nested
    --  block here does the same job). Built with "for Ch of Source
    --  loop" -- Phase 5's Cursor/Iterable -- and the new "&" (Rope,
    --  Character) overload above, rather than hand-walking Fetch by
-   --  index the way Rope.Mod must.
+   --  index the way Ropes.Mod must.
    function Escape (Source : Rope) return Rope is
       Result : Rope := Null_Rope;
    begin

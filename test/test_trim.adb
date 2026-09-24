@@ -1,13 +1,13 @@
 --  Phase 6 checks: Trim. See PLAN.md's phased plan and Testing
 --  approach, and RopeTest.Mod's CheckTrim
---  (~/Repos/Oberon/oberon-tools/RopeTest.Mod) -- Rope.Mod's separate
+--  (~/Repos/Oberon/Ropes/RopeTest.Mod) -- Ropes.Mod's separate
 --  TrimLeft/TrimRight/Trim collapse into this package's one Trim
 --  function (see ropes.ads's doc comment); TrimLeft/TrimRight
 --  translate to Trim called with the untouched side's set as
 --  Ada.Strings.Maps.Null_Set. One extra check beyond RopeTest.Mod's
 --  own scenarios uses a non-whitespace Character_Set, to exercise
 --  that Trim's Left/Right are genuinely independent sets, not always
---  Whitespace -- something Rope.Mod's own TrimLeft/TrimRight/Trim
+--  Whitespace -- something Ropes.Mod's own TrimLeft/TrimRight/Trim
 --  can't express at all (they only ever trim IsSpace).
 
 with Ada.Command_Line; use Ada.Command_Line;

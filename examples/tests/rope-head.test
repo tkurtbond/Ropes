@@ -1,4 +1,4 @@
-# No Rope.Mod/RopeTool.Mod counterpart at all -- original, same as
+# No Ropes.Mod/RopeTool.Mod counterpart at all -- original, same as
 # rope-overwrite.test above.
 program rope_tool
 arg head

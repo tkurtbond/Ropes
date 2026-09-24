@@ -1,5 +1,5 @@
 --  Command definitions for rope_tool, the Ada port of RopeTool.Mod
---  (~/Repos/Oberon/oberon-tools/RopeTool.Mod): a git-style CLI
+--  (~/Repos/Oberon/Ropes/RopeTool.Mod): a git-style CLI
 --  exposing Ropes operations as subcommands. Built on Arg_Parser
 --  (~/Repos/Ada/arg_parser, installed under
 --  /usr/local/sw/versions/ada/), modeled directly on its own
@@ -99,22 +99,22 @@ package Rope_Tool_Args is
    --  --- escaped S --- (Ropes.Escape)
    function Escaped_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
-   --  --- overwrite S POS NEW --- (Ropes.Overwrite; 1-based, no Rope.Mod/RopeTool.Mod counterpart -- see PLAN.md's "Deferred / stretch")
+   --  --- overwrite S POS NEW --- (Ropes.Overwrite; 1-based, no Ropes.Mod/RopeTool.Mod counterpart -- see PLAN.md's "Deferred / stretch")
    function Overwrite_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
-   --  --- head S COUNT --- (Ropes.Head, default Pad; no Rope.Mod/RopeTool.Mod counterpart)
+   --  --- head S COUNT --- (Ropes.Head, default Pad; no Ropes.Mod/RopeTool.Mod counterpart)
    function Head_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
-   --  --- tail S COUNT --- (Ropes.Tail, default Pad; no Rope.Mod/RopeTool.Mod counterpart)
+   --  --- tail S COUNT --- (Ropes.Tail, default Pad; no Ropes.Mod/RopeTool.Mod counterpart)
    function Tail_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
-   --  --- lines FILE --- (Ropes.Text_IO.Get_Line, File and Current_Input overloads; no Rope.Mod/RopeTool.Mod counterpart)
+   --  --- lines FILE --- (Ropes.Text_IO.Get_Line, File and Current_Input overloads; no Ropes.Mod/RopeTool.Mod counterpart)
    function Lines_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
-   --  --- readfile FILE --- (Ropes.Stream_IO.Read_File; no Rope.Mod/RopeTool.Mod counterpart before Phase 13)
+   --  --- readfile FILE --- (Ropes.Stream_IO.Read_File; no Ropes.Mod/RopeTool.Mod counterpart before Phase 13)
    function Readfile_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
-   --  --- copyslice S LOW HIGH T POS --- (Ropes.Copy_Slice, Rope.Mod's Blit; Phase 15)
+   --  --- copyslice S LOW HIGH T POS --- (Ropes.Copy_Slice, Ropes.Mod's Blit; Phase 15)
    function Copyslice_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
    --  --- replaceslice S LOW HIGH BY --- (Ropes.Replace_Slice, String By; Phase 17)

@@ -1,9 +1,9 @@
 --  Phase 8 checks: Contains, all four overloads. See PLAN.md's phased
 --  plan, "Search" section, and the "Open questions" note that floated
 --  Contains as a plausible thin wrapper over Index (...) /= 0.
---  Rope.Mod's own Contains (Character pattern, with From, always
+--  Ropes.Mod's own Contains (Character pattern, with From, always
 --  Forward) is the direct model for the Character/From overload; the
---  Rope-pattern and no-From overloads have no Rope.Mod counterpart at
+--  Rope-pattern and no-From overloads have no Ropes.Mod counterpart at
 --  all, so those scenarios are original. The last check confirms
 --  Contains is genuinely a thin wrapper: it inherits Index's own
 --  Ada.Strings.Pattern_Error on a Null_Rope Pattern rather than

@@ -4,14 +4,16 @@
 working notes for an agent in this repo: what exists, how to build and
 test it, and the rules this project has learned. **`PLAN.md` is the
 design doc and the history.** It has the design rationale, the
-operation-by-operation mapping from `Rope.Mod` to Ada, and one entry
+operation-by-operation mapping from `Ropes.Mod` to Ada, and one entry
 per phase (Phases 1–26) with the full account behind each rule below.
 
 ## Status
 
 Every planned phase is done. Several phases (9, 10, 12, 14 and 26)
-changed only the sibling Oberon repo, `~/Repos/Oberon/oberon-tools`,
-feeding this repo's additions back into `Rope.Mod`.
+changed only the sibling Oberon repo, feeding this repo's additions
+back into `Ropes.Mod`. That was `Rope.Mod` in
+`~/Repos/Oberon/oberon-tools` then. It is now `Ropes.Mod` in
+`~/Repos/Oberon/Ropes`, with its history.
 
 - `src/ropes.ads`/`.adb` is the library. It has
   reference-counted, balanced ropes and most of `Ada.Strings.Unbounded`'s
@@ -60,7 +62,7 @@ cd examples && ./tests/run-tests.sh   # the rope_tool fixtures alone
 ## Source material
 
 - **The direct model, to read first**:
-  `~/Repos/Oberon/oberon-tools/Rope.Mod`, plus its `RopeTest.Mod`
+  `~/Repos/Oberon/Ropes/Ropes.Mod`, plus its `RopeTest.Mod`
   checks, its `RopeTool.Mod` CLI and its `tests/rope-*.test`
   fixtures. `Ropes` exports the same functionality in Ada idioms. It
   is not a transliteration: check `PLAN.md`'s mapping before assuming
@@ -72,9 +74,9 @@ cd examples && ./tests/run-tests.sh   # the rope_tool fixtures alone
   `cordxtra.c`/`cordprnt.c` (lazy, file-backed, printf) are out of
   scope.
 - **When porting a test, translate the scenario, not the assertion.**
-  `Ropes` raises `Index_Error` where `Rope.Mod` clamps, indexes from
-  1, and takes `Slice (Low, High)` where `Rope.Mod` takes
-  `(start, len)`. Porting in the other direction, to `Rope.Mod`
+  `Ropes` raises `Index_Error` where `Ropes.Mod` clamps, indexes from
+  1, and takes `Slice (Low, High)` where `Ropes.Mod` takes
+  `(start, len)`. Porting in the other direction, to `Ropes.Mod`
   (Phases 9, 12 and 26), translates into that module's clamp-or-HALT
   conventions. The `voc` pitfalls behind those ports are in their
   `PLAN.md` entries: `Out` never flushes at exit, `Out.String` stops
@@ -92,12 +94,12 @@ cd examples && ./tests/run-tests.sh   # the rope_tool fixtures alone
   bottom-up and never mutated: there are no parent or back pointers,
   and no mutable field that could point at a later node. That is what
   lets plain reference counting reclaim everything.
-- **Indexing is 1-based**; the paper and `Rope.Mod` are 0-based. Every
+- **Indexing is 1-based**; the paper and `Ropes.Mod` are 0-based. Every
   ported index expression needs a deliberate off-by-one check.
 - **Reuse `Ada.Strings` vocabulary.** That means
   `Index_Error`/`Length_Error`, `Unbounded`'s names and shapes,
   `Going => Forward | Backward`, `Character_Set`/`Character_Mapping`,
-  and `"*"` in place of `Rope.Mod`'s `Make`/`Repeat`. **Check for an
+  and `"*"` in place of `Ropes.Mod`'s `Make`/`Repeat`. **Check for an
   operator match, not just a function name**: `"*"` was found only
   at Phase 7.
 - **`Ropes` follows the RM. GNAT's `Ada.Strings` is the test oracle
@@ -180,7 +182,7 @@ cd examples && ./tests/run-tests.sh   # the rope_tool fixtures alone
 - **When a scope list groups items, check each item against the
   source** before ruling the whole group out (Phase 13:
   `CORD_from_file_eager` is not file-backed).
-- **An explicit user decision overrides "match `Rope.Mod`'s scope."**
+- **An explicit user decision overrides "match `Ropes.Mod`'s scope."**
   Do what was asked, and record why the old reasoning no longer
   applies. Don't record it as though that reasoning had been wrong
   (Phase 8 onward).

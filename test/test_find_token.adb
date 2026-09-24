@@ -1,5 +1,5 @@
 --  Phase 19 checks: Index_Non_Blank and Find_Token,
---  Ada.Strings.Unbounded's own. No Rope.Mod counterpart. The oracle is
+--  Ada.Strings.Unbounded's own. No Ropes.Mod counterpart. The oracle is
 --  GNAT's Ada.Strings.Fixed on the same text, over a rope of 9-character
 --  leaves (9 + 9 > 16, the short-leaf merge threshold, so they stay
 --  separate), run for every From in both directions -- Index_Error

@@ -1,8 +1,8 @@
 --  Phase 6 checks: Map/Map_Indexed. See PLAN.md's phased plan and
 --  Testing approach, and RopeTest.Mod's CheckMap
---  (~/Repos/Oberon/oberon-tools/RopeTest.Mod), which this is sourced
+--  (~/Repos/Oberon/Ropes/RopeTest.Mod), which this is sourced
 --  from -- ShiftMapper translates directly; IndexDigitMapper's index
---  arithmetic is adjusted from Rope.Mod's 0-based "i MOD 10" to
+--  arithmetic is adjusted from Ropes.Mod's 0-based "i MOD 10" to
 --  "(Index - 1) mod 10" for Map_Indexed's 1-based Index, so it still
 --  produces the same expected string ("0123456789...").
 

@@ -1,6 +1,6 @@
 --  Phase 16 checks: the String overloads of Index, Insert, Overwrite
 --  and the comparison operators -- the forms Ada.Strings.Fixed and
---  Ada.Strings.Unbounded themselves take. No Rope.Mod counterpart
+--  Ada.Strings.Unbounded themselves take. No Ropes.Mod counterpart
 --  (Oberon-2 has no overloading). Index/Insert/Overwrite are checked
 --  against their own Rope overloads' documented results; the
 --  comparisons against predefined String comparison as an oracle,

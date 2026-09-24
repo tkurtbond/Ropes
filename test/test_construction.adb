@@ -2,10 +2,10 @@
 --  Is_Empty, plain "&" (short-leaf merge only, no rebalancing yet),
 --  From_String/To_String, Element. See PLAN.md's phased plan and
 --  Testing approach, and RopeTest.Mod
---  (~/Repos/Oberon/oberon-tools/RopeTest.Mod), which this is sourced
+--  (~/Repos/Oberon/Ropes/RopeTest.Mod), which this is sourced
 --  from -- CheckConstruction, CheckLengthAndFetch and CheckCat's
 --  content-only assertions, translated to 1-based indexing and to
---  Ada.Strings.Index_Error where Rope.Mod clamped.
+--  Ada.Strings.Index_Error where Ropes.Mod clamped.
 
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Strings;
@@ -72,7 +72,7 @@ begin
       Check (Length (R) = 26, "Cat of two large leaves: length");
    end;
 
-   --  Mirrors Rope.Mod's CheckCat (content only -- Depth is not part
+   --  Mirrors Ropes.Mod's CheckCat (content only -- Depth is not part
    --  of Phase 1's public API): the first "0123456789012345" append
    --  (16 chars) forces a real Concat (4 + 16 > 16). The "01234"
    --  append (5 chars) does NOT absorb into that 16-char right leaf

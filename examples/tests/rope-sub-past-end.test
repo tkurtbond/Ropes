@@ -6,7 +6,7 @@
 # this is still an empty rope, printed as a blank output line, same
 # outcome as the original for a differently-chosen boundary value (100
 # itself would raise Index_Error here -- see PLAN.md's "Modification"
-# section on why Rope.Mod's permissive clamping was not carried over
+# section on why Ropes.Mod's permissive clamping was not carried over
 # wholesale).
 program rope_tool
 arg slice

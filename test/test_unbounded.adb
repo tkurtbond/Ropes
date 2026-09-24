@@ -1,6 +1,6 @@
 --  Phase 7 checks: From_Unbounded_String/To_Unbounded_String. See
 --  PLAN.md's phased plan and "Construction and concatenation" section
---  -- no Rope.Mod counterpart at all (Oberon-2 has no unbounded string
+--  -- no Ropes.Mod counterpart at all (Oberon-2 has no unbounded string
 --  type), so these scenarios are original: a round trip each way, plus
 --  the empty-string edge case on each direction.
 

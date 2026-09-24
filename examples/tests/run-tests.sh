@@ -32,11 +32,11 @@
 # space is ignored when comparing output. Both the output and the error
 # output are compared, mixed together.
 #
-# This is a direct port of ~/Repos/Oberon/oberon-tools/tests/
+# This is a direct port of ~/Repos/Oberon/Ropes/tests/
 # run-tests.sh -- see PLAN.md's "Command-line tool (rope_tool)"
 # section. The harness itself needed no changes at all (it is already
 # generic over "program" and "bindir"); only the fixtures are
-# rope_tool's own (translated from Rope.Mod's own tests/rope-*.test,
+# rope_tool's own (translated from Ropes.Mod's own tests/rope-*.test,
 # not copied -- see each fixture's own header comment where the
 # scenario or its expected outcome differs from the Oberon original:
 # 0-based -> 1-based indices, HALT/clamp -> an Ada.Strings exception

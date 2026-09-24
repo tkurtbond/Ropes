@@ -1,5 +1,5 @@
 --  Phase 8 checks: Head/Tail. See PLAN.md's phased plan and "Deferred
---  / stretch" section -- no Rope.Mod counterpart, so these scenarios
+--  / stretch" section -- no Ropes.Mod counterpart, so these scenarios
 --  are original, written directly against
 --  Ada.Strings.Unbounded.Head/Tail's own documented semantics
 --  (verified from GNAT's a-strunb.ads, not assumed): cutting Source

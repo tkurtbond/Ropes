@@ -2,24 +2,24 @@
 --  directions, both overloads). See PLAN.md's phased plan and Testing
 --  approach, and RopeTest.Mod's CheckCompareFindRepeat (its Find
 --  cases only -- Compare/Equal are Phase 3, Repeat is a later phase)
---  and CheckIndexCharAndRFind (~/Repos/Oberon/oberon-tools/
+--  and CheckIndexCharAndRFind (~/Repos/Oberon/Ropes/
 --  RopeTest.Mod). Translated 0-based -> 1-based throughout, and NOT
 --  translated verbatim where PLAN.md changed the semantics:
 --
 --  * An empty pattern now raises Ada.Strings.Pattern_Error instead of
---    Rope.Mod's Find/RFind, which treat it as matching at "from" --
+--    Ropes.Mod's Find/RFind, which treat it as matching at "from" --
 --    see ropes.ads's Index doc comment.
 --  * Ropes.Index (Going => Backward) matches Ada.Strings.Fixed.Index's
 --    own Backward semantics exactly (a match must fit entirely within
 --    Source (1 .. From), i.e. Start <= From - Pattern'Length + 1),
---    NOT Rope.Mod's RFind, which instead clamps to Start <= before.
+--    NOT Ropes.Mod's RFind, which instead clamps to Start <= before.
 --    These coincide for a length-1 pattern (RIndexChar's scenarios
 --    translate directly) but differ for a longer one (RFind's
 --    scenarios are translated to different From/expected values
 --    below, chosen to exercise the same "a bound excludes a later
 --    occurrence" shape under the real formula).
 --
---  Rope.Mod's Contains has no Ropes counterpart yet (PLAN.md flags it
+--  Ropes.Mod's Contains has no Ropes counterpart yet (PLAN.md flags it
 --  optional/undecided) and is not translated here.
 
 with Ada.Command_Line; use Ada.Command_Line;

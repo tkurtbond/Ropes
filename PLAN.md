@@ -18,22 +18,26 @@
   surface (lazy leaves, substring nodes, file-backed cords,
   `CORD_printf`) that this port deliberately does **not** chase — see
   below.
-- **The direct model**: `~/Repos/Oberon/oberon-tools/Rope.Mod`, an
-  Oberon-2 port of the same paper with two engineering choices taken
+- **The direct model**: `~/Repos/Oberon/Ropes/Ropes.Mod`, an
+  Oberon-2 port of the same paper (it was `Rope.Mod` in
+  `~/Repos/Oberon/oberon-tools` until 2026-09-24, when it moved, with
+  its history, to its own repo and was renamed after Oberon-2's
+  `Strings`; the phase log below still names `oberon-tools` where it
+  records what was done there) with two engineering choices taken
   from cord (short-leaf merge in `Cat`, the Fibonacci-forest rebalance)
   rather than from scratch. This is the actual scope contract for
   `Ropes`: a "core" rope — flat leaves and concatenation nodes only, no
   lazy/function leaves, no substring nodes, no file-backed ropes,
   `Substring` always copies. `Ropes` should export **the same
-  functionality** as `Rope.Mod`, using Ada idioms in place of its
+  functionality** as `Ropes.Mod`, using Ada idioms in place of its
   Oberon-2 ones — not a bigger feature set, and not a mechanical
   transliteration of its calling conventions.
-- **`Rope.Mod`'s own test suite and demo tool**, in the same directory:
+- **`Ropes.Mod`'s own test suite and demo tool**, in the same directory:
   `RopeTest.Mod` (an internal battery of `Check(cond, name)` assertions,
   printed as `ok - NAME`/`not ok - NAME` plus a summary, `HALT(1)` on
   any failure) and `RopeTool.Mod` (a `arg_parser`-based CLI exposing
   each `Rope` operation as a subcommand, e.g. `ropetool sub S START
-  LEN`). `~/Repos/Oberon/oberon-tools/tests/rope-*.test` are black-box
+  LEN`). `~/Repos/Oberon/Ropes/tests/rope-*.test` are black-box
   fixtures run through `RopeTool` by `tests/run-tests.sh` (`program
   RopeTool` / `arg ...` / `status N` / expected `output`), plus
   `rope-selftest.test`, which just runs `RopeTest` itself and checks
@@ -53,7 +57,7 @@
 ## Why this is a real port, not a transliteration
 
 Oberon-2 and Ada solve several of the same problems differently enough
-that copying `Rope.Mod`'s shape verbatim would produce non-idiomatic
+that copying `Ropes.Mod`'s shape verbatim would produce non-idiomatic
 (and in a couple of places actively wrong) Ada. The differences that
 actually change the design, not just the syntax:
 
@@ -74,7 +78,7 @@ actually change the design, not just the syntax:
   reused here directly including the *reason* for wrapping the
   `Controlled` type inside a plain record rather than making `Rope`
   itself `new Controlled with private` (RM 3.9.3(10) — see below).
-- **Fail-fast vs. clamp-and-HALT.** `Rope.Mod` mixes two failure
+- **Fail-fast vs. clamp-and-HALT.** `Ropes.Mod` mixes two failure
   conventions: `Fetch`/`Blit` `HALT(1)` on an out-of-range index,
   while `Substring`/`Insert`/`Remove` silently clamp. voc's `HALT` is a
   hard process abort with no recovery. Ada's idiom for "index out of
@@ -85,10 +89,10 @@ actually change the design, not just the syntax:
   exceptions rather than clamping or inventing new ones, so a caller
   already familiar with `Unbounded_String`'s failure modes needs to
   learn nothing new.
-- **0-based vs. 1-based indexing.** Both the paper and `Rope.Mod` index
+- **0-based vs. 1-based indexing.** Both the paper and `Ropes.Mod` index
   from 0. Every other Ada string type (`String`, `Ada.Strings.Unbounded`,
   `Ada.Strings.Bounded`) indexes from 1. `Ropes` follows Ada, which
-  means every index expression ported from `Rope.Mod` needs a deliberate
+  means every index expression ported from `Ropes.Mod` needs a deliberate
   off-by-one adjustment, not a verbatim copy — flagged per-operation
   below.
 - **Named comparison/search pairs vs. operator overloading and
@@ -104,7 +108,7 @@ actually change the design, not just the syntax:
   that surfaces as a trap deep inside the traversal. Ada's `not null
   access` constraint catches this at the call boundary. Every
   callback-taking `Ropes` subprogram uses it.
-- **Manual iterator object vs. the `Iterable` aspect.** `Rope.Mod`'s
+- **Manual iterator object vs. the `Iterable` aspect.** `Ropes.Mod`'s
   `Iterator` is a heap-allocated, mutable-state object with `Get`/
   `Incr`/`Decr`/`Goto`/`Move`/`Peek`/`Source` methods — needed in
   Oberon-2 because there's no language-level custom-iteration hook.
@@ -112,7 +116,7 @@ actually change the design, not just the syntax:
   directly, backed by a small value-type `Cursor` (not heap-allocated,
   not mutated in place — `Next` returns a new `Cursor`). See
   "Iteration" below for why `Cursor` must stay untagged.
-- **Hand-rolled linked list vs. `Ada.Containers`.** `Rope.Mod`'s
+- **Hand-rolled linked list vs. `Ada.Containers`.** `Ropes.Mod`'s
   `SplitList` (a hand-rolled singly linked `Piece`/`PieceDesc`) exists
   because Oberon-2 has no generic container library at hand. Ada does
   (`Ada.Containers.Vectors`, `Doubly_Linked_Lists`); `Ropes.Split`
@@ -121,13 +125,13 @@ actually change the design, not just the syntax:
   `Doubly_Linked_Lists` over `Rope` themselves rather than `Ropes`
   reinventing one.
 - **Hardcoded `MaxDepth` vs. computed from the type's actual range.**
-  `Rope.Mod`'s `MaxDepth = 44` is explicitly derived from voc's 32-bit
+  `Ropes.Mod`'s `MaxDepth = 44` is explicitly derived from voc's 32-bit
   `LONGINT` (`minLength[44]` is the last Fibonacci-like value under
   `MAX(LONGINT) = 2147483647`; `minLength[45]` would overflow) — the
   module's own comment says so. `Ropes` computes the equivalent table
   and depth bound *at package elaboration*, growing the Fibonacci-like
   sequence until it would exceed `Natural'Last`, the same technique
-  `Rope.Mod`'s `InitMinLength` uses but without hardcoding the
+  `Ropes.Mod`'s `InitMinLength` uses but without hardcoding the
   assumption about the integer width — see "Balancing" below.
 - **Ada already has most of the string vocabulary this needs.**
   Wherever an operation overlaps something `Ada.Strings.Unbounded` or
@@ -141,10 +145,10 @@ actually change the design, not just the syntax:
 
 ## What's explicitly out of scope (v1)
 
-Matching `Rope.Mod`'s own stated scope, not cord's full surface:
+Matching `Ropes.Mod`'s own stated scope, not cord's full surface:
 
 - No lazy/function-generator leaves (cord's `CORD_from_fn`).
-- No lazy substring nodes — `Slice` always copies, like `Rope.Mod`'s
+- No lazy substring nodes — `Slice` always copies, like `Ropes.Mod`'s
   `Substring` and unlike cord's substring-node optimization.
 - No file-backed ropes (`CORD_from_file`/`_lazy`/`_eager`).
   **[Phase 13, partly revisited]**: this bullet grouped `_eager` with
@@ -167,7 +171,7 @@ Ropes/                   -- repo root (github.com/tkurtbond/Ropes)
   ropes.gpr              -- library project
   src/
     ropes.ads / .adb      -- the whole public API; one package, matching
-                              Rope.Mod's own single-MODULE scope
+                              Ropes.Mod's own single-MODULE scope
     ropes-test_support.ads / .adb  -- test-only internals accessor (Depth); see Phase 2
     ropes-text_io.ads / .adb       -- Put/Put_Line/Get_Line on Rope; see Phase 11
     ropes-stream_io.ads / .adb     -- whole-file Read/Write, byte for byte; see Phase 13
@@ -183,7 +187,7 @@ Ropes/                   -- repo root (github.com/tkurtbond/Ropes)
       run-tests.sh, *.test       -- black-box rope_tool suite (see Testing)
 ```
 
-One flat package, not a `Ropes.*` hierarchy — `Rope.Mod` is a single
+One flat package, not a `Ropes.*` hierarchy — `Ropes.Mod` is a single
 module and the API is small enough (on the order of `Ada.Strings.Unbounded`)
 that splitting it up front would just add navigation overhead with no
 present payoff. Revisit if it grows unwieldy, same policy `alibfyaml`'s
@@ -216,7 +220,7 @@ behind once one does. Phase 1 gave `rope_tool` three subcommands —
 `Ropes`'s own indexing convention, unlike `RopeTool.Mod`'s 0-based
 `Fetch`) — matching `RopeTool.Mod`'s `cat`/`len`/`fetch` commands
 exactly in shape, differing only where `Ropes` itself already differs
-from `Rope.Mod` (1-based indexing, `Ada.Strings.Index_Error` on a bad
+from `Ropes.Mod` (1-based indexing, `Ada.Strings.Index_Error` on a bad
 `fetch` index instead of `HALT`, `Positive'Value` instead of
 `ArgParser.StrToInt`/`ParseInt`). Phase 3 added `slice`
 (`RopeTool.Mod`'s `sub`, renamed to match `Slice`'s own name, 1-based
@@ -270,7 +274,7 @@ before. Phase 11 switched every rope-valued result to
 `Ropes.Text_IO.Put_Line` and added `lines FILE` (`Get_Line`'s demo; see
 Phase 11 below).
 
-`~/Repos/Oberon/oberon-tools/tests/rope-*.test` (see "Sources being
+`~/Repos/Oberon/Ropes/tests/rope-*.test` (see "Sources being
 ported" above) are black-box fixtures written against `RopeTool`, run
 via `tests/run-tests.sh`'s `program`/`arg`/`status`/`output` format.
 **[Phase 8, done.]** Ported as `examples/tests/run-tests.sh` (the
@@ -335,7 +339,7 @@ Null_Rope : constant Rope := (Ref => (Ada.Finalization.Controlled with Data => n
 Points worth calling out explicitly:
 
 - **`Node` is a discriminated variant record**, not a small tagged
-  hierarchy mirroring `Rope.Mod`'s `Leaf`/`Concat` type extension.
+  hierarchy mirroring `Ropes.Mod`'s `Leaf`/`Concat` type extension.
   Ada's idiom for "a closed, fixed set of two node shapes" is a
   `case`-variant, not inheritance — there is no dispatching need here
   (every consumer of a `Node` already knows both possible shapes and
@@ -344,7 +348,7 @@ Points worth calling out explicitly:
 - **A `Leaf` node's characters live in an embedded, discriminant-sized
   `String` component** (`Chars : String (1 .. Len)`), not a separate
   heap-allocated `POINTER TO ARRAY OF CHAR` one level removed the way
-  `Rope.Mod`'s `LeafDesc` does it — one allocation per leaf instead of
+  `Ropes.Mod`'s `LeafDesc` does it — one allocation per leaf instead of
   two.
 - **Why `Rope` is untagged, wrapping a tagged `Controlled` component
   instead of deriving from it directly**: if `Rope` itself were `new
@@ -398,7 +402,7 @@ Points worth calling out explicitly:
   isn't a new limitation `Ropes` introduces. See the open question below
   if that turns out to matter.
 - All positions are `Positive`, 1-based — **every index expression
-  ported from `Rope.Mod` or the paper needs a +1/-1 adjustment**, not a
+  ported from `Ropes.Mod` or the paper needs a +1/-1 adjustment**, not a
   verbatim copy. This is the easiest place to introduce an off-by-one
   bug while porting; call it out at each site during implementation.
 - Out-of-range index → `Ada.Strings.Index_Error` (not `Constraint_Error`,
@@ -407,13 +411,13 @@ Points worth calling out explicitly:
   `Ada.Strings.Length_Error`, via an explicit checked-add
   (`if Left.Length > Natural'Last - Right.Length then raise
   Ada.Strings.Length_Error;`) before computing the sum — the same
-  overflow check `Rope.Mod`'s `AddLen` does (there, because voc
+  overflow check `Ropes.Mod`'s `AddLen` does (there, because voc
   silently wraps on overflow instead of trapping), reusing the
   standard exception instead of `HALT(1)`.
 
 ### Balancing
 
-`Short_Leaf_Length` (merge-on-`Cat` threshold, `Rope.Mod`'s
+`Short_Leaf_Length` (merge-on-`Cat` threshold, `Ropes.Mod`'s
 `ShortLeafLength`) stays a plain tunable constant, `16`, same value,
 same rationale (keeps repeated single-character `&` from growing a
 deep skinny tree).
@@ -426,7 +430,7 @@ Min_Length : array (0 .. <computed>) of Natural;
 Max_Depth  : constant Natural := <last index filled in>;
 ```
 
-grown the same way `Rope.Mod`'s `InitMinLength` does
+grown the same way `Ropes.Mod`'s `InitMinLength` does
 (`Min_Length(0) = 1`, `Min_Length(1) = 2`, `Min_Length(d) =
 Min_Length(d-1) + Min_Length(d-2)`), but stopping at the largest `d`
 such that the next value would exceed `Natural'Last`, rather than
@@ -437,13 +441,13 @@ inheriting an assumption borrowed from voc's `LONGINT` the way a
 literal `44` would.
 
 The Fibonacci-forest rebalance itself (`BalanceInsert`/`BalanceWalk`/
-`ConcatForest` in `Rope.Mod`) ports essentially as-is — it's index-free
+`ConcatForest` in `Ropes.Mod`) ports essentially as-is — it's index-free
 tree-shape logic, not string-index arithmetic, so it isn't one of the
 0-vs-1-based-indexing risk spots above. **[Phase 2, done.]** The one
-real port-time difference is refcounting: `Rope.Mod`'s forest is a
+real port-time difference is refcounting: `Ropes.Mod`'s forest is a
 plain `ARRAY OF Rope` under a tracing collector, so `forest[i] := NIL`
 just drops a GC reference; `Ropes.Balance_Insert`/`Concat_Forest`
-explicitly `Decr_Ref` a forest slot at the same point `Rope.Mod` nulls
+explicitly `Decr_Ref` a forest slot at the same point `Ropes.Mod` nulls
 it out, immediately after folding its content into the running `Sum`
 via `New_Simple_Cat` (which borrows both operands, per the usual
 `Node_Access` contract — see `ropes.adb`'s "Node-level reference
@@ -471,21 +475,21 @@ function To_String (Source : Rope) return String;
 function From_Unbounded_String (Source : Ada.Strings.Unbounded.Unbounded_String) return Rope;
 function To_Unbounded_String (Source : Rope) return Ada.Strings.Unbounded.Unbounded_String;
 
-function "*" (Left : Natural; Right : Character) return Rope;  -- Rope.Mod's Make
-function "*" (Left : Natural; Right : Rope) return Rope;       -- Rope.Mod's Repeat: O(log Left), binary doubling
+function "*" (Left : Natural; Right : Character) return Rope;  -- Ropes.Mod's Make
+function "*" (Left : Natural; Right : Rope) return Rope;       -- Ropes.Mod's Repeat: O(log Left), binary doubling
 function "*" (Left : Natural; Right : String) return Rope;     -- Phase 23: Left * From_String (Right)
 ```
 
 `"&"` replaces `Cat`/`AppendChar`/`FromChar` together — this is *the*
 idiom substitution for a "cheap concatenation" type in Ada (mirrors
 `String "&" String`, `Unbounded_String`'s own `"&"` suite exactly).
-`From_Unbounded_String`/`To_Unbounded_String` have no `Rope.Mod`
+`From_Unbounded_String`/`To_Unbounded_String` have no `Ropes.Mod`
 counterpart (Oberon-2 has no unbounded string type) — added because
 Ada does, and a rope library that can't interop with the type most Ada
 code already uses for "a string that grows" would be an odd omission.
 
 **Correction from the sketch above, found at Phase 7 implementation
-time:** `Rope.Mod`'s `Repeat`/`Make` are named `"*"` here instead,
+time:** `Ropes.Mod`'s `Repeat`/`Make` are named `"*"` here instead,
 overloading `Natural * Rope`/`Natural * Character` — because
 `Ada.Strings.Fixed` already has `"*" (Natural, Character)`/`"*"
 (Natural, String)` operators doing exactly this for `String`. Reusing
@@ -500,15 +504,15 @@ precedent than `Index`/`Trim`/`Slice` were.
 ### Access and slicing
 
 ```ada
-function Element (Source : Rope; Index : Positive) return Character;   -- Ada.Strings.Unbounded naming; Rope.Mod's Fetch
+function Element (Source : Rope; Index : Positive) return Character;   -- Ada.Strings.Unbounded naming; Ropes.Mod's Fetch
 function Is_Empty (Source : Rope) return Boolean;
-function Slice (Source : Rope; Low : Positive; High : Natural) return Rope;  -- inclusive bounds, Unbounded_String's own Slice convention/signature exactly; Rope.Mod's Substring(start, len)
-procedure Copy_Slice (Source : Rope; Low : Positive; High : Natural; Target : in out String; Target_Low : Positive);  -- Rope.Mod's Blit (Phase 15)
+function Slice (Source : Rope; Low : Positive; High : Natural) return Rope;  -- inclusive bounds, Unbounded_String's own Slice convention/signature exactly; Ropes.Mod's Substring(start, len)
+procedure Copy_Slice (Source : Rope; Low : Positive; High : Natural; Target : in out String; Target_Low : Positive);  -- Ropes.Mod's Blit (Phase 15)
 ```
 
-`Rope.Mod`'s `Blit (r, srcStart, dst, dstStart, len)` — copy part of
+`Ropes.Mod`'s `Blit (r, srcStart, dst, dstStart, len)` — copy part of
 a rope into part of an existing `ARRAY OF CHAR` — was, until Phase 15,
-the one `Rope.Mod` operation this mapping never mentioned. Its
+the one `Ropes.Mod` operation this mapping never mentioned. Its
 idiomatic Ada equivalent needs no new operation at all: `Target
 (Target_Low .. Target_Low + (High - Low)) := To_String (Slice (Source,
 Low, High))`, the way `Ada.Strings.Unbounded` (which has no blit either)
@@ -524,12 +528,12 @@ existing string, leaving the rest alone".
 `Slice` takes **inclusive `Low`/`High`**, matching
 `Ada.Strings.Unbounded.Slice` exactly (including its exact signature —
 `Low : Positive`, not `Natural`, confirmed against GNAT's
-`a-strunb.ads`) — not `Rope.Mod`'s `(start, len)` pair. This is a real
+`a-strunb.ads`) — not `Ropes.Mod`'s `(start, len)` pair. This is a real
 shape change, not just a rename; every call site doing `Substring (R,
 Start, Len)` becomes `Slice (R, Start + 1, Start + Len)` (plus the
 0-to-1-based shift), not a find-and-replace.
 
-`Rope.Mod`'s permissive clamping (`Substring`/`Insert`/`Remove` all
+`Ropes.Mod`'s permissive clamping (`Substring`/`Insert`/`Remove` all
 silently clamp an out-of-range `start`/`len`/`pos`) is **not** carried
 over wholesale: `Slice`/`Insert`/`Delete` raise `Ada.Strings.Index_Error`
 on a bad bound, matching `Ada.Strings.Unbounded`'s own behavior for the
@@ -545,8 +549,8 @@ boundary behavior. `[Phase 3, done.]`
 ### Modification (still non-destructive — every operation returns a new `Rope`)
 
 ```ada
-function Insert (Source : Rope; Before : Positive; New_Item : Rope) return Rope;  -- Rope.Mod's Insert
-function Delete (Source : Rope; From, Through : Natural) return Rope;             -- Rope.Mod's Remove
+function Insert (Source : Rope; Before : Positive; New_Item : Rope) return Rope;  -- Ropes.Mod's Insert
+function Delete (Source : Rope; From, Through : Natural) return Rope;             -- Ropes.Mod's Remove
 function Insert (Source : Rope; Before : Positive; New_Item : String) return Rope;       -- Phase 16
 function Overwrite (Source : Rope; Position : Positive; New_Item : String) return Rope; -- Phase 16
 function Replace_Slice (Source : Rope; Low : Positive; High : Natural; By : Rope) return Rope;   -- Phase 17
@@ -569,7 +573,7 @@ function Tail (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Sp
 ```
 
 **[Phase 8, done.]** `Overwrite`/`Head`/`Tail` (which
-`Unbounded_String` also has, and `Rope.Mod` doesn't) were reviewed and
+`Unbounded_String` also has, and `Ropes.Mod` doesn't) were reviewed and
 left out at Phase 7, then added anyway in Phase 8 at explicit user
 request — see "Deferred / stretch" below for the full reasoning on
 both sides of that call. Signatures and semantics are
@@ -598,7 +602,7 @@ function ">=" (Left, Right : Rope) return Boolean;
 ```
 
 Lexicographic, character-by-character, then by length on a common
-prefix — exactly `Rope.Mod`'s `Compare` semantics, just exposed as the
+prefix — exactly `Ropes.Mod`'s `Compare` semantics, just exposed as the
 six standard operators instead of a `-1/0/1` function plus a derived
 `Equal`. No `strcmp`-style three-way function — nothing else in
 `Ada.Strings` exposes one, and nothing here needs it.
@@ -688,10 +692,10 @@ an unmapped one on 2 million characters (`Index`: 0.016 s unmapped,
 since every such parameter is `not null`.
 
 
-Collapses `Rope.Mod`'s four functions (`Find`, `RFind`, `IndexChar`,
+Collapses `Ropes.Mod`'s four functions (`Find`, `RFind`, `IndexChar`,
 `RIndexChar`) into two, reusing `Ada.Strings.Direction` the same way
 `Ada.Strings.Fixed.Index` does. **Returns `0` for "not found", not
-`-1`** — `Ada.Strings.Fixed.Index`'s own convention, not `Rope.Mod`'s.
+`-1`** — `Ada.Strings.Fixed.Index`'s own convention, not `Ropes.Mod`'s.
 **`[Phase 4, done.]`**
 
 **Correction from the sketch above** (caught while verifying against
@@ -718,11 +722,11 @@ unbounded whole source in each direction, confirmed against
 **Empty-pattern decision** (the discrepancy flagged as an open
 question in an earlier draft of this section): `Ropes.Index` raises
 `Ada.Strings.Pattern_Error` for a `Null_Rope` `Pattern`, exactly
-matching real `Ada.Strings.Search.Index` — **not** `Rope.Mod`'s
+matching real `Ada.Strings.Search.Index` — **not** `Ropes.Mod`'s
 `Find`/`RFind`, which instead treat an empty pattern as always
 matching at `from`/`before` (clamped into `[0, Length (r)]`). This
 follows the house rule (`AGENTS.md`) of reusing `Ada.Strings`
-vocabulary and behavior precisely rather than preserving `Rope.Mod`'s
+vocabulary and behavior precisely rather than preserving `Ropes.Mod`'s
 own convention where the two diverge. The `Character` overload has no
 analogous case (a `Character` is never "empty").
 
@@ -831,7 +835,7 @@ at Phase 18's user request, and fixed in `Ropes` at Phase 20:
   `Unbounded.Find_Token`, which GNAT doesn't check at all). A future
   GNAT that fixes its checks changes nothing here.
 
-`Rope.Mod`'s `RFind`'s own bound convention does **not** carry over
+`Ropes.Mod`'s `RFind`'s own bound convention does **not** carry over
 unchanged: `RFind`'s `before` clamps so that a match's *start*
 position is `<= before`; `Ada.Strings.Fixed.Index`'s `Backward`
 requires a match to fit **entirely** within `Source (First .. From)`,
@@ -841,14 +845,14 @@ Length - 1`. These coincide for a length-1 pattern (so `IndexChar`/
 directly, 0-based → 1-based only) but genuinely differ for a longer
 one, so `RFind`'s own multi-character scenarios in `test_index.adb`
 use different `From`/expected values, chosen under the real formula,
-not copied from `Rope.Mod`'s numbers.
+not copied from `Ropes.Mod`'s numbers.
 
 `Contains (Source, Pattern) return Boolean` **[Phase 8, done.]** Added
 as the thin wrapper this section always said it would be — four
 overloads (`Rope`/`Character` pattern, each with/without `From`,
 mirroring `Index`'s own four), always `Going => Forward` (no `Going`
 parameter: "contains" is an existence question, not a search
-direction, and `Rope.Mod`'s own `Contains` — the `Character`/`From`
+direction, and `Ropes.Mod`'s own `Contains` — the `Character`/`From`
 overload's direct model — has no `Going` option either). Genuinely
 thin: the `Rope`-pattern overloads inherit `Index`'s own
 `Ada.Strings.Pattern_Error` on a `Null_Rope` `Pattern` rather than
@@ -867,7 +871,7 @@ function Split
   (Source : Rope; Separator : Ada.Strings.Maps.Character_Set) return Rope_Array;
 ```
 
-Four overloads, one splitting rule shared by all of them (`Rope.Mod`'s
+Four overloads, one splitting rule shared by all of them (`Ropes.Mod`'s
 `Split`/`SplitArray`/`SplitList` rule: maximal runs between
 non-overlapping separator occurrences; leading/trailing/doubled
 separator gives an empty piece — Python `str.split`'s convention):
@@ -877,9 +881,9 @@ separator gives an empty piece — Python `str.split`'s convention):
   is pure ergonomics over the `Rope` one (no `From_String` wrapping
   needed at the call site) and both share one internal substring-search
   implementation. An empty separator (`Null_Rope`, or `""`) never
-  splits — one piece, the whole source — matching `Rope.Mod`'s own
+  splits — one piece, the whole source — matching `Ropes.Mod`'s own
   empty-separator convention.
-- `Separator : Character` — a single-character separator (`Rope.Mod`
+- `Separator : Character` — a single-character separator (`Ropes.Mod`
   has no direct equivalent; this is the natural counterpart to
   `Index`'s `Character` overload above). Always exactly one character
   wide, so there is no empty-separator case to special-case here.
@@ -893,13 +897,13 @@ separator gives an empty piece — Python `str.split`'s convention):
   character-class pattern). `Ada.Strings.Maps.Null_Set` is this
   overload's empty-separator case — never splits, matching the
   `Rope`/`String` overloads' `""` case. This overload has no
-  `Rope.Mod` counterpart either, but fits naturally once `Trim` already
+  `Ropes.Mod` counterpart either, but fits naturally once `Trim` already
   needs `Character_Set` (see below) — a caller splitting on "any of
   these delimiter characters" (e.g. any whitespace) shouldn't have to
   build a set-of-single-char `Split` calls or reach for a regex engine.
 
 Implementation note: all four share one private piece-walking loop
-(`Rope.Mod`'s `NextPiece`/`CountPieces`), parameterized only by "find
+(`Ropes.Mod`'s `NextPiece`/`CountPieces`), parameterized only by "find
 the next separator occurrence at or after position P, and how wide is
 it" — a substring search for the two literal forms, a single-character
 equality test for `Character`, a single-character
@@ -912,7 +916,7 @@ section described a local generic, `Split_Generic`, with `Sep_Width`
 and a formal `Find_Next`, which never existed in `src/`: it was in
 this file from the Phase 4 commit on, but no version of `ropes.adb`
 ever had it): each `Split` overload writes out the two-pass
-count-then-build walk itself (`Rope.Mod`'s `CountPieces` +
+count-then-build walk itself (`Ropes.Mod`'s `CountPieces` +
 `NextPiece`/`SplitArray` shape, kept as two passes rather than a single
 dynamic-array pass — faithful to the source, not a scope change),
 around a nested `Find_Next (From)` that closes over that overload's
@@ -948,8 +952,8 @@ matches again, it's found immediately, producing the empty piece in
 between — this falls out of the walk's own structure, not an extra
 check.
 
-Only the array form is ported in Phase 4 (`Rope.Mod`'s `SplitArray`);
-the push-based early-stopping `Visitor` form (`Split` in `Rope.Mod`)
+Only the array form is ported in Phase 4 (`Ropes.Mod`'s `SplitArray`);
+the push-based early-stopping `Visitor` form (`Split` in `Ropes.Mod`)
 and the hand-rolled linked list form (`SplitList`) are dropped — see
 "Why this is a real port" above for why the list form specifically
 doesn't need porting. A lazy/early-stop iterator form is a plausible
@@ -961,7 +965,7 @@ Boolean)`, one overload per separator kind (four total, matching the
 array form's own four), a real single-pass walk (not the array form's
 own count-then-build two passes) that calls `Process` on each piece
 left to right and stops — without visiting any further piece — the
-first time `Process` returns `False`, translating `Rope.Mod`'s own
+first time `Process` returns `False`, translating `Ropes.Mod`'s own
 `WHILE more & ~last DO more := visit(NextPiece(...)) END` shape
 directly. The linked-list form (`SplitList`) stays dropped; nothing
 changed that would revisit "Why this is a real port"'s reasoning for
@@ -972,7 +976,7 @@ it.
 **[Phase 6, done.]**
 
 ```ada
-Whitespace : constant Ada.Strings.Maps.Character_Set;  -- space, tab, CR, LF, FF -- Rope.Mod's IsSpace set
+Whitespace : constant Ada.Strings.Maps.Character_Set;  -- space, tab, CR, LF, FF -- Ropes.Mod's IsSpace set
 
 function Trim
   (Source : Rope;
@@ -982,7 +986,7 @@ function Trim
 
 Mirrors `Ada.Strings.Fixed.Trim`'s two-`Character_Set` overload
 exactly (not the single-`Trim_End`-plus-blanks-only overload, since
-that one only trims a literal space and `Rope.Mod`'s `IsSpace` covers
+that one only trims a literal space and `Ropes.Mod`'s `IsSpace` covers
 five characters). A caller who wants only-space trimming passes
 `Ada.Strings.Maps.To_Set (' ')` explicitly, same as they would with
 `Ada.Strings.Fixed`.
@@ -1017,16 +1021,16 @@ function Map_Indexed
 function To_Upper (Source : Rope) return Rope;  -- Map (Source, Ada.Characters.Handling.To_Upper'Access)
 function To_Lower (Source : Rope) return Rope;  -- Map (Source, Ada.Characters.Handling.To_Lower'Access)
 
-function Capitalize (Source : Rope) return Rope;    -- Rope.Mod's CapitalizeAscii
-function Uncapitalize (Source : Rope) return Rope;  -- Rope.Mod's UncapitalizeAscii
+function Capitalize (Source : Rope) return Rope;    -- Ropes.Mod's CapitalizeAscii
+function Uncapitalize (Source : Rope) return Rope;  -- Ropes.Mod's UncapitalizeAscii
 ```
 
-`To_Upper`/`To_Lower` (not `Rope.Mod`'s `UppercaseAscii`/
+`To_Upper`/`To_Lower` (not `Ropes.Mod`'s `UppercaseAscii`/
 `LowercaseAscii`) reuse `Ada.Characters.Handling`'s own names, and are
 implemented *as* a `Map` call using `Ada.Characters.Handling.To_Upper`/
 `To_Lower (Character)` as the conversion function — no separate
-hand-rolled `A..Z`/`a..z` range check the way `Rope.Mod`'s
-`UpperChar`/`LowerChar` do it. `Map_Indexed` is `Rope.Mod`'s `Mapi`,
+hand-rolled `A..Z`/`a..z` range check the way `Ropes.Mod`'s
+`UpperChar`/`LowerChar` do it. `Map_Indexed` is `Ropes.Mod`'s `Mapi`,
 renamed for clarity and taking a `Positive` index (1-based, per the
 indexing convention above) instead of `LONGINT`.
 
@@ -1036,13 +1040,13 @@ uppercased/lowercased (ASCII-range only, via
 rope unchanged — are **promoted from an earlier deferred/stretch idea
 to core v1**: both `RopeTest.Mod` and `RopeTool.Mod` exercise
 `CapitalizeAscii`/`UncapitalizeAscii` as ordinary first-class
-operations (not edge cases), so matching `Rope.Mod`'s scope means
+operations (not edge cases), so matching `Ropes.Mod`'s scope means
 keeping them in, just renamed to drop the redundant `Ascii` suffix
 (there's no non-ASCII variant to disambiguate from — same reasoning
 `To_Upper`/`To_Lower` above already apply). No `Ada.Strings` precedent
 to match the name against (neither `Ada.Strings.Fixed` nor
 `Ada.Characters.Handling` has a "capitalize" operation), so these keep
-names close to `Rope.Mod`'s own, just Ada-cased.
+names close to `Ropes.Mod`'s own, just Ada-cased.
 
 **[Phase 22, done.]** `Ada.Strings.Unbounded.Translate`'s two function
 forms, both `Map` underneath (so the result keeps `Source`'s tree
@@ -1091,9 +1095,9 @@ actual `Iterable`-using type on this machine (GNAT's own
 Iterable => (...)` on the type declaration; none use `for ... use`.
 
 Gives `for Ch of Some_Rope loop ... end loop;` directly — the Ada
-replacement for `Rope.Mod`'s heap-allocated `Iterator` object and its
+replacement for `Ropes.Mod`'s heap-allocated `Iterator` object and its
 `Get`/`Incr`/`Decr`/`Goto`/`Move`/`Peek`/`Source` methods.  `Cursor`
-caches the current leaf and its start offset the same way `Rope.Mod`'s
+caches the current leaf and its start offset the same way `Ropes.Mod`'s
 `Iterator` does (`Locate`), giving the same O(1)-amortized/O(log
 n)-on-leaf-crossing behavior — but functionally: `Next` returns a new
 `Cursor` value rather than mutating one in place, matching the
@@ -1121,18 +1125,18 @@ parameter's type.
 
 ### Deferred / stretch (not v1)
 
-- `Overwrite`, `Head`, `Tail` (`Unbounded_String` has them, `Rope.Mod`
+- `Overwrite`, `Head`, `Tail` (`Unbounded_String` has them, `Ropes.Mod`
   doesn't — plausible additions, not required to match scope).
-  **Reviewed at Phase 7 and left out**: `Rope.Mod` has none of the
-  three, so adding them would grow past `Rope.Mod`'s own scope rather
+  **Reviewed at Phase 7 and left out**: `Ropes.Mod` has none of the
+  three, so adding them would grow past `Ropes.Mod`'s own scope rather
   than complete it, and `rope_tool` would have no `RopeTool.Mod`
   command to demonstrate them with either — unlike `"*"`/
-  `From_Unbounded_String`/`Escape`, which either complete `Rope.Mod`'s
-  scope or (for `From_Unbounded_String`) fill a gap `Rope.Mod` can't
+  `From_Unbounded_String`/`Escape`, which either complete `Ropes.Mod`'s
+  scope or (for `From_Unbounded_String`) fill a gap `Ropes.Mod` can't
   have by construction (no unbounded string type in Oberon-2).
   **Revisited and added in Phase 8**, at explicit user request rather
-  than this file's own "match `Rope.Mod`'s scope" instinct — the
-  Phase 7 reasoning above (no `Rope.Mod` counterpart, so no natural
+  than this file's own "match `Ropes.Mod`'s scope" instinct — the
+  Phase 7 reasoning above (no `Ropes.Mod` counterpart, so no natural
   ceiling to stop at) is still accurate, it was simply overridden by a
   direct instruction to add these anyway. Signatures and semantics
   match `Ada.Strings.Unbounded.Overwrite`/`Head`/`Tail` exactly
@@ -1142,7 +1146,7 @@ parameter's type.
   anyway, with no `RopeTool.Mod` command to model them on, the same
   "demonstrate the addition, `RopeTool.Mod` precedent or not" reasoning
   `chars` established back at Phase 5.
-- `Escaped` (`Rope.Mod`'s backslash-escape utility) — kept as an idea,
+- `Escaped` (`Ropes.Mod`'s backslash-escape utility) — kept as an idea,
   not committed to a name yet. Needs a clear doc note that Ada string
   *literals* don't use backslash escapes at all (quote-doubling is the
   only escape Ada source syntax has), so this would be a debug/display
@@ -1158,7 +1162,7 @@ parameter's type.
   this package.
 - A lazy/early-stopping `Split` iterator (see "Splitting" above).
   **[Phase 8, done]**: the Process-callback `Split` overloads restore
-  `Rope.Mod`'s own dropped `Visitor` form — see "Splitting" above.
+  `Ropes.Mod`'s own dropped `Visitor` form — see "Splitting" above.
 - Wider-than-`Natural` length type for ropes over ~2×10⁹ characters
   (see the open question below).
 
@@ -1182,7 +1186,7 @@ parameter's type.
 - **Phase 0 (this):** `AGENTS.md` + `PLAN.md`. Done by this task.
 - **Phase 1 [done]:** `Rope`/`Node`/`Rope_Ref` skeleton, refcounting
   (`Adjust`/`Finalize`), `Null_Rope`, `Length`, `Is_Empty`, plain `"&"`
-  (short-leaf merge only — `Rope.Mod`'s `SimpleCat`; no depth check/
+  (short-leaf merge only — `Ropes.Mod`'s `SimpleCat`; no depth check/
   rebalance yet), `From_String`/`To_String`, `Element (Rope,
   Positive)`. Implemented in `src/ropes.ads`/`.adb`;
   `test/test_construction.adb` (19 checks, translated from
@@ -1197,10 +1201,10 @@ parameter's type.
 - **Phase 2 [done]:** `Max_Depth`/`Min_Length` elaboration-time
   computation (`Compute_Max_Depth`/`Compute_Min_Length`, growing the
   Fibonacci-like sequence until the next term would exceed
-  `Natural'Last` — 44 on a 32-bit `Natural`, matching `Rope.Mod`'s
+  `Natural'Last` — 44 on a 32-bit `Natural`, matching `Ropes.Mod`'s
   hardcoded value), `"&"`'s depth check, `Balance` (`Balance_Insert`/
   `Balance_Walk`/`Concat_Forest`, the Fibonacci-forest algorithm,
-  ported directly from `Rope.Mod`'s `BalanceInsert`/`BalanceWalk`/
+  ported directly from `Ropes.Mod`'s `BalanceInsert`/`BalanceWalk`/
   `ConcatForest` with explicit `Incr_Ref`/`Decr_Ref` bookkeeping in
   place of what GC handles implicitly there). `Balance`/`Min_Length`/
   `Max_Depth` stay internal to `ropes.adb` — not exposed publicly, per
@@ -1223,11 +1227,11 @@ parameter's type.
   operators. Implementation shares two new internal helpers with each
   other and with `Element`: `Fetch` (extracted from `Element`'s
   former nested function, now also used by `Compare`) and
-  `Node_Slice` (Rope.Mod's `SubstrHelper`, 0-based internally, with a
+  `Node_Slice` (Ropes.Mod's `SubstrHelper`, 0-based internally, with a
   whole-node sharing shortcut extended to leaves too — a strict
-  improvement over `Rope.Mod`, which only takes that shortcut for a
+  improvement over `Ropes.Mod`, which only takes that shortcut for a
   `Concat`). `Insert`/`Delete` are themselves both implemented as one-
-  or two-line compositions of `Slice` and `"&"` (matching `Rope.Mod`'s
+  or two-line compositions of `Slice` and `"&"` (matching `Ropes.Mod`'s
   own `Insert`/`Remove`, which are `Substring` + `Cat` compositions),
   not hand-rolled tree surgery. `Delete`'s `Through`-past-the-end
   clamp and `Slice`'s `High`-past-the-end `Index_Error` are
@@ -1238,7 +1242,7 @@ parameter's type.
   `test_compare.adb` (13) — 38 checks total, translated from
   `RopeTest.Mod`'s `CheckSubstring`/`CheckInsert`/`CheckRemove`/the
   `Compare`/`Equal` half of `CheckCompareFindRepeat` — all pass,
-  valgrind-clean. Several `Rope.Mod` clamp-cases had no direct
+  valgrind-clean. Several `Ropes.Mod` clamp-cases had no direct
   translation at all (a negative `Low`/`Before`/`From`), since those
   parameters are `Positive` — not a differently-handled case, just not
   a representable call; each test file's header comment says so.
@@ -1252,9 +1256,9 @@ parameter's type.
   around its own `Find_Next` — see "Splitting" above; this entry said
   "via a local generic `Split_Generic`" until Phase 21, which never
   existed). Both `Index`'s
-  empty-pattern behavior (`Ada.Strings.Pattern_Error`, not `Rope.Mod`'s
+  empty-pattern behavior (`Ada.Strings.Pattern_Error`, not `Ropes.Mod`'s
   clamp-and-match) and its `Backward` bound convention (a match must
-  fit entirely within `Source (1 .. From)`, not `Rope.Mod`'s `RFind`
+  fit entirely within `Source (1 .. From)`, not `Ropes.Mod`'s `RFind`
   looser "start `<= before`") were resolved by reading GNAT's actual
   `a-strsea.adb` rather than assumed — same discipline as Phase 3's
   `Slice`/`Insert`/`Delete` verification against `a-strunb.ads`/`.adb`.
@@ -1262,13 +1266,13 @@ parameter's type.
   `CheckCompareFindRepeat`'s `Find` cases and `CheckIndexCharAndRFind`,
   plus new checks locking in the empty-Source/empty-Pattern check
   ordering and the `Forward`-never-raises/`Backward`-raises-past-the-
-  end asymmetry — none of which `Rope.Mod` had reason to test, since
+  end asymmetry — none of which `Ropes.Mod` had reason to test, since
   its own `Find`/`RFind` don't have these behaviors) and
   `test/test_split.adb` (15 checks, translated from `RopeTest.Mod`'s
   `CheckSplit`, minus its visitor-early-stop and `SplitList` cases,
   which don't translate — no visitor/list API exists here) — 40 checks
   total, all pass, valgrind-clean across every test binary (0 errors,
-  0 definite/indirect leaks). `Rope.Mod`'s `Contains` has no `Ropes`
+  0 definite/indirect leaks). `Ropes.Mod`'s `Contains` has no `Ropes`
   counterpart yet (see "Search" above — still optional/undecided).
   `examples/rope_tool` gained `index`/`rindex` (`Rope` pattern, the
   `Going => Forward`/`Backward` split into two commands since
@@ -1283,10 +1287,10 @@ parameter's type.
   `RopeTool.Mod`'s own `split` description) in this phase.
 - **Phase 5 [done]:** `Cursor` + `Iterable` aspect. `Cursor` is a plain
   (non-tagged, non-`Controlled`) private record — `Pos`, plus a cached
-  `Leaf`/`Leaf_Start` (`Rope.Mod`'s `Iterator.Locate`, ported
+  `Leaf`/`Leaf_Start` (`Ropes.Mod`'s `Iterator.Locate`, ported
   functionally: `First`/`Next` each *produce* a `Cursor` whose cache
   already covers its own `Pos`, rather than mutating a heap object in
-  place the way `Rope.Mod`'s `Iterator.Get`/`Incr`/`Decr` do). The
+  place the way `Ropes.Mod`'s `Iterator.Get`/`Incr`/`Decr` do). The
   `Iterable` aspect itself had to be given as `with Iterable => (...)`
   directly on `type Rope is private`, not as a separate `for Rope use
   Iterable => (...)` clause the way `PLAN.md`'s original sketch showed
@@ -1302,7 +1306,7 @@ parameter's type.
   (`Locate_Leaf`, O(log n)) when the new position has left the old
   `Cursor`'s cached leaf, otherwise it's O(1) — `Element` and
   `Has_Element` never call `Locate_Leaf` at all, just read the
-  already-valid cache. `Rope.Mod`'s arbitrary-position `Peek`/`Goto`/
+  already-valid cache. `Ropes.Mod`'s arbitrary-position `Peek`/`Goto`/
   `Move`/`Decr`/`Source` have no counterpart — the `Iterable` aspect's
   scope is forward-only `First`/`Next`/`Has_Element`/`Element`, so
   there is nothing to port them to; `test/test_iterator.adb`'s header
@@ -1342,12 +1346,12 @@ parameter's type.
   owned children, build the result with `New_Concat` — **directly**,
   not `New_Simple_Cat` — then `Decr_Ref` both children. `New_Concat`
   rather than `New_Simple_Cat` is load-bearing, not a style choice:
-  `RopeTest.Mod`'s `CheckMap` asserts `Rope.Depth(mapped) = Rope.Depth(r)`,
+  `RopeTest.Mod`'s `CheckMap` asserts `Ropes.Depth(mapped) = Ropes.Depth(r)`,
   i.e. `Map` must preserve the source's exact tree shape, and
   `New_Simple_Cat`'s short-leaf merge would perturb it. `Map.Mod`'s
   `MapHelper`/`MapiHelper` confirm this by also calling `NewConcat`
   directly. `Map_Indexed` threads a `Next_Index : in out Positive`
-  parameter through the recursion in place of `Rope.Mod`'s `Mapi`'s `VAR
+  parameter through the recursion in place of `Ropes.Mod`'s `Mapi`'s `VAR
   idx: LONGINT` — this relies on Ada's guaranteed left-to-right
   sequential elaboration of a `declare` block's object declarations
   (`Left := Map_Indexed_Node (N.Left, ...)` must be fully elaborated,
@@ -1358,7 +1362,7 @@ parameter's type.
   across a Concat node" check exercises this against a genuine two-leaf
   rope. `To_Upper`/`To_Lower` are one-line wrappers around `Map`,
   reusing `Ada.Characters.Handling.To_Upper`/`To_Lower (Character)`
-  directly via `'Access` rather than hand-rolling `Rope.Mod`'s
+  directly via `'Access` rather than hand-rolling `Ropes.Mod`'s
   `UpperChar`/`LowerChar` ASCII-range checks. `Capitalize`/
   `Uncapitalize` are not built on `Map` (mapping every character would
   waste work past the first) but as `From_String` of the converted
@@ -1366,7 +1370,7 @@ parameter's type.
   `Length (Source) = 1`, that slice is `Slice (Source, 2, 1)`, `High <
   Low`, already-verified-in-Phase-3 `Null_Rope`, not an error, so no
   extra boundary case is needed (locked in by `test_case.adb`'s two
-  one-character-rope checks). `Trim` collapses `Rope.Mod`'s three
+  one-character-rope checks). `Trim` collapses `Ropes.Mod`'s three
   separate `TrimLeft`/`TrimRight`/`Trim` into the one function the
   design sketch below specifies, verified against real GNAT source
   (`a-strfix.adb`, not assumed) and proven equivalent to it — see the
@@ -1375,7 +1379,7 @@ parameter's type.
   `test_case.adb` (8 checks, from `CheckAsciiCase`, plus the two
   one-character-rope boundary checks above), `test_trim.adb` (7 checks,
   from `CheckTrim`, plus one non-whitespace-`Character_Set` check that
-  `Rope.Mod`'s always-`IsSpace` `TrimLeft`/`TrimRight`/`Trim` can't
+  `Ropes.Mod`'s always-`IsSpace` `TrimLeft`/`TrimRight`/`Trim` can't
   express at all) — 19 new checks, 133 total, all pass, all valgrind-clean
   (`Map`/`Map_Indexed` are the only new node-constructing code this
   phase; `Trim`/`To_Upper`/`To_Lower`/`Capitalize`/`Uncapitalize` build
@@ -1391,41 +1395,41 @@ parameter's type.
 - **Phase 7 (stretch), done.** Rounded out the remaining "Construction
   and concatenation" design sketch (never assigned to an earlier
   phase's actual scope) plus one genuinely-worth-adding "Deferred /
-  stretch" item, closing out the rest of `Rope.Mod`'s own scope:
+  stretch" item, closing out the rest of `Ropes.Mod`'s own scope:
   `"&" (Rope, Character)`/`(Character, Rope)`/`(Rope, String)`/`(String,
   Rope)`, `From_Character`, `From_Unbounded_String`/
   `To_Unbounded_String`, `"*" (Natural, Character)`/`(Natural, Rope)`,
   and `Escape`. **`"*"` is a real find, not in the original sketch**:
   `Ada.Strings.Fixed` already has `"*" (Natural, Character)`/`"*"
-  (Natural, String)` operators doing exactly what `Rope.Mod`'s
+  (Natural, String)` operators doing exactly what `Ropes.Mod`'s
   `Make`/`Repeat` do for `String`, discovered only at Phase 7
   implementation time (PLAN.md's original "Construction and
   concatenation" sketch had named these `Repeat`/`Make` after
-  `Rope.Mod`'s own names, before this match was found) — reusing that
+  `Ropes.Mod`'s own names, before this match was found) — reusing that
   vocabulary instead of inventing separate names is exactly AGENTS.md's
   "Reuse `Ada.Strings` vocabulary" convention already applied to
   `Index`/`Slice`/`Trim` in earlier phases. The `Rope` overload is
-  `Rope.Mod`'s `Repeat`: `O(log Left)` by binary doubling (`Piece :=
+  `Ropes.Mod`'s `Repeat`: `O(log Left)` by binary doubling (`Piece :=
   Piece & Piece`), sharing subtrees rather than copying characters, so
   even `Left` in the billions stays cheap; the `Character` overload is
-  `Rope.Mod`'s `Make`, implemented as `Left * From_Character (Right)`.
-  `Escape` is `Rope.Mod`'s `Escaped`, renamed at implementation time
+  `Ropes.Mod`'s `Make`, implemented as `Left * From_Character (Right)`.
+  `Escape` is `Ropes.Mod`'s `Escaped`, renamed at implementation time
   (once its return type was confirmed to be `Rope`, not `String`) away
   from the `To_Display_String` name floated in "Deferred / stretch"
   below, since a `To_..._String` shape would misleadingly suggest a
   `String` result — `Escape` reads as a verb matching
   `Trim`/`Capitalize`'s own naming instead. `Overwrite`/`Head`/`Tail`
   (the other "Deferred / stretch" candidates) were **not** added:
-  `Rope.Mod` has no counterpart for any of the three, so adding them
-  would grow past `Rope.Mod`'s own scope rather than complete it — see
-  this file's "port `Rope.Mod`'s scope, not a bigger feature set"
+  `Ropes.Mod` has no counterpart for any of the three, so adding them
+  would grow past `Ropes.Mod`'s own scope rather than complete it — see
+  this file's "port `Ropes.Mod`'s scope, not a bigger feature set"
   framing at the top — and `rope_tool` would have nothing to
   demonstrate them with either (no `RopeTool.Mod` command for any of
   the three). New tests: `test_concat_overloads.adb` (12 checks, no
   direct `RopeTest.Mod` precedent — Oberon-2 has no operator
   overloading — except `From_Character`'s own content/length check,
   from `CheckFromCharAndMake`), `test_unbounded.adb` (4 checks, no
-  `Rope.Mod` precedent at all), `test_repeat.adb` (8 checks, from
+  `Ropes.Mod` precedent at all), `test_repeat.adb` (8 checks, from
   `CheckCompareFindRepeat`'s `Repeat` scenarios, `CheckFromCharAndMake`'s
   `Make` scenarios, and `CheckOverflowGuard` — its `MAX(LONGINT)`
   boundary translates to `Natural'Last`; the boundary check builds a
@@ -1444,10 +1448,10 @@ parameter's type.
   every "API surface not added" item this file's "Deferred / stretch"
   section had on file, plus build the black-box `rope_tool` test suite
   that section also flagged as never committed to a phase — both
-  deliberately expanding past `Rope.Mod`'s own scope rather than
+  deliberately expanding past `Ropes.Mod`'s own scope rather than
   completing it, unlike every phase before this one. `Overwrite`/
   `Head`/`Tail` (Phase 7 reviewed and left these out for lack of a
-  `Rope.Mod` counterpart — see Phase 7's entry above — and that
+  `Ropes.Mod` counterpart — see Phase 7's entry above — and that
   reasoning still stands as a fact about scope; the user simply chose
   to override it) are `Ada.Strings.Unbounded.Overwrite`/`Head`/`Tail`'s
   own signatures and semantics, verified against GNAT's `a-strunb.ads`
@@ -1457,7 +1461,7 @@ parameter's type.
   pattern) is a thin wrapper over `Index (...) /= 0` — see "Search"
   above. The Process-callback `Split` overloads (`Rope`/`String`/
   `Character`/`Character_Set` separators, matching the array-returning
-  overloads' own separator kinds) restore `Rope.Mod`'s own dropped
+  overloads' own separator kinds) restore `Ropes.Mod`'s own dropped
   `Visitor`-based `Split`, translated as `procedure Split (Source,
   Separator, Process : not null access function (Piece : Rope) return
   Boolean)` — a true single-pass walk with no separate counting pass,
@@ -1493,7 +1497,7 @@ parameter's type.
   touched already-shipped Phase 7 code rather than adding new surface.
 
   The tooling item — a black-box `rope_tool` test suite built from
-  `~/Repos/Oberon/oberon-tools/tests/rope-*.test` — is
+  `~/Repos/Oberon/Ropes/tests/rope-*.test` — is
   `examples/tests/run-tests.sh` (a direct port of that repo's own
   `tests/run-tests.sh`; the harness itself needed no changes at all,
   being already generic over `program`/`bindir`) plus 38
@@ -1510,12 +1514,12 @@ parameter's type.
 
 - **Phase 9, done — not an `Ada`-side change.** Phase 8's own scope
   expansion (`Overwrite`/`Head`/`Tail`, `Contains`) fed back into
-  `~/Repos/Oberon/oberon-tools/Rope.Mod`, the model this whole port is
+  `~/Repos/Oberon/Ropes/Ropes.Mod`, the model this whole port is
   based on: at explicit user request, `Overwrite`, `Head`/`Tail`, and
   a `Contains` extended to a string/rope pattern (`ContainsPattern`,
   named separately since Oberon-2 has no overloading to distinguish it
   from the existing char-based `Contains`) were added there too,
-  translated back into `Rope.Mod`'s own clamp-not-trap conventions
+  translated back into `Ropes.Mod`'s own clamp-not-trap conventions
   rather than copied verbatim from `Ropes`'s Ada.Strings-flavored
   exception behavior — the same "translate the scenario, not the
   assertion" discipline this file's own "Sources being ported" section
@@ -1524,7 +1528,7 @@ parameter's type.
   operator overloads and `From_Unbounded_String`/`To_Unbounded_String`
   have no Oberon-2 counterpart (no operator overloading, no unbounded
   string type), and the Process-callback `Split` Phase 8 added to
-  `Ropes` was itself restoring `Rope.Mod`'s own pre-existing `Split`
+  `Ropes` was itself restoring `Ropes.Mod`'s own pre-existing `Split`
   visitor, so there was nothing new to send back for that one.
   `RopeTest.Mod` gained `CheckOverwrite`/`CheckHeadTail`/
   `CheckContainsPattern` (134 → 164 checks); `RopeTool.Mod` gained
@@ -1541,7 +1545,7 @@ parameter's type.
   comment: it said `chars` was "the one rope_tool command with no
   RopeTool.Mod counterpart (it has no iterator-related subcommand at
   all)" — true of `RopeTool.Mod` specifically, but easily misread as
-  "`Rope.Mod` has nothing iterator-related", which is false. `Rope.Mod`
+  "`Ropes.Mod` has nothing iterator-related", which is false. `Ropes.Mod`
   has *two* character-level iteration APIs — `Iterate` (a push-based
   `Visitor` callback with early-stop support) and the `Iterator` type
   (a stateful `Get`/`Incr`/`Decr`/`Goto`/`Move`/`Peek`/`Source`
@@ -1549,13 +1553,13 @@ parameter's type.
   subcommand demonstrating either one. Two fixes, at explicit user
   request: (1) the comment itself, corrected to state this precisely
   rather than leave the ambiguous reading in place; (2) `RopeTool.Mod`
-  gained `iterate` (via `Rope.Iterate`) and `iterator` (via
-  `Rope.NewIterator`/`Get`/`Incr`) subcommands, each printing a rope's
+  gained `iterate` (via `Ropes.Iterate`) and `iterator` (via
+  `Ropes.NewIterator`/`Get`/`Incr`) subcommands, each printing a rope's
   characters one per line — the same output `chars` produces here,
-  demonstrating `Rope.Mod`'s two *separate* iteration APIs as two
+  demonstrating `Ropes.Mod`'s two *separate* iteration APIs as two
   separate commands rather than picking one to stand in for both.
   Fixing this also surfaced a real, previously-unnoticed test gap:
-  `Rope.Iterate` had zero coverage in `RopeTest.Mod` (only the
+  `Ropes.Iterate` had zero coverage in `RopeTest.Mod` (only the
   `Iterator` type was checked, via `CheckIterator`) — closed with a new
   `CheckIterate` (3 checks: visits every character in order, stops
   early when the visitor returns `FALSE`, and `NIL` visits nothing),
@@ -1572,7 +1576,7 @@ parameter's type.
 - **Phase 11 (stretch), done — `Process_Chunks`, `Ropes.Text_IO`, a
   linear `Compare`, and `rope_tool lines`.**
   At explicit user request, the same kind of scope expansion as Phase
-  8: `Rope.Mod` has no output operations (only `ToString`/`Blit`), so
+  8: `Ropes.Mod` has no output operations (only `ToString`/`Blit`), so
   there is no counterpart to port. Motivated by a real failure, not
   just convenience — `To_String` builds a stack-allocated `String (1 ..
   Length)` and copies it again to return it, so `Put_Line (To_String
@@ -1588,7 +1592,7 @@ parameter's type.
   flattening it. Shaped like `Ada.Containers`' `Iterate`/
   `Query_Element` (access-to-procedure, no early stop — raise and
   handle an exception to stop, same as with those), rather than
-  `Split`'s Boolean-returning `Process`, which mirrors `Rope.Mod`'s own
+  `Split`'s Boolean-returning `Process`, which mirrors `Ropes.Mod`'s own
   visitor. Never called for `Null_Rope`, never with an empty chunk; the
   chunking itself is unspecified (it depends on how the rope was
   built). It pins `Source` with its own reference for the whole walk:
@@ -1672,12 +1676,12 @@ parameter's type.
   expected output, so that case lives in `test_text_io.adb`.
 
 - **Phase 12, done — not an `Ada`-side change.** Phase 11's
-  additions fed back into `~/Repos/Oberon/oberon-tools/Rope.Mod`, at
+  additions fed back into `~/Repos/Oberon/Ropes/Ropes.Mod`, at
   explicit user request, the same way Phase 9 fed back Phase 8's — and,
-  like Phase 9, translated into `Rope.Mod`'s own conventions rather
+  like Phase 9, translated into `Ropes.Mod`'s own conventions rather
   than copied. `IterateChunks (r, visit)` is `Process_Chunks`, but with
   a Boolean-returning `ChunkVisitor = PROCEDURE (VAR chunk: ARRAY OF
-  CHAR): BOOLEAN` for early stop, matching `Rope.Mod`'s existing
+  CHAR): BOOLEAN` for early stop, matching `Ropes.Mod`'s existing
   `Visitor`/`Visitor2` rather than `Ada.Containers`' no-early-stop
   shape; `chunk` is `VAR` only to avoid copying the leaf, documented
   as must-not-modify. `Write (r)` (standard output) and `WriteRider
@@ -1706,7 +1710,7 @@ parameter's type.
   `ToString` into an `ArgParser.MaxStringLength` (4095) buffer, so
   `RopeTool make 5000 x` printed only 4095 `x`s — Oberon's fixed
   buffers truncated silently where Ada's stack copy overflowed loudly.
-  All 18 print sites now use `Rope.Write`; a new
+  All 18 print sites now use `Ropes.Write`; a new
   `tests/rope-make-long.test` fails against the pre-Phase-12 build.
 
   `RopeTool.Mod` gained `lines FILE` (standard input for `-`; the
@@ -1725,7 +1729,7 @@ parameter's type.
   as `eb449c2`. Here, only `examples/tests/run-tests.sh`'s header
   comment changed (it said the original harness "has no way to feed a
   program standard input", no longer true). Not carried back:
-  `Rope.Mod`'s `Blit` and `Escaped` still `Fetch` per character
+  `Ropes.Mod`'s `Blit` and `Escaped` still `Fetch` per character
   (O(n log n)) — neither exists in the Ada port in that form, so there
   was nothing to port — and `RopeTool` has no subcommand for
   `WriteRider`, which only `RopeTest` covers. **[Phase 14, done]**:
@@ -1733,7 +1737,7 @@ parameter's type.
   `Escape` — see Phase 14 below.
 
 - **Phase 13 (stretch), done — whole-file I/O, in both `Ropes` and
-  `Rope.Mod`.** At explicit user request. Motivation: loading a whole
+  `Ropes.Mod`.** At explicit user request. Motivation: loading a whole
   document is ropes' central use, and the only way to do it before was
   a `Get_Line` loop re-adding `"\n"` after each line, which can't
   reproduce a file exactly — it can't tell whether the last line had a
@@ -1780,7 +1784,7 @@ parameter's type.
   from the escape rules; `rope-help.test`/`rope-unknown-command.test`
   regenerated. `44 ok, 0 failed`.
 
-  *`Rope.Mod`* (`~/Repos/Oberon/oberon-tools`): `ReadAll (VAR rd:
+  *`Ropes.Mod`* (`~/Repos/Oberon/oberon-tools`): `ReadAll (VAR rd:
   Files.Rider): Rope` (rider position to end, via `Files.ReadBytes` in
   4096-byte chunks — `rd.res` is the count *not* read),
   `ReadFile (name; VAR r): BOOLEAN` (FALSE, with NIL, if `Files.Old`
@@ -1797,7 +1801,7 @@ parameter's type.
   failed`; committed and pushed there as `d4b154b`.
 
 - **Phase 14, done — not an `Ada`-side change.** At explicit user
-  request, `~/Repos/Oberon/oberon-tools/Rope.Mod`'s two remaining
+  request, `~/Repos/Oberon/Ropes/Ropes.Mod`'s two remaining
   per-character-`Fetch` operations, left alone at Phase 12 because
   neither had an Ada counterpart in that form to port, were made
   linear, and `Escaped` was renamed `Escape` — a verb, like every other
@@ -1820,10 +1824,10 @@ parameter's type.
   mid-escape and output well past the buffer. `oberon-tools`' suite
   `305 ok, 0 failed`; committed and pushed there as `a41f0a7`. Here,
   only `ropes.ads`'s `Escape` comment changed (it described
-  `Rope.Mod`'s name as `Escaped`, and printing via its since-removed
+  `Ropes.Mod`'s name as `Escaped`, and printing via its since-removed
   `PrintRope`).
 
-- **Phase 15, done — `Copy_Slice`, `Rope.Mod`'s `Blit`.** At explicit
+- **Phase 15, done — `Copy_Slice`, `Ropes.Mod`'s `Blit`.** At explicit
   user request, after the user asked what `Ropes`'s equivalent of
   `Blit` was and the answer turned out to be "none, and `PLAN.md`'s
   mapping doesn't say" — see "Access and slicing" above for why the
@@ -1840,7 +1844,7 @@ parameter's type.
   Target'Last - Target_Low`, not `Target_Low + (High - Low) >
   Target'Last`, so that a `Target_Low` near `Positive'Last` can't
   overflow the check itself. Implemented by `Node_Copy`, `Node_Slice`'s
-  shape without building any nodes: O(len + depth), `Rope.Mod`'s
+  shape without building any nodes: O(len + depth), `Ropes.Mod`'s
   `BlitHelper` (Phase 14) translated.
 
   `test_copy_slice.adb` (11 checks): into the middle of `Target`, into
@@ -1864,7 +1868,7 @@ parameter's type.
   `Ada.Strings.Unbounded` has for `Index` (`Pattern`), `Insert`/
   `Overwrite` (`New_Item`), and the five comparison operators (mixed
   `(Rope, String)` and `(String, Rope)`, ten functions), and then
-  `Contains` (`Pattern : String`). No `Rope.Mod`
+  `Contains` (`Pattern : String`). No `Ropes.Mod`
   counterpart — Oberon-2 has no overloading. `Index`/`Insert`/
   `Overwrite` are `From_String` wrappers over the `Rope` overloads, so
   every boundary rule carries over unchanged (`""` raises
@@ -1897,7 +1901,7 @@ parameter's type.
 
 - **Phase 17, done — `Replace_Slice`, `Index` with a `Character_Set`,
   `Count`.** At explicit user request, the next three from the same
-  list of `Ada.Strings.Fixed`/`Unbounded` gaps. No `Rope.Mod`
+  list of `Ada.Strings.Fixed`/`Unbounded` gaps. No `Ropes.Mod`
   counterpart for any of them. Signatures and semantics are
   `Ada.Strings.Unbounded`'s, checked against the RM (A.4.3, which A.4.5
   defers to) and GNAT's `a-strunb.adb`/`a-strsea.adb`:
@@ -1907,7 +1911,7 @@ parameter's type.
     `High` past the end clamped; for `High < Low`, `Insert (Source,
     Low, By)`. A composition of `Slice`/`"&"`/`Insert`, so O(log n)
     new nodes plus `By`.
-  - `Index (Source, Set, [From,] Test, Going)`: `Rope.Mod` has nothing
+  - `Index (Source, Set, [From,] Test, Going)`: `Ropes.Mod` has nothing
     set-based. The `From` rules are the existing `Index` overloads'
     ones, i.e. GNAT's rather than the RM's literal wording (the RM says
     `Index_Error` for any `From` outside `Source'Range`; GNAT, and
@@ -1993,7 +1997,7 @@ parameter's type.
 
 - **Phase 19, done — `Index_Non_Blank` and `Find_Token`.** At explicit
   user request, the last two search operations from the
-  `Ada.Strings.Fixed`/`Unbounded` gap list; no `Rope.Mod` counterpart.
+  `Ada.Strings.Fixed`/`Unbounded` gap list; no `Ropes.Mod` counterpart.
   `Index_Non_Blank (Source, [From,] Going)` is what the RM defines it
   as, `Index (Source, To_Set (Space), [From,] Outside, Going)`, so it
   inherits `Index`'s `From` rule and Phase 18's leaf walk; only a
@@ -2090,7 +2094,7 @@ parameter's type.
   `Ada.Strings.Unbounded.Translate`'s two function forms, `function
   Translate (Source : Rope; Mapping : Ada.Strings.Maps.
   Character_Mapping) return Rope` and the same with `Mapping :
-  Ada.Strings.Maps.Character_Mapping_Function`. No `Rope.Mod`
+  Ada.Strings.Maps.Character_Mapping_Function`. No `Ropes.Mod`
   counterpart (it has `Map`, but nothing table-driven). It is `Map`
   with a nested `Convert` returning `Ada.Strings.Maps.Value (Mapping,
   Ch)` — `Map` accepts a local function's `'Access` since its
@@ -2189,10 +2193,10 @@ parameter's type.
   `rope-help.test`/`rope-unknown-command.test` regenerated each phase:
   `81 ok, 0 failed`. `make test`: 407 + 81 = 488 ok, 0 failed.
 
-- **Phase 26, done — Phases 16–25 fed back into `Rope.Mod`**, like
+- **Phase 26, done — Phases 16–25 fed back into `Ropes.Mod`**, like
   Phases 9 and 12. At explicit user request. Everything is in
   `~/Repos/Oberon/oberon-tools`; nothing under `src/`/`test/`/
-  `examples/` changed. Each addition was translated into `Rope.Mod`'s
+  `examples/` changed. Each addition was translated into `Ropes.Mod`'s
   conventions (0-based, clamping rather than exceptions, -1 for "not
   found", procedure types rather than generics):
   - Phase 16: `CompareString`/`EqualString`
@@ -2210,12 +2214,12 @@ parameter's type.
     computed without overflow, giving GNAT's `Ada.Strings.Hash` values
     (`RopeTool hash "Hello, World"` prints 3446766348, as `rope_tool
     hash` does here); `CompareNoCase`/`EqualNoCase`, folding ASCII
-    only, like the rest of `Rope.Mod`
+    only, like the rest of `Ropes.Mod`
   - Phase 25: `FindMapped`/`RFindMapped`/`CountMapped` with a `Mapper`
     (NIL means unmapped), and `UpperChar`/`LowerChar` exported for them
 
   Not ported: Phase 20, which was about Ada's exceptions, while
-  `Rope.Mod` clamps; `String` wrappers of `Insert`/`Overwrite`/
+  `Ropes.Mod` clamps; `String` wrappers of `Insert`/`Overwrite`/
   `Repeat`, since `FromString(s)` is the Oberon idiom and a wrapper
   would save only that call; a `Mapping`-table search, since a table
   can't be passed as a `Mapper`, which has no closure; and a mapped
@@ -2256,7 +2260,7 @@ Everything in "Deferred / stretch" above is now done — Phase 7 closed
 out the rest of "Construction and concatenation" plus `Escape`, and
 Phase 8 added `Overwrite`/`Head`/`Tail`, `Contains`, and the
 Process-callback `Split`. (Phase 9, below, doesn't change anything
-here — it fed Phase 8's additions back into `Rope.Mod`, not into
+here — it fed Phase 8's additions back into `Ropes.Mod`, not into
 `Ropes` itself, so this list is still current as of Phase 8, the last
 phase that touched this repo's own scope — until Phase 11, which added
 `Process_Chunks`/`Ropes.Text_IO`, and made `Compare` linear.) What's left, gathered in
@@ -2264,11 +2268,11 @@ one place for whichever future phase picks it up, rather than left
 scattered across "What's explicitly out of scope (v1)" and "Open
 questions" above:
 
-- **Cord/paper features never in `Rope.Mod`'s own scope to begin
+- **Cord/paper features never in `Ropes.Mod`'s own scope to begin
   with** (see "What's explicitly out of scope (v1)" above — this plan
   has never targeted them, not even as a stretch item): lazy/
   function-generator leaves (cord's `CORD_from_fn`), lazy substring
-  nodes (`Slice` always copies here, matching `Rope.Mod`'s own
+  nodes (`Slice` always copies here, matching `Ropes.Mod`'s own
   `Substring`), file-backed ropes (`CORD_from_file`/`_lazy`; `_eager`,
   which isn't file-backed, has an equivalent since Phase 13),
   `CORD_printf`-style formatting. `PLAN.md` suggests a separate
@@ -2307,7 +2311,7 @@ the `alibfyaml`/`besm2_fmt`/`ova_fmt` family) pulls one in either, and a
 library this size doesn't need the extra machinery.
 
 **Source the actual test cases from `RopeTest.Mod` and
-`~/Repos/Oberon/oberon-tools/tests/rope-*.test`** (see "Sources being
+`~/Repos/Oberon/Ropes/tests/rope-*.test`** (see "Sources being
 ported" above) — they already enumerate the edge cases per operation
 (`NIL`/empty operands, negative and past-the-end positions, the
 short-leaf-merge and absorb-into-concat depth cases in `CheckCat`, the
@@ -2321,7 +2325,7 @@ to the end"`, `"Remove clamps a negative len to 0"`, and their
 `.test`-fixture counterparts) becomes a case asserting
 `Ada.Strings.Index_Error` is raised instead, per "Indexing and length
 conventions" and "Access and slicing" above; a case phrased around
-`Rope.Mod`'s 0-based indices or `(start, len)` `Substring` needs its
+`Ropes.Mod`'s 0-based indices or `(start, len)` `Substring` needs its
 numbers reworked for 1-based `Slice (Low, High)`, not just copied.
 Content-only checks (`Cat` merging/depth behavior, `Map`/`Mapi`
 threading, `Trim`, `Compare` ordering, `Split`'s piece-count and
@@ -2334,16 +2338,16 @@ ownership bugs there passed their own tests while quietly reading
 freed memory, and the exact same class of bug (a refcount decremented
 wrong, a child node freed while still referenced from elsewhere) is
 possible here for the same underlying reason: manual reference
-counting has no compiler backstop the way GC-backed `Rope.Mod`/cord
+counting has no compiler backstop the way GC-backed `Ropes.Mod`/cord
 do.
 
 **Black-box `rope_tool` testing, `examples/tests/`. [Phase 8, done.]**
 Everything above is `Ropes`-the-library, exercised in-process; this is
 `rope_tool`-the-CLI, exercised as a subprocess, from
 `examples/tests/run-tests.sh` (a direct, unmodified-harness port of
-`~/Repos/Oberon/oberon-tools/tests/run-tests.sh`) against fixtures at
+`~/Repos/Oberon/Ropes/tests/run-tests.sh`) against fixtures at
 `examples/tests/*.test`, one `program`/`arg`/`status`/`output` file per
-scenario. Sourced from `~/Repos/Oberon/oberon-tools/tests/rope-*.test`
+scenario. Sourced from `~/Repos/Oberon/Ropes/tests/rope-*.test`
 the same "translate the scenario, not the assertion" way the unit
 tests above are sourced from `RopeTest.Mod` — and translating these
 needed more care than most unit-test ports, because a fixture's

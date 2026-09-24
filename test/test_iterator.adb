@@ -1,7 +1,7 @@
 --  Phase 5 checks: Cursor and the Iterable aspect ("for Ch of
 --  Some_Rope loop"). See PLAN.md's phased plan and Testing approach,
 --  and RopeTest.Mod's CheckIterator
---  (~/Repos/Oberon/oberon-tools/RopeTest.Mod). Rope.Mod's Iterator is
+--  (~/Repos/Oberon/Ropes/RopeTest.Mod). Ropes.Mod's Iterator is
 --  a heap-allocated object with arbitrary-position Peek/Goto/Move/
 --  Decr/Source methods; Ropes's Cursor only supports the Iterable
 --  aspect's forward-only First/Next/Has_Element/Element shape (see
@@ -62,7 +62,7 @@ begin
       Check (Next = 6 and then Buf = "hello", "for Ch of R loop visits every character in order");
    end;
 
-   --  --- Two leaves, crossing the boundary (Rope.Mod's own test rope
+   --  --- Two leaves, crossing the boundary (Ropes.Mod's own test rope
    --  shape: a 16-character first leaf -- Short_Leaf_Length -- so
    --  position 16 is its last 1-based index and 17 crosses into the
    --  second leaf) ---

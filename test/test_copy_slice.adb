@@ -1,6 +1,6 @@
---  Phase 15 checks: Copy_Slice, Rope.Mod's Blit. See PLAN.md's phased
+--  Phase 15 checks: Copy_Slice, Ropes.Mod's Blit. See PLAN.md's phased
 --  plan and RopeTest.Mod's CheckBlit/CheckBlitAcrossLeaves
---  (~/Repos/Oberon/oberon-tools/RopeTest.Mod), whose scenarios these
+--  (~/Repos/Oberon/Ropes/RopeTest.Mod), whose scenarios these
 --  translate: 1-based inclusive Low/High instead of Blit's 0-based
 --  (srcStart, len), and Ada.Strings.Index_Error instead of HALT(1). The
 --  oracle is the slice assignment Copy_Slice is documented as equal to,

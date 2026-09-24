@@ -1,6 +1,6 @@
 --  Phase 24 checks: Hash, Hash_Case_Insensitive,
 --  Equal_Case_Insensitive and Less_Case_Insensitive -- RM A.4.9 and
---  A.4.10's Ada.Strings.Unbounded ones. No Rope.Mod counterpart. The
+--  A.4.10's Ada.Strings.Unbounded ones. No Ropes.Mod counterpart. The
 --  oracles are GNAT's own Ada.Strings functions of the same names on
 --  the same text, over ropes of two different leaf chunkings (9 and 17
 --  characters; 9 + 9 > 16, the short-leaf merge threshold, so leaves

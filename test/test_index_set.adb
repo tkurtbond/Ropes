@@ -1,5 +1,5 @@
 --  Phase 17 checks: Index with a Character_Set, Ada.Strings.Unbounded's
---  own overloads. No Rope.Mod counterpart (Rope.Mod's Split visitor
+--  own overloads. No Ropes.Mod counterpart (Ropes.Mod's Split visitor
 --  takes a character predicate, but it has no set-based search). The
 --  oracle is GNAT's Ada.Strings.Fixed.Index with the RM's From check
 --  added (RM, below), run for every From, Test and Going around a rope

@@ -2,7 +2,7 @@
 --  overloads. See PLAN.md's phased plan and "Construction and
 --  concatenation" section. These have no direct RopeTest.Mod
 --  counterpart to translate scenarios from -- Oberon-2 has no operator
---  overloading, so Rope.Mod's FromChar is the only piece with a real
+--  overloading, so Ropes.Mod's FromChar is the only piece with a real
 --  precedent (RopeTest.Mod's CheckFromCharAndMake); the four "&"
 --  overloads are pure Ada idiom (Ada.Strings.Unbounded's own "&"
 --  suite), so their checks are original, covering each overload's
