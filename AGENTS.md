@@ -8,7 +8,7 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-20, Phases
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-21, Phases
 7-8, 11 and 13 stretch phases and Phases 9-10, 12 and 14 not really
 `Ada`-side changes — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
@@ -40,14 +40,14 @@ the `Ropes.Text_IO` child package (`Put`/`Put_Line`/`Get_Line`).
 `src/ropes-stream_io.ads`/`.adb` (whole-file `Read`/`Write`/
 `Read_File`/`Write_File`, byte for byte) exist and build; `test/test_construction.adb` (19), `test_balance.adb` (5),
 `test_slice.adb` (8), `test_insert.adb` (8), `test_delete.adb` (9),
-`test_compare.adb` (19), `test_index.adb` (25), `test_split.adb` (15),
+`test_compare.adb` (19), `test_index.adb` (27), `test_split.adb` (17),
 `test_iterator.adb` (12), `test_map.adb` (4), `test_case.adb` (8),
 `test_trim.adb` (7), `test_concat_overloads.adb` (12),
 `test_unbounded.adb` (4), `test_repeat.adb` (8), `test_escape.adb`
 (5), `test_overwrite.adb` (6), `test_head_tail.adb` (10),
-`test_contains.adb` (9), `test_split_visitor.adb` (13), and
+`test_contains.adb` (9), `test_split_visitor.adb` (16), and
 `test_text_io.adb` (17), `test_stream_io.adb` (11), `test_copy_slice.adb` (11), `test_string_overloads.adb` (25), `test_replace_slice.adb` (10),
-`test_index_set.adb` (10), `test_count.adb` (10), `test_search_walk.adb` (31), `test_find_token.adb` (14) — 349 checks total — all pass clean, including under valgrind. Plus a
+`test_index_set.adb` (10), `test_count.adb` (10), `test_search_walk.adb` (31), `test_find_token.adb` (14) — 352 checks total — all pass clean, including under valgrind. Plus a
 black-box `rope_tool` test suite, `examples/tests/` (`run-tests.sh` +
 66 `.test` fixtures, mostly ported from
 `~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `66 ok, 0 failed`.
@@ -270,6 +270,14 @@ place** — `Leaf_Walk` is a plain record, so `V_Walk : Leaf_Walk := W`
 is the whole trick. **Proving a search test can fail is part of
 writing it**: `test_search_walk.adb` was checked by planting three
 bugs, one at a time, and seeing it fail each.
+
+**Phase 21 put the `Character`/`Character_Set` `Split`s on the
+leaf-walking `Index`** (they had each kept a per-character `Element`
+loop), and found `PLAN.md` describing a `Split_Generic` that never
+existed in `src/`. Their new `Find_Next` guards were untested at
+first too, like Phase 20's — the separator-ends-the-rope case existed
+only for `Rope`/`String` separators. **A design doc's "what actually got built" needs
+checking against `git log -S` as much as any comment does.**
 
 **Phase 20 made every `From` overload of `Index` follow the RM**:
 `Index_Error` for `From > Length (Source)` in either direction (a

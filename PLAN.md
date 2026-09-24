@@ -851,61 +851,46 @@ equality test for `Character`, a single-character
 shared private function/generic, not four independent copies.
 **`[Phase 4, done]`**, but not quite as sketched — see below.
 
-**What actually got built**: a local generic function,
+**What actually got built** (corrected at Phase 21 — until then this
+section described a local generic, `Split_Generic`, with `Sep_Width`
+and a formal `Find_Next`, which never existed in `src/`: it was in
+this file from the Phase 4 commit on, but no version of `ropes.adb`
+ever had it): each `Split` overload writes out the two-pass
+count-then-build walk itself (`Rope.Mod`'s `CountPieces` +
+`NextPiece`/`SplitArray` shape, kept as two passes rather than a single
+dynamic-array pass — faithful to the source, not a scope change),
+around a nested `Find_Next (From)` that closes over that overload's
+own `Separator` by ordinary lexical scoping:
 
-```ada
-generic
-   Sep_Width : Positive;
-   with function Find_Next (Source : Rope; From : Positive) return Natural;
-function Split_Generic (Source : Rope) return Rope_Array;
-```
-
-holding the two-pass count-then-build walk (`Rope.Mod`'s
-`CountPieces` + `NextPiece`/`SplitArray` shape, kept as two passes
-rather than a single dynamic-array pass, for the same reason —
-faithful to the source, not a scope change). Each `Split` overload
-instantiates it **locally**, inside its own body, with `Sep_Width` and
-a nested `Find_Next` function that closes over that overload's own
-`Separator` parameter by ordinary lexical scoping:
-
-- `Separator : Rope` — `Find_Next` calls the `Index` (`Pattern :
-  Rope`) overload above; `Sep_Width => Length (Separator)`. The empty
-  case (`Is_Empty (Separator)`) is checked *before* instantiating (a
-  generic formal `Positive` can't be `0`), returning `(1 => Source)`
-  directly.
+- `Separator : Rope` — `Find_Next` calls the `From`-bounded `Index`
+  (`Pattern : Rope`), and the walk advances `Length (Separator)` past
+  each match. The empty case (`Is_Empty (Separator)`) returns `[1 =>
+  Source]` before the walk.
 - `Separator : String` — a one-line expression function, `Split
   (Source, From_String (Separator))`: this literally *is* the "share
-  the Rope overload's implementation" the sketch called for, simpler
-  than giving it its own instantiation.
-- `Separator : Character` — `Find_Next` calls the `Index` (`Pattern :
-  Character`) overload; `Sep_Width => 1`. No empty case.
-- `Separator : Ada.Strings.Maps.Character_Set` — `Find_Next` is a
-  small nested linear scan using `Ada.Strings.Maps.Is_In` (when
-  written, there was no public `Character_Set`-based `Index` to call —
-  Phase 17 added one, but this scan was left as it is rather than
-  rewritten onto it); `Sep_Width => 1`. Empty case
-  is `Ada.Strings.Maps.Null_Set`.
+  the Rope overload's implementation" the sketch called for.
+- `Separator : Character` — `Find_Next` calls the `From`-bounded
+  `Index` (`Pattern : Character`) and the walk advances 1 past each
+  match. No empty case. (Until Phase 21 this bullet already said so,
+  but `Find_Next` was really its own loop calling `Element` per
+  character — O(n log n) — and only Phase 21 made it true.)
+- `Separator : Ada.Strings.Maps.Character_Set` — `Find_Next` calls
+  the `From`-bounded `Index` with that set (`Test => Inside`), since
+  Phase 21 (before that, a loop calling `Element` and `Is_In` per
+  character, there being no set-based `Index` until Phase 17); the
+  walk advances 1. The empty case is `Ada.Strings.Maps.Null_Set`.
 
-Binding `Find_Next` as a **generic formal subprogram** (not an
-access-to-subprogram value) was a deliberate choice made during
-implementation: a nested function closing over a local `Separator`
-can't safely be turned into an `access function ...` value pointing
-out of a package-level type without hitting Ada's accessibility rules
-(the classic reason to reach for `Unrestricted_Access`, which this
-codebase avoids elsewhere). A **local** generic instantiation sidesteps
-that entirely — the formal subprogram is bound by name at compile
-time, not through a runtime access value, so ordinary lexical closure
-over `Separator` just works, no accessibility question ever arises.
-Local (subprogram-nested) generic instantiation is ordinary, legal
-Ada, re-elaborated each call, at the cost of paying that elaboration
-once per `Split` call — irrelevant next to the search itself.
+Every `Find_Next` returns 0 for `From > Length (Source)` itself, since
+Phase 20's `Index` raises there: after a separator that ends `Source`,
+the walk asks from `Length (Source) + 1`. The Process-callback
+`Split`s (below) use the same `Find_Next`s.
 
 Non-collapsing behavior for the `Character_Set` overload requires no
-special-casing: the shared walk always resumes searching starting
-exactly at the position just past the previous match (`Found +
-Sep_Width`), so if that position itself matches again, it's found
-immediately, producing the empty piece in between — this falls out of
-the walk's own structure, not an extra check.
+special-casing: the walk always resumes searching exactly at the
+position just past the previous match, so if that position itself
+matches again, it's found immediately, producing the empty piece in
+between — this falls out of the walk's own structure, not an extra
+check.
 
 Only the array form is ported in Phase 4 (`Rope.Mod`'s `SplitArray`);
 the push-based early-stopping `Visitor` form (`Split` in `Rope.Mod`)
@@ -1193,8 +1178,10 @@ parameter's type.
   no-`From` and a `From`-bounded overload, both directions — four
   functions total, not the two-with-a-default originally sketched; see
   "Search" above for why), all four `Split` overloads (`Rope`/`String`/
-  `Character`/`Character_Set`, via a local generic `Split_Generic`
-  instantiated per overload — see "Splitting" above). Both `Index`'s
+  `Character`/`Character_Set`, each writing out the same two-pass walk
+  around its own `Find_Next` — see "Splitting" above; this entry said
+  "via a local generic `Split_Generic`" until Phase 21, which never
+  existed). Both `Index`'s
   empty-pattern behavior (`Ada.Strings.Pattern_Error`, not `Rope.Mod`'s
   clamp-and-match) and its `Backward` bound convention (a match must
   fit entirely within `Source (1 .. From)`, not `Rope.Mod`'s `RFind`
@@ -2008,6 +1995,25 @@ parameter's type.
     ignored** (`pragma Assertion_Policy (Pre => Ignore, ...)`); the
     `From` ones above are the only ones found to differ from what the
     bodies do on the operations `Ropes` shares.
+
+- **Phase 21, done — `Split` on the leaf-walking `Index`.** At
+  explicit user request: the `Character` and `Character_Set`
+  `Split`s (array and Process-callback forms, four in all) now find
+  each separator with the `From`-bounded `Index` for that kind — Phase
+  18's leaf walk — instead of a loop calling `Element` (a descent from
+  the root) per character, so they are linear rather than O(n log n).
+  Each `Find_Next` returns 0 itself for a `From` past the end, as the
+  `Rope`-separator ones have since Phase 20. Two stale descriptions
+  surfaced and were corrected: "Splitting" (and Phase 4's entry) had
+  described a shared generic `Split_Generic` that was never in
+  `src/`, and said the `Character` `Split` used `Index` when it didn't;
+  `ropes.adb`'s "Splitting" comment had said the `Character_Set` one
+  used a local scan. `test_split.adb`/`test_split_visitor.adb` had a
+  separator ending the rope only for `Rope`/`String` separators (Phase
+  20), so the new `Find_Next`s' past-the-end guards could be removed
+  without any test failing; they gained that case for `Character` and
+  `Character_Set` (17 and 16 checks), and now fail without the guards.
+  No new operation, so no `rope_tool` change.
 
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds

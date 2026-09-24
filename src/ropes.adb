@@ -1483,9 +1483,9 @@ package body Ropes is
    --  overload below (count, then build) instead of a single dynamic
    --  pass, matching Rope.Mod's own two-pass CountPieces + SplitArray
    --  shape. Each overload supplies its own "find the next occurrence
-   --  at or after position P" search (Index above for the Rope and
-   --  Character separators; a small local scan for Character_Set);
-   --  the walk itself -- advance past the match, repeat, Slice out
+   --  at or after position P" search, Find_Next, on the From-bounded
+   --  Index above for its kind of separator (0 for a P past the end,
+   --  which Index itself rejects); the walk itself -- advance past the match, repeat, Slice out
    --  what's left over at the end -- is the same shape in all three,
    --  by construction of how Slice's own boundary behavior (empty for
    --  High < Low, valid at Low = Length + 1) already produces the
@@ -1537,15 +1537,11 @@ package body Ropes is
    function Split (Source : Rope; Separator : Character) return Rope_Array is
       S_Len : constant Natural := Length (Source);
 
+      --  The next Separator at or after From, or 0 -- including for
+      --  From = S_Len + 1, after a separator that ends Source, which
+      --  Index rejects (the RM's From rule).
       function Find_Next (From : Positive) return Natural is
-      begin
-         for I in From .. S_Len loop
-            if Element (Source, I) = Separator then
-               return I;
-            end if;
-         end loop;
-         return 0;
-      end Find_Next;
+        (if From > S_Len then 0 else Index (Source, Separator, From, Ada.Strings.Forward));
 
       Count : Positive := 1;
       Pos   : Positive := 1;
@@ -1575,15 +1571,9 @@ package body Ropes is
    function Split (Source : Rope; Separator : Ada.Strings.Maps.Character_Set) return Rope_Array is
       S_Len : constant Natural := Length (Source);
 
+      --  As in the Character Split above.
       function Find_Next (From : Positive) return Natural is
-      begin
-         for I in From .. S_Len loop
-            if Ada.Strings.Maps.Is_In (Element (Source, I), Separator) then
-               return I;
-            end if;
-         end loop;
-         return 0;
-      end Find_Next;
+        (if From > S_Len then 0 else Index (Source, Separator, From, Ada.Strings.Inside, Ada.Strings.Forward));
 
       Count : Positive := 1;
       Pos   : Positive := 1;
@@ -1662,15 +1652,11 @@ package body Ropes is
    procedure Split (Source : Rope; Separator : Character; Process : not null access function (Piece : Rope) return Boolean) is
       S_Len : constant Natural := Length (Source);
 
+      --  The next Separator at or after From, or 0 -- including for
+      --  From = S_Len + 1, after a separator that ends Source, which
+      --  Index rejects (the RM's From rule).
       function Find_Next (From : Positive) return Natural is
-      begin
-         for I in From .. S_Len loop
-            if Element (Source, I) = Separator then
-               return I;
-            end if;
-         end loop;
-         return 0;
-      end Find_Next;
+        (if From > S_Len then 0 else Index (Source, Separator, From, Ada.Strings.Forward));
 
       Start : Positive := 1;
       Found : Natural;
@@ -1693,15 +1679,9 @@ package body Ropes is
    is
       S_Len : constant Natural := Length (Source);
 
+      --  As in the Character Split above.
       function Find_Next (From : Positive) return Natural is
-      begin
-         for I in From .. S_Len loop
-            if Ada.Strings.Maps.Is_In (Element (Source, I), Separator) then
-               return I;
-            end if;
-         end loop;
-         return 0;
-      end Find_Next;
+        (if From > S_Len then 0 else Index (Source, Separator, From, Ada.Strings.Inside, Ada.Strings.Forward));
 
       Start : Positive := 1;
       Found : Natural;

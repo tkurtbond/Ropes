@@ -184,6 +184,17 @@ begin
       Split (From_String ("a::b::"), "::", Collect'Access);
       Check
         (Count = 3 and then Is_Empty (Last), "Split (Process, String separator): one ending the rope gives a last, empty piece");
+      Count := 0;
+      Last  := From_String ("not visited");
+      Split (From_String ("a,b,"), ',', Collect'Access);
+      Check
+        (Count = 3 and then Is_Empty (Last), "Split (Process, Character separator): one ending the rope gives a last, empty piece");
+      Count := 0;
+      Last  := From_String ("not visited");
+      Split (From_String ("a,b;"), To_Set (",;"), Collect'Access);
+      Check
+        (Count = 3 and then Is_Empty (Last),
+         "Split (Process, Character_Set separator): one ending the rope gives a last, empty piece");
    end;
 
    New_Line;
