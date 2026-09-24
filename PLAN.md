@@ -988,6 +988,20 @@ to match the name against (neither `Ada.Strings.Fixed` nor
 `Ada.Characters.Handling` has a "capitalize" operation), so these keep
 names close to `Rope.Mod`'s own, just Ada-cased.
 
+**[Phase 22, done.]** `Ada.Strings.Unbounded.Translate`'s two function
+forms, both `Map` underneath (so the result keeps `Source`'s tree
+shape):
+
+```ada
+function Translate (Source : Rope; Mapping : Ada.Strings.Maps.Character_Mapping) return Rope;
+function Translate (Source : Rope; Mapping : Ada.Strings.Maps.Character_Mapping_Function) return Rope;
+```
+
+The first maps each character through `Ada.Strings.Maps.Value`; the
+second is exactly `Map (Source, Mapping)`, and a null `Mapping`
+raises `Constraint_Error` (`Map`'s `Convert` is `not null`). See the
+Phase 22 entry below.
+
 ### Iteration
 
 **`[Phase 5, done.]`**

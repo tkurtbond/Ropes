@@ -272,6 +272,21 @@ is the whole trick. **Proving a search test can fail is part of
 writing it**: `test_search_walk.adb` was checked by planting three
 bugs, one at a time, and seeing it fail each.
 
+**Phase 22 added `Translate`, both of
+`Ada.Strings.Unbounded`'s function forms** — `Character_Mapping` and
+`Character_Mapping_Function` — each a wrapper over `Map`. The function
+form first shipped as a comment saying "call `Map` itself"; the user
+wanted a real overload so calls read in `Ada.Strings`' vocabulary.
+**A null `Character_Mapping_Function` raises `Constraint_Error`**
+(`Map`'s `Convert` is `not null`): the RM doesn't say, and GNAT's
+`Ada.Strings.Fixed.Translate` states `Mapping /= null` only as a
+precondition its `Assertion_Policy (Pre => Ignore)` turns off. **A
+`Character_Mapping_Function` can't designate a nested function** (its
+access type is library-level), so tests use
+`Ada.Characters.Handling.To_Upper'Access`. `rope_tool translate S FROM
+TO` demonstrates the `Character_Mapping` form; the function form has no
+command, like `Map`.
+
 **Phase 21 put the `Character`/`Character_Set` `Split`s on the
 leaf-walking `Index`** (they had each kept a per-character `Element`
 loop), and found `PLAN.md` describing a `Split_Generic` that never
