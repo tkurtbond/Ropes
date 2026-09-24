@@ -2189,6 +2189,54 @@ parameter's type.
   `rope-help.test`/`rope-unknown-command.test` regenerated each phase:
   `81 ok, 0 failed`. `make test`: 407 + 81 = 488 ok, 0 failed.
 
+- **Phase 26, done — Phases 16–25 fed back into `Rope.Mod`**, like
+  Phases 9 and 12. At explicit user request. Everything is in
+  `~/Repos/Oberon/oberon-tools`; nothing under `src/`/`test/`/
+  `examples/` changed. Each addition was translated into `Rope.Mod`'s
+  conventions (0-based, clamping rather than exceptions, -1 for "not
+  found", procedure types rather than generics):
+  - Phase 16: `CompareString`/`EqualString`
+  - Phase 17: `Replace`, `Count`, and a `CharSet` record with
+    `IndexSet`/`RIndexSet`/`CountSet`
+  - Phase 18: leaf-walking `Find`/`RFind`/`IndexChar`/`RIndexChar`,
+    about 20× faster on 20 million characters (1.7 s → 0.08 s for a
+    missing pattern). `Split` gets faster with them.
+  - Phase 19: `IndexNonBlank`/`RIndexNonBlank`, and `FindToken` giving
+    a `(start, len)` like `Substring`'s
+  - Phase 22: a `Mapping` record with `MakeMapping` (FALSE where Ada
+    raises `Translation_Error`) and `Translate`
+  - Phase 23: `ReplaceChar`, which traps like `Fetch`
+  - Phase 24: `Hash`/`HashNoCase` as `HUGEINT`, the sdbm recurrence
+    computed without overflow, giving GNAT's `Ada.Strings.Hash` values
+    (`RopeTool hash "Hello, World"` prints 3446766348, as `rope_tool
+    hash` does here); `CompareNoCase`/`EqualNoCase`, folding ASCII
+    only, like the rest of `Rope.Mod`
+  - Phase 25: `FindMapped`/`RFindMapped`/`CountMapped` with a `Mapper`
+    (NIL means unmapped), and `UpperChar`/`LowerChar` exported for them
+
+  Not ported: Phase 20, which was about Ada's exceptions, while
+  `Rope.Mod` clamps; `String` wrappers of `Insert`/`Overwrite`/
+  `Repeat`, since `FromString(s)` is the Oberon idiom and a wrapper
+  would save only that call; a `Mapping`-table search, since a table
+  can't be passed as a `Mapper`, which has no closure; and a mapped
+  `ContainsPattern`, since `FindMapped(...) >= 0` does the job.
+
+  `LeafWalk`'s stack is a `POINTER TO ARRAY` there, so assigning one
+  walk to another shares the stack, where Ada's record copy was deep.
+  The search checks a crossing candidate on a `CopyWalk` for that
+  reason. A planted "plain assignment" bug was not caught by
+  left-deep test trees: a forward walk over one keeps only leaves on
+  its stack, and `NextLeaf` never overwrites a leaf. The test gained
+  right-deep and `Balance`d shapes, plus a run of `a`s that makes
+  failing crossing candidates common. The bug was then caught, as a
+  trap rather than a `not ok` line, which is why a mutation check
+  must look at the exit status as well. `RopeTest` 199 → 242 checks;
+  `RopeTool` gains 15 commands (`replace`, `replacechar`, `count`,
+  `countset`, `indexset`, `rindexset`, `nonblank`, `rnonblank`,
+  `findtoken`, `translate`, `cmpnocase`, `hash`, `hashnocase`,
+  `findnocase`, `countnocase`), and `cmp` uses `CompareString`.
+  `oberon-tools`' suite: `329 ok, 0 failed`.
+
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds
 the matching `rope_tool` subcommand(s) — see "Command-line tool

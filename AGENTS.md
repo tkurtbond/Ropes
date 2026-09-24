@@ -8,9 +8,9 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-25, Phases
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-26, Phases
 7-8, 11 and 13 stretch phases and Phases 9-10, 12 and 14 not really
-`Ada`-side changes — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
+`Ada`-side changes, nor is Phase 26 — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
 depth-triggered auto-rebalance — `Balance`/`Balance_Insert`/
 `Balance_Walk`/`Concat_Forest`, the Fibonacci-forest algorithm), plus
@@ -335,6 +335,19 @@ IteratedAssoc", leaving the whole file unformatted), so `Table_Of` is
 a loop. (3) **A test that passes a constant `null` to a `not null`
 formal draws a compile-time warning**; the tests silence it with
 `pragma Warnings (Off, ...)` on those two messages.
+
+**Phase 26 fed Phases 16–25 back into `Rope.Mod`**
+(`~/Repos/Oberon/oberon-tools`), like Phases 9 and 12. Nothing under
+`src/`/`test/`/`examples/` changed; see `PLAN.md`'s Phase 26 entry for
+what was translated, how, and what wasn't ported. **`Rope.Mod`'s
+searches had still been a `Fetch` per character**; walking leaves made
+them about 20× faster. **In Oberon, assigning a `LeafWalk` shares its
+stack** (a `POINTER TO ARRAY`), so a search that checks a crossing
+match on a copy needs `CopyWalk`. Left-deep test trees can't catch the
+shared-stack bug, so test right-deep and `Balance`d shapes too. **Treat
+a trap as a caught mutation**: the harness first looked only for `not
+ok` lines and missed one. `Hash` there gives GNAT's values, so the two
+repos' `hash` fixtures agree.
 
 **Phase 21 put the `Character`/`Character_Set` `Split`s on the
 leaf-walking `Index`** (they had each kept a per-character `Element`
