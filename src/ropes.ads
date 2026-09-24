@@ -271,39 +271,26 @@ package Ropes is
    --  (Forward) or Source (1 .. From) (Backward). If Source is
    --  Null_Rope it returns 0 at once, even when Pattern is also
    --  Null_Rope (Source's emptiness is checked before Pattern's).
-   --  Otherwise, a From past the end of Source is handled as GNAT's
-   --  Ada.Strings.Fixed.Index handles it, which is NOT what the RM
-   --  says:
+   --  Otherwise it raises Ada.Strings.Index_Error if From > Length
+   --  (Source), whichever way Going points -- the RM's rule
+   --  (A.4.3(56.2/3), and 58.5/3 for the Character_Set overloads),
+   --  for every From overload of Index (Rope, String, Character and
+   --  Character_Set patterns) and so of Index_Non_Blank and Contains.
    --
-   --  * The RM (A.4.3(56.2/3), and 58.5/3 for the Character_Set
-   --    overloads; the same since Ada 2005) says Index_Error whenever
-   --    From is not in Source'Range, in either direction.
-   --
-   --  * GNAT (a-strsea.adb) checks only the bound its direction
-   --    needs, then searches a slice: Forward raises only if From <
-   --    Source'First, and otherwise returns Index (Source (From ..
-   --    Source'Last), ...), which for From > Source'Last is a null
-   --    slice, and so 0; Backward raises only if From > Source'Last.
-   --    From is Positive and a rope starts at 1, so for a rope
-   --    Forward never raises.
-   --
-   --  GNAT's own Ada.Strings.Unbounded does state the RM's rule, as a
-   --  precondition (From <= Length (Source) when Source isn't empty,
-   --  either direction), but that file sets pragma Assertion_Policy
-   --  (Pre => Ignore), so it is never checked and a caller gets the
-   --  Fixed bodies' behavior above.
-   --
-   --  So here, as with GNAT, Forward with From > Length (Source)
-   --  returns 0, where the RM says Index_Error; Backward with From >
-   --  Length (Source) raises Ada.Strings.Index_Error, as both say.
-   --  Ropes follows GNAT because that is what a caller moving from
-   --  Ada.Strings.Fixed/Unbounded under GNAT actually gets, and
-   --  because it is what makes the usual scan loop -- search, then
-   --  search again from just past the match -- work without a guard
-   --  when the match ends the rope (Split and Count here rely on it).
-   --  Every From overload of Index (Rope, String, Character and
-   --  Character_Set) follows this same rule. See PLAN.md's "Search"
-   --  section.
+   --  GNAT does not do this. Its Ada.Strings.Fixed.Index
+   --  (a-strsea.adb) checks only the bound its direction needs --
+   --  Forward only From < Source'First, Backward only From >
+   --  Source'Last -- and then searches a slice, which for a Forward
+   --  From past the end is a null slice, so it returns 0 there instead
+   --  of raising. Its Ada.Strings.Unbounded states the RM's rule as a
+   --  precondition, but that file sets pragma Assertion_Policy (Pre =>
+   --  Ignore), so it is never checked. Ropes followed GNAT's behavior
+   --  until Phase 20; since GNAT's own contract calls a Forward search
+   --  from past the end a caller error, it now follows the RM. A scan
+   --  loop -- search, then search again from just past the match --
+   --  must therefore stop by itself when a match ends the rope, rather
+   --  than rely on a search from Length (Source) + 1 returning 0 (as
+   --  Split and Count here do). See PLAN.md's "Search" section.
    --
    --  Time, for every Index overload: O(depth) to reach From, then
    --  linear in the characters scanned, walking Source's leaves in
@@ -342,10 +329,9 @@ package Ropes is
    --  or not in Set (Test => Outside), or 0 if there is none --
    --  Ada.Strings.Unbounded's own Character_Set Index. The From
    --  overload follows the same boundary rules as the Rope overload
-   --  above -- GNAT's, not the RM's, as explained there: 0 for a
-   --  Null_Rope Source; Forward returns 0 for From > Length (Source),
-   --  where the RM (A.4.3(58.5/3)) says Index_Error; Backward raises
-   --  Ada.Strings.Index_Error if From > Length (Source).
+   --  above -- the RM's (A.4.3(58.5/3)), not GNAT's: 0 for a Null_Rope
+   --  Source; otherwise Ada.Strings.Index_Error if From > Length
+   --  (Source), in either direction.
 
    function Index_Non_Blank (Source : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
    function Index_Non_Blank (Source : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
@@ -354,7 +340,7 @@ package Ropes is
    --  Ada.Strings.Unbounded.Index_Non_Blank, which the RM defines as
    --  Index (Source, To_Set (Space), [From,] Outside, Going), and which
    --  this is. So the From overload has the same boundary rules as
-   --  Index's (GNAT's, not the RM's; see Index above). Only a space
+   --  Index's (the RM's, not GNAT's; see Index above). Only a space
    --  counts as blank, not Whitespace's other characters.
 
    procedure Find_Token
@@ -370,13 +356,13 @@ package Ropes is
    --  First is From and Last is 0 -- Ada.Strings.Unbounded.Find_Token.
    --
    --  Raises Ada.Strings.Index_Error if Source is not Null_Rope and
-   --  From > Length (Source). Unlike Index's From rule, this is the
-   --  RM's (A.4.3(66.2/3), from AI05-0031), and GNAT's
-   --  Ada.Strings.Fixed.Find_Token checks it exactly so. (GNAT's
+   --  From > Length (Source) -- the RM's rule (A.4.3(66.2/3), from
+   --  AI05-0031), the same as Index's, and one GNAT's
+   --  Ada.Strings.Fixed.Find_Token checks exactly so. (GNAT's
    --  Ada.Strings.Unbounded.Find_Token states it only as a
    --  precondition, which its Assertion_Policy ignores, and so doesn't
-   --  raise; Ropes follows Fixed and the RM.) A Null_Rope Source never
-   --  raises: First is From and Last is 0.
+   --  raise.) A Null_Rope Source never raises: First is From and Last
+   --  is 0.
 
    function Count (Source : Rope; Pattern : Rope) return Natural;
    function Count (Source : Rope; Pattern : String) return Natural;
@@ -406,7 +392,9 @@ package Ropes is
    --  model -- has no Going option either). Genuinely a thin wrapper:
    --  the Rope and String overloads inherit Index's own
    --  Ada.Strings.Pattern_Error on an empty Pattern (Null_Rope or "")
-   --  rather than softening it to some other answer.
+   --  rather than softening it to some other answer, and the From
+   --  overloads its Ada.Strings.Index_Error for a From > Length
+   --  (Source) when Source isn't Null_Rope.
 
    type Rope_Array is array (Positive range <>) of Rope;
 

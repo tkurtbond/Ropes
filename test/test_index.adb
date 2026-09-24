@@ -84,6 +84,7 @@ procedure Test_Index is
    function Try_3b return Natural is (Index (Null_Rope, Null_Rope, Going => Backward));
    function Try_4 return Natural is (Index (From_String ("abc"), Null_Rope));
    function Try_5 return Natural is (Index (Abcabc, 'b', From => 100, Going => Backward));
+   function Try_6 return Natural is (Index (Abcabc, 'b', From => 7, Going => Forward));
 
 begin
    --  --- Index (Pattern : Rope), Forward ---
@@ -94,9 +95,16 @@ begin
      (Index (Hello_World, From_String ("o"), From => 6, Going => Forward) = 9,
       "Find starting from an offset skips an earlier match");
    Check (Index (Hello_World, From_String ("World")) = 8, "Find with the no-From overload defaults to searching from 1");
-   Check
-     (Index (Hello_World, From_String ("World"), From => 100, Going => Forward) = 0,
-      "Forward never raises for an out-of-range From -- it just finds nothing");
+   declare
+      function Try return Natural is (Index (Hello_World, From_String ("World"), From => 100, Going => Forward));
+      function Try_Just_Past return Natural is (Index (Hello_World, From_String ("!"), From => 14, Going => Forward));
+   begin
+      --  The RM's rule (A.4.3(56.2/3)), not GNAT's: a Forward From past
+      --  the end is an error too (until Phase 20, this returned 0, as
+      --  GNAT's unchecked Ada.Strings.Fixed.Index does).
+      Check_Index_Error ("Forward raises Index_Error for an out-of-range From", Try'Access);
+      Check_Index_Error ("Forward raises Index_Error for From = Length + 1", Try_Just_Past'Access);
+   end;
    Check_Pattern_Error ("Find of the empty pattern raises Pattern_Error", Try_2'Access);
 
    --  --- Index (Pattern : Rope), Backward ---
@@ -146,6 +154,7 @@ begin
    Check (Index (Abcabc, 'b', From => 4, Going => Backward) = 2, "RIndexChar-equivalent: before an offset");
    Check (Index (Abcabc, 'z', Going => Backward) = 0, "RIndexChar-equivalent: not present");
    Check_Index_Error ("Character Backward also raises Index_Error for an out-of-range From", Try_5'Access);
+   Check_Index_Error ("Character Forward also raises Index_Error for an out-of-range From", Try_6'Access);
 
    Check (Index (Null_Rope, 'x') = 0, "Character Forward on a Null_Rope source returns 0");
    Check (Index (Null_Rope, 'x', Going => Backward) = 0, "Character Backward on a Null_Rope source returns 0, not Index_Error");

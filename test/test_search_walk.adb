@@ -4,7 +4,8 @@
 --  From, over ropes of the same text built into differently shaped
 --  trees -- left-built, right-built, by scattered Inserts, one flat
 --  leaf, and by "*" (whose subtrees are shared) -- with
---  Ada.Strings.Fixed on the same text as the oracle, Index_Error cases
+--  Ada.Strings.Fixed on the same text as the oracle, plus the RM's From
+--  check that GNAT's Fixed leaves out (RM, below), Index_Error cases
 --  included. The leaves are 9 characters (9 + 9 > 16, the short-leaf
 --  merge threshold, so they stay separate), and the text is mostly a's
 --  and b's, so most candidate matches are partial ones and many cross
@@ -119,6 +120,13 @@ procedure Test_Search_Walk is
      [Left   => Left_Built (Text), Right => Right_Built, Inserted => Insert_Built, One_Leaf => From_String (Text),
      Starred => 8 * Left_Built (Period)];
 
+   --  The oracle: GNAT's Ada.Strings.Fixed result, with the RM's From
+   --  check that GNAT leaves out (A.4.3(56.2/3, 58.5/3)): Index_Error
+   --  for a From past the end of a non-empty Source, whichever way the
+   --  search goes. GNAT itself raises only going Backward.
+   function RM (Source : String; From : Positive; Fixed_Result : Natural) return Natural is
+     (if Source'Length > 0 and then From > Source'Last then raise Index_Error else Fixed_Result);
+
    Sets : constant array (1 .. 4) of Character_Set := [To_Set ('a'), To_Set ('c'), To_Set ("bc"), Null_Set];
 
    Lengths : constant array (1 .. 11) of Positive := [1, 2, 3, 5, 8, 9, 10, 17, 19, 30, 61];
@@ -176,7 +184,7 @@ begin
                   declare
                      function Got return Natural is (Index (R, P, From, Going));
                      function Got_Rope return Natural is (Index (R, P_Rope, From, Going));
-                     function Want return Natural is (Ada.Strings.Fixed.Index (O, P, From, Going));
+                     function Want return Natural is (RM (O, From, Ada.Strings.Fixed.Index (O, P, From, Going)));
                      function Agree_String is new Agree (Got, Want);
                      function Agree_Rope is new Agree (Got_Rope, Want);
                   begin
@@ -205,7 +213,7 @@ begin
                for From in 1 .. O'Last + 2 loop
                   declare
                      function Got return Natural is (Index (R, Ch, From, Going));
-                     function Want return Natural is (Ada.Strings.Fixed.Index (O, [1 => Ch], From, Going));
+                     function Want return Natural is (RM (O, From, Ada.Strings.Fixed.Index (O, [1 => Ch], From, Going)));
                      function Agree_Char is new Agree (Got, Want);
                   begin
                      if not Agree_Char then
@@ -223,7 +231,7 @@ begin
                   for From in 1 .. O'Last + 2 loop
                      declare
                         function Got return Natural is (Index (R, Set, From, Test, Going));
-                        function Want return Natural is (Ada.Strings.Fixed.Index (O, Set, From, Test, Going));
+                        function Want return Natural is (RM (O, From, Ada.Strings.Fixed.Index (O, Set, From, Test, Going)));
                         function Agree_Set is new Agree (Got, Want);
                      begin
                         if not Agree_Set then

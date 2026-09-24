@@ -169,6 +169,23 @@ begin
       Check (Count = 1, "Split (Process, Character_Set separator) with Null_Set calls Process exactly once");
    end;
 
+   --  A separator that ends the rope: see test_split.adb's check.
+   declare
+      Count : Natural := 0;
+      Last  : Rope    := From_String ("not visited");
+
+      function Collect (Piece : Rope) return Boolean is
+      begin
+         Count := Count + 1;
+         Last  := Piece;
+         return True;
+      end Collect;
+   begin
+      Split (From_String ("a::b::"), "::", Collect'Access);
+      Check
+        (Count = 3 and then Is_Empty (Last), "Split (Process, String separator): one ending the rope gives a last, empty piece");
+   end;
+
    New_Line;
    Put_Line (Passed'Image & " /" & Natural'Image (Passed + Failed) & " tests passed.");
    if Failed > 0 then

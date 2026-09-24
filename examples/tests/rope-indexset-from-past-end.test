@@ -1,11 +1,11 @@
-# A forward search from past the end finds nothing rather than raising
-# -- GNAT's behavior, which the RM's A.4.3(58.5/3) words differently;
-# see ropes.ads.
+# A forward FROM past the end raises Ada.Strings.Index_Error -- the
+# RM's rule (A.4.3(58.5/3)). GNAT's own Ada.Strings.Fixed.Index returns
+# 0 here instead; Ropes did too, until Phase 20.
 program rope_tool
 arg indexset
 arg hello
 arg z
 arg 99
-status 0
+status 1
 output
-0
+Error: FROM out of range

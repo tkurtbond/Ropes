@@ -1,10 +1,10 @@
 --  Phase 17 checks: Index with a Character_Set, Ada.Strings.Unbounded's
 --  own overloads. No Rope.Mod counterpart (Rope.Mod's Split visitor
 --  takes a character predicate, but it has no set-based search). The
---  oracle is GNAT's Ada.Strings.Fixed.Index, run for every From,
---  Test and Going around a rope of several leaves -- including the
---  Index_Error cases, which must raise exactly when Fixed's does, since
---  Ropes deliberately follows GNAT's From rules (see ropes.ads).
+--  oracle is GNAT's Ada.Strings.Fixed.Index with the RM's From check
+--  added (RM, below), run for every From, Test and Going around a rope
+--  of several leaves -- including the Index_Error cases, which must
+--  raise exactly when the RM says (see ropes.ads).
 
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Strings;      use Ada.Strings;
@@ -46,13 +46,20 @@ procedure Test_Index_Set is
    Base   : constant String := "abc 1defghijklmnop2qrs tuvwxyzabcd3efghij klm4";
    Chunks : constant Rope   := Chunked (Base, 17);
 
+   --  The oracle: GNAT's Ada.Strings.Fixed result, with the RM's From
+   --  check that GNAT leaves out (A.4.3(56.2/3, 58.5/3)): Index_Error
+   --  for a From past the end of a non-empty Source, whichever way the
+   --  search goes. GNAT itself raises only going Backward.
+   function RM (Source : String; From : Positive; Fixed_Result : Natural) return Natural is
+     (if Source'Length > 0 and then From > Source'Last then raise Index_Error else Fixed_Result);
+
    --  Whether Index (Chunks, Set, From, Test, Going) agrees with
    --  Ada.Strings.Fixed.Index (Base, Set, From, Test, Going): the same
    --  result, or both raising Index_Error.
    function Agrees_At (Set : Character_Set; From : Positive; Test : Membership; Going : Direction) return Boolean is
    begin
       declare
-         Expected : constant Natural := Ada.Strings.Fixed.Index (Base, Set, From, Test, Going);
+         Expected : constant Natural := RM (Base, From, Ada.Strings.Fixed.Index (Base, Set, From, Test, Going));
       begin
          return Index (Chunks, Set, From, Test, Going) = Expected;
       exception
@@ -93,6 +100,16 @@ procedure Test_Index_Set is
    Digits_Set : constant Character_Set := To_Set ("0123456789");
    R          : constant Rope          := From_String ("hello world");
 
+   function Forward_Raises return Boolean is
+      Unused : Natural;
+   begin
+      Unused := Index (R, Digits_Set, 12);
+      return False;
+   exception
+      when Index_Error =>
+         return True;
+   end Forward_Raises;
+
    function Backward_Raises return Boolean is
       Unused : Natural;
    begin
@@ -110,7 +127,7 @@ begin
    Check (Index (R, To_Set ("dlr"), Test => Outside, Going => Backward) = 8, "Outside, Backward");
    Check (Index (R, Digits_Set) = 0, "no match returns 0");
    Check (Index (R, To_Set ("o"), 6) = 8 and then Index (R, To_Set ("o"), 7, Going => Backward) = 5, "From, both ways");
-   Check (Index (R, Digits_Set, 99) = 0, "Forward From past the end returns 0 (GNAT, not the RM's Index_Error)");
+   Check (Forward_Raises, "Forward From past the end raises Index_Error (the RM's rule; GNAT returns 0)");
    Check (Backward_Raises, "Backward From past the end raises Index_Error");
    Check (Index (Null_Rope, Digits_Set, 99, Going => Backward) = 0, "Null_Rope returns 0 before checking From");
    Check

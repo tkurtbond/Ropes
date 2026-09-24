@@ -288,7 +288,7 @@ later phase to add). Same
 than hand-derived wherever the translation was non-mechanical — see
 "Testing approach" below for the two real divergences that caught
 (`bigcat`'s overflow behavior and `slice`'s past-the-end boundary).
-Currently `65 ok, 0 failed`; run via `cd examples &&
+Currently `66 ok, 0 failed`; run via `cd examples &&
 ./tests/run-tests.sh`.
 
 ## Core design
@@ -686,19 +686,17 @@ to (and hit the `Pattern = ""` check inside) the base function; a bare
 call with no `From` goes straight to the base function, whose `Pattern
 = ""` check has no such short-circuit.
 
-Also verified rather than assumed: the `From`/`Going` boundary
-asymmetry. `Forward` never raises for an out-of-range `From` — `Source
-(From .. Length (Source))` is simply empty if `From` is too large, so
-the search just finds nothing (`From < Source'First` can't happen
-here since `From : Positive` and `Source'First` is always `1`).
-`Backward` raises `Ada.Strings.Index_Error` if `From > Length
-(Source)`.
+Out-of-range `From` (**as of Phase 20**): `Index_Error` if `Source`
+isn't empty and `From > Length (Source)`, in either direction — the
+RM's rule. Until Phase 20 `Forward` never raised (it returned 0),
+copying GNAT's `a-strsea.adb`, which was checked at Phase 4 without
+checking the RM; see below.
 
 #### `From` past the end: the RM, GNAT, and `Ropes`
 
-That asymmetry is **GNAT's, not the RM's** — not noticed when it was
-first written down above (it was checked against `a-strsea.adb` only),
-and spelled out at Phase 17's user request:
+GNAT's behavior here is **not the RM's** — not noticed when it was
+first written down (Phase 4 checked `a-strsea.adb` only), spelled out
+at Phase 18's user request, and fixed in `Ropes` at Phase 20:
 
 - **The RM** says `Index_Error` whenever `From` is not in
   `Source'Range`, in either direction: A.4.3(56.2/3) for a pattern,
@@ -742,41 +740,40 @@ and spelled out at Phase 17's user request:
   own contract calls a `Forward` search from past the end a caller
   error; the lax result is what an unchecked precondition happens to
   give, not something GNAT promises.
-- **`Ropes` follows GNAT** in every `From` overload of `Index`
-  (`Rope`, `String`, `Character` and `Character_Set` patterns):
-  `Forward` with `From > Length (Source)` returns 0; `Backward` with
-  `From > Length (Source)` raises `Index_Error`. Why:
-  1. **It's what callers actually get.** The design goal (see "Why
-     this is a real port") is that someone who knows `Ada.Strings`
-     can guess `Ropes`'s behavior. Under GNAT, the only Ada compiler
-     this project builds with, what they have observed is GNAT's rule,
-     and a program that works with `Unbounded_String.Index` should
-     keep working with `Ropes.Index` — though, as above, GNAT's own
-     (unchecked) precondition says such a program is relying on
-     something it shouldn't.
-  2. **Scan loops rely on it.** "Find, then search again from just
-     past the match" reaches `From = Length (Source) + 1` whenever a
-     match ends the rope. `Split` does exactly this, as did `Count`
-     before its early exit, and with the RM's rule every such loop
-     would need a guard.
-  3. **The tests use GNAT's `Ada.Strings.Fixed` as their oracle**
-     (`test_index_set.adb`, `test_string_overloads.adb`), which only
-     works if the two agree, `Index_Error` cases included.
+- **`Ropes` followed GNAT from Phase 4 to Phase 19**, in every
+  `From` overload of `Index` (and so `Index_Non_Blank` and
+  `Contains`): `Forward` with `From > Length (Source)` returned 0. The
+  reasons given at Phase 18 were that it's what a GNAT user actually
+  gets, that `Split`'s scan loop relied on it, and that the tests used
+  GNAT's `Fixed` as their oracle.
+- **Phase 20 switched `Ropes` to the RM**, at explicit user request,
+  once Phase 19 had found GNAT's ignored precondition: GNAT's own
+  contract says such a call is a caller error, so "what a GNAT user
+  gets" is only what an unchecked precondition happens to give, and a
+  program relying on it is relying on something GNAT doesn't promise.
+  Each of the other reasons had a direct fix:
+  1. **`Split`'s loops** (the `Rope`/`String`-separator ones, array
+     and Process-callback) search through a local `Find_Next` that
+     returns 0 for `From > Length (Source)` rather than asking
+     `Index`. No test had a separator ending the rope — the one case
+     that reaches `Length + 1` — so taking the guard out didn't fail
+     anything at first; `test_split.adb`/`test_split_visitor.adb` now
+     have that case, and fail without the guard. `Count` already
+     stopped when a match reaches the end; `Find_Token` checks `From`
+     itself before searching.
+  2. **The tests' oracle** is GNAT's `Fixed` with the RM's `From`
+     check added: a local `RM (Source, From, Fixed_Result)` in
+     `test_index_set.adb`, `test_search_walk.adb` and
+     `test_find_token.adb`, which raises `Index_Error` for `From`
+     past the end of a non-empty `Source` and otherwise returns
+     `Fixed`'s answer.
 
-  The cost is that `Ropes` isn't RM-conformant here, and a future
-  GNAT that fixes its check would make `Ropes` differ from it. If that
-  happens, or if strict conformance becomes the goal, the change is
-  one rule applied to all the `From` overloads together, plus guards
-  in `Split`'s loops — not a change to one overload.
-
-  **The rule, stated once: `Ropes` does what GNAT's
-  `Ada.Strings.Fixed` does on the same text.** For `Index` that is
-  laxer than the RM; for `Find_Token` (Phase 19) it is exactly the RM
-  — `Fixed.Find_Token` checks `From` in both directions, per AI05-0031
-  — even though GNAT's `Unbounded.Find_Token` doesn't check it at all
-  (its precondition ignored, its body a slice of the no-`From`
-  version). `Fixed` is also the tests' oracle, so the rule is checked,
-  not just stated.
+  **The rule, stated once: `Ropes` does what the RM says**, checked
+  against GNAT's `Ada.Strings.Fixed` wherever GNAT and the RM agree
+  (every other operation), and against the RM text itself where they
+  don't (the `From` overloads of `Index` and `Index_Non_Blank`, and
+  `Unbounded.Find_Token`, which GNAT doesn't check at all). A future
+  GNAT that fixes its checks changes nothing here.
 
 `Rope.Mod`'s `RFind`'s own bound convention does **not** carry over
 unchanged: `RFind`'s `before` clamps so that a match's *start*
@@ -1967,6 +1964,51 @@ parameter's type.
   not a `rope_tool` bug; they were generated from Python argument
   lists instead, with no shell.)
 
+- **Phase 20, done — the RM's `From` rule, and an RM/GNAT survey.**
+  At explicit user request, once Phase 19 showed GNAT's own contract
+  calls a `Forward` search from past the end an error: every `From`
+  overload of `Index` (and so `Index_Non_Blank` and `Contains`) now
+  raises `Index_Error` for `From > Length (Source)` in either
+  direction, when `Source` isn't empty — see "`From` past the end"
+  above for the rule, the history, and the fixes it needed (`Split`'s
+  guard, an RM-checked oracle in three tests). `test_index.adb` gained
+  the `Forward` `Index_Error` checks (and one at exactly `Length + 1`);
+  `test_split.adb`/`test_split_visitor.adb` gained a separator ending
+  the rope — missing before, so the guard's removal had gone unnoticed
+  until that was added. `rope-indexset-from-past-end.test` now expects
+  the error; `rope-nonblank-all-blank.test` was split into an
+  all-blank case and `rope-nonblank-from-past-end.test`. `66 ok, 0
+  failed`.
+
+  **The survey** — every operation `Ropes` shares with
+  `Ada.Strings.Fixed`/`Unbounded`, its RM rule (A.4.3, which A.4.5's
+  paragraphs 82–87 defer to, and A.4.4 for `Element`/`Slice`) against
+  GNAT 16's bodies and `Ropes`:
+  - **`Index`, `From` overloads (all pattern kinds), and
+    `Index_Non_Blank`'s:** GNAT differs (no `Forward` check, above);
+    `Ropes` now follows the RM.
+  - **`Find_Token`, `From` overload:** GNAT's `Fixed` follows the RM
+    (AI05-0031); GNAT's `Unbounded` doesn't check `From` at all — its
+    precondition ignored, its body the no-`From` version on the slice
+    `From .. Length`. `Ropes` follows the RM (since Phase 19).
+  - **Everything else agrees** — RM, GNAT and `Ropes`: `Element`
+    (`Index_Error` past the end), `Slice` (`Index_Error` if `Low >
+    Length + 1` or `High > Length`, an empty range included — GNAT's
+    body is literally `Low - 1 > Last or else High > Last`), `Insert`
+    and `Overwrite` (`Before`/`Position` in `1 .. Length + 1`),
+    `Delete` (`Replace_Slice (Source, From, Through, "")` when `From <=
+    Through`, so `Through` past the end is fine), `Replace_Slice`,
+    `Head`, `Tail`, `Trim`, `Count` (`Pattern_Error` for an empty
+    pattern), `"*"`, and the comparisons.
+  - **Left to the implementation by the RM, so not a conflict:** which
+    of `Pattern_Error` and `Index_Error`/0 wins when both `Source` and
+    `Pattern` are empty (AARM A.4.3(56.e/3)). `Ropes` matches GNAT's
+    order, as `test_index.adb` records.
+  - **GNAT's `a-strunb.ads` has preconditions throughout, all
+    ignored** (`pragma Assertion_Policy (Pre => Ignore, ...)`); the
+    `From` ones above are the only ones found to differ from what the
+    bodies do on the operations `Ropes` shares.
+
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds
 the matching `rope_tool` subcommand(s) — see "Command-line tool
@@ -2094,5 +2136,5 @@ Oberon original: `rope-chars.test`, `rope-overwrite.test`,
 `rope-lines-stdin.test`, `rope-lines-missing.test`, for commands
 `RopeTool.Mod` never had to begin with. Run via `cd examples && ./tests/run-tests.sh`
 (`-v` per-test, `-o` also showing captured output, or name specific
-fixtures — see the script's own header comment); currently `65 ok, 0
+fixtures — see the script's own header comment); currently `66 ok, 0
 failed`.

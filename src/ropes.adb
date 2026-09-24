@@ -1041,7 +1041,7 @@ package body Ropes is
    --  bounds: the start of the first occurrence starting at or after
    --  From (Forward), or of the last one lying wholly within 1 .. From
    --  (Backward), or 0. Precondition: S_D /= null, Pattern /= "", and
-   --  From <= S_D.Len if Going = Backward.
+   --  From <= S_D.Len.
    function Find (S_D : Node_Access; Pattern : String; From : Positive; Going : Ada.Strings.Direction) return Natural is
       S_Len : constant Positive := S_D.Len;
       P_Len : constant Positive := Pattern'Length;
@@ -1192,7 +1192,6 @@ package body Ropes is
    function Index
      (Source : Rope; Pattern : String; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural
    is
-      use type Ada.Strings.Direction;
       S_D : constant Node_Access := Data_Of (Source);
    begin
       --  Source's emptiness is checked, and short-circuits, before
@@ -1200,16 +1199,17 @@ package body Ropes is
       --  From-bounded Ada.Strings.Search.Index returns 0 immediately
       --  for an empty Source, even when Pattern is also empty (the
       --  Pattern_Error check lives in the *other*, no-From overload,
-      --  reached only once Source is known non-empty). Then From is
-      --  checked GNAT's way, not the RM's: see ropes.ads and PLAN.md's
-      --  "Search".
+      --  reached only once Source is known non-empty). Then From must
+      --  be in Source's range, in either direction -- the RM's rule
+      --  (A.4.3(56.2/3)), not GNAT's laxer one: see ropes.ads and
+      --  PLAN.md's "Search".
       if S_D = null then
          return 0;
       end if;
       if Pattern'Length = 0 then
          raise Ada.Strings.Pattern_Error;
       end if;
-      if Going = Ada.Strings.Backward and then From > S_D.Len then
+      if From > S_D.Len then
          raise Ada.Strings.Index_Error;
       end if;
       return Find (S_D, Pattern, From, Going);
@@ -1225,6 +1225,9 @@ package body Ropes is
       end if;
       if P_D = null then
          raise Ada.Strings.Pattern_Error;
+      end if;
+      if From > Length (Source) then
+         raise Ada.Strings.Index_Error;
       end if;
       if P_D.Kind = Leaf_Kind then
          return Index (Source, P_D.Chars, From, Going);
@@ -1293,12 +1296,7 @@ package body Ropes is
          return 0;
       end if;
       if From > S_D.Len then
-         case Going is
-            when Ada.Strings.Forward =>
-               return 0;
-            when Ada.Strings.Backward =>
-               raise Ada.Strings.Index_Error;
-         end case;
+         raise Ada.Strings.Index_Error;
       end if;
       return Scan_For_Pattern (S_D, From, Going);
    end Index;
@@ -1333,12 +1331,7 @@ package body Ropes is
          return 0;
       end if;
       if From > S_D.Len then
-         case Going is
-            when Ada.Strings.Forward =>
-               return 0;
-            when Ada.Strings.Backward =>
-               raise Ada.Strings.Index_Error;
-         end case;
+         raise Ada.Strings.Index_Error;
       end if;
       return Scan_For_Set (S_D, From, Going);
    end Index;
@@ -1502,6 +1495,12 @@ package body Ropes is
 
    function Split (Source : Rope; Separator : Rope) return Rope_Array is
       Sep_Len : constant Natural := Length (Separator);
+
+      --  The next Separator at or after From, or 0. After a separator
+      --  that ends Source, From is Length (Source) + 1, which Index
+      --  rejects (the RM's From rule), so that case is 0 here.
+      function Find_Next (From : Positive) return Natural is
+        (if From > Length (Source) then 0 else Index (Source, Separator, From, Ada.Strings.Forward));
    begin
       if Sep_Len = 0 then
          return [1 => Source];
@@ -1512,7 +1511,7 @@ package body Ropes is
          Found : Natural;
       begin
          loop
-            Found := Index (Source, Separator, Pos, Ada.Strings.Forward);
+            Found := Find_Next (Pos);
             exit when Found = 0;
             Count := Count + 1;
             Pos   := Found + Sep_Len;
@@ -1523,7 +1522,7 @@ package body Ropes is
             Start  : Positive := 1;
          begin
             for I in 1 .. Count - 1 loop
-               Found      := Index (Source, Separator, Start, Ada.Strings.Forward);
+               Found      := Find_Next (Start);
                Result (I) := Slice (Source, Start, Found - 1);
                Start      := Found + Sep_Len;
             end loop;
@@ -1630,16 +1629,21 @@ package body Ropes is
 
    procedure Split (Source : Rope; Separator : Rope; Process : not null access function (Piece : Rope) return Boolean) is
       Sep_Len : constant Natural := Length (Separator);
-      Start   : Positive         := 1;
-      Found   : Natural;
-      More    : Boolean;
+
+      --  As in the array-returning Split above.
+      function Find_Next (From : Positive) return Natural is
+        (if From > Length (Source) then 0 else Index (Source, Separator, From, Ada.Strings.Forward));
+
+      Start : Positive := 1;
+      Found : Natural;
+      More  : Boolean;
    begin
       if Sep_Len = 0 then
          More := Process (Source);
          return;
       end if;
       loop
-         Found := Index (Source, Separator, Start, Ada.Strings.Forward);
+         Found := Find_Next (Start);
          if Found = 0 then
             More := Process (Slice (Source, Start, Length (Source)));
             exit;

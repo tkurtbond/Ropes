@@ -1,9 +1,8 @@
-# No non-space character: 0. A forward FROM past the end is 0 too,
-# not an error -- Index's GNAT rule, which Index_Non_Blank inherits.
+# No non-space character: 0.
 program rope_tool
 arg nonblank
 arg    
-arg 9
+arg 1
 status 0
 output
 0

@@ -1,0 +1,9 @@
+# A forward FROM past the end raises Ada.Strings.Index_Error, as for
+# Index, which Index_Non_Blank is built on -- the RM's rule, not GNAT's.
+program rope_tool
+arg nonblank
+arg ab
+arg 9
+status 1
+output
+Error: FROM out of range

@@ -8,7 +8,7 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-19, Phases
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-20, Phases
 7-8, 11 and 13 stretch phases and Phases 9-10, 12 and 14 not really
 `Ada`-side changes — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
@@ -47,10 +47,10 @@ the `Ropes.Text_IO` child package (`Put`/`Put_Line`/`Get_Line`).
 (5), `test_overwrite.adb` (6), `test_head_tail.adb` (10),
 `test_contains.adb` (9), `test_split_visitor.adb` (13), and
 `test_text_io.adb` (17), `test_stream_io.adb` (11), `test_copy_slice.adb` (11), `test_string_overloads.adb` (25), `test_replace_slice.adb` (10),
-`test_index_set.adb` (10), `test_count.adb` (10), `test_search_walk.adb` (31), `test_find_token.adb` (14) — 345 checks total — all pass clean, including under valgrind. Plus a
+`test_index_set.adb` (10), `test_count.adb` (10), `test_search_walk.adb` (31), `test_find_token.adb` (14) — 349 checks total — all pass clean, including under valgrind. Plus a
 black-box `rope_tool` test suite, `examples/tests/` (`run-tests.sh` +
-65 `.test` fixtures, mostly ported from
-`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `65 ok, 0 failed`.
+66 `.test` fixtures, mostly ported from
+`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `66 ok, 0 failed`.
 `Balance`/`Max_Depth`/`Min_Length` are internal to `ropes.adb`, not
 public — `src/ropes-test_support.ads`/`.adb` is a small test-only
 child package (`function Depth`) so tests can confirm depth stays
@@ -271,9 +271,22 @@ is the whole trick. **Proving a search test can fail is part of
 writing it**: `test_search_walk.adb` was checked by planting three
 bugs, one at a time, and seeing it fail each.
 
+**Phase 20 made every `From` overload of `Index` follow the RM**:
+`Index_Error` for `From > Length (Source)` in either direction (a
+non-empty `Source`), where it had copied GNAT's unchecked `Forward`
+behavior (returning 0). **`Ropes` follows the RM; GNAT's `Fixed` is
+the test oracle only where the two agree** — where they don't, the
+tests wrap it (`RM (Source, From, Fixed_Result)`). PLAN.md's Phase 20
+entry has the full RM/GNAT survey: the `From` overloads of `Index`/
+`Index_Non_Blank` and GNAT's `Unbounded.Find_Token` are the only
+conflicts. **A guard can be untested even when every test passes** —
+`Split`'s new one wasn't, until a separator-ends-the-rope case was
+added; remove a guard once to see that some test notices.
+
 **Phase 19 added `Index_Non_Blank` and `Find_Token`, and settled the
-`From` rule as "do what GNAT's `Ada.Strings.Fixed` does"** — laxer
-than the RM for `Index`, exactly the RM for `Find_Token`. Checking it
+`From` rule as "do what GNAT's `Ada.Strings.Fixed` does"** (replaced
+by the RM at Phase 20) — laxer than the RM for `Index`, exactly the RM
+for `Find_Token`. Checking it
 found that **GNAT's `a-strunb.ads` states the RM's `From` rule as
 preconditions and then ignores them** (`pragma Assertion_Policy (Pre
 => Ignore)`): read a GNAT runtime spec's contracts *and* its

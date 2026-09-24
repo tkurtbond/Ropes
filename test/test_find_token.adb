@@ -3,9 +3,10 @@
 --  GNAT's Ada.Strings.Fixed on the same text, over a rope of 9-character
 --  leaves (9 + 9 > 16, the short-leaf merge threshold, so they stay
 --  separate), run for every From in both directions -- Index_Error
---  cases included, which must raise exactly when Fixed's does. For
---  Find_Token that is the RM's rule, which Fixed follows and GNAT's
---  Unbounded (whose From precondition is never checked) does not.
+--  cases included, which must raise exactly when the RM says. For
+--  Find_Token, GNAT's Fixed already follows the RM (GNAT's Unbounded,
+--  whose From precondition is never checked, does not); for
+--  Index_Non_Blank, it needs the RM's From check added (RM, below).
 
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Strings;      use Ada.Strings;
@@ -47,6 +48,13 @@ procedure Test_Find_Token is
    Text   : constant String := "   alpha 12 bravo          charlie3456789 delta  x 1234567890123456789 echo   ";
    Chunks : constant Rope   := Chunked (Text);
 
+   --  The oracle: GNAT's Ada.Strings.Fixed result, with the RM's From
+   --  check that GNAT leaves out (A.4.3(56.2/3, 58.5/3)): Index_Error
+   --  for a From past the end of a non-empty Source, whichever way the
+   --  search goes. GNAT itself raises only going Backward.
+   function RM (Source : String; From : Positive; Fixed_Result : Natural) return Natural is
+     (if Source'Length > 0 and then From > Source'Last then raise Index_Error else Fixed_Result);
+
    Digit_Set  : constant Character_Set := To_Set ("0123456789");
    Letter_Set : constant Character_Set := To_Set (Ranges => [('a', 'z')]);
    Blank_Set  : constant Character_Set := To_Set (' ');
@@ -81,7 +89,7 @@ procedure Test_Find_Token is
    function Non_Blank_Agrees (R : Rope; O : String; From : Positive; Going : Direction) return Boolean is
    begin
       declare
-         Want : constant Natural := Ada.Strings.Fixed.Index_Non_Blank (O, From, Going);
+         Want : constant Natural := RM (O, From, Ada.Strings.Fixed.Index_Non_Blank (O, From, Going));
       begin
          return Index_Non_Blank (R, From, Going) = Want;
       exception

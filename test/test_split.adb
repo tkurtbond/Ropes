@@ -128,6 +128,19 @@ begin
       Check (P'Length = 1 and then To_String (P (1)) = "abc", "Split (Character_Set separator) with Null_Set never splits");
    end;
 
+   --  A separator that ends the rope: the search for the next one
+   --  would start at Length + 1, which Index rejects (the RM's From
+   --  rule, since Phase 20), so Split must stop there itself.
+   declare
+      P : constant Rope_Array := Split (From_String ("a,b,"), From_String (","));
+      Q : constant Rope_Array := Split (From_String ("a::b::"), "::");
+   begin
+      Check
+        (P'Length = 3 and then To_String (P (2)) = "b" and then To_String (P (3)) = "" and then Q'Length = 3
+         and then To_String (Q (2)) = "b" and then To_String (Q (3)) = "",
+         "Split (Rope and String separators): one ending the rope gives a last, empty piece");
+   end;
+
    New_Line;
    Put_Line (Passed'Image & " /" & Natural'Image (Passed + Failed) & " tests passed.");
    if Failed > 0 then
