@@ -1,0 +1,8 @@
+# No occurrence, in any case: 0.
+program rope_tool
+arg indexci
+arg The Quick BROWN Fox
+arg dog
+status 0
+output
+0

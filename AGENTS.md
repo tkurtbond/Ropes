@@ -8,7 +8,7 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-22, Phases
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-25, Phases
 7-8, 11 and 13 stretch phases and Phases 9-10, 12 and 14 not really
 `Ada`-side changes — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
@@ -21,7 +21,11 @@ depth-triggered auto-rebalance — `Balance`/`Balance_Insert`/
 all five comparison operators, both operand orders; Phase 17:
 `Replace_Slice`, `Index` with a `Character_Set`, and `Count`; Phase 19:
 `Index_Non_Blank` and `Find_Token`; Phase 22: `Translate` with a
-`Character_Mapping` or a `Character_Mapping_Function`),
+`Character_Mapping` or a `Character_Mapping_Function`; Phase 23:
+`"*" (Natural, String)` and `Replace_Element`; Phase 24: `Hash`,
+`Hash_Case_Insensitive`, `Equal_Case_Insensitive` and
+`Less_Case_Insensitive`; Phase 25: a `Mapping` parameter, either form,
+on the `Rope`/`String` `Index`, `Count` and `Contains`),
 `Delete`, `Overwrite`/`Head`/`Tail`, the five
 comparison operators (`"="`/`"<"`/`"<="`/`">"`/`">="`), `Index`
 (`Rope`/`Character` patterns, each with a no-`From` and a
@@ -44,14 +48,14 @@ the `Ropes.Text_IO` child package (`Put`/`Put_Line`/`Get_Line`).
 `test_compare.adb` (19), `test_index.adb` (27), `test_split.adb` (17),
 `test_iterator.adb` (12), `test_map.adb` (4), `test_case.adb` (8),
 `test_trim.adb` (7), `test_concat_overloads.adb` (12),
-`test_unbounded.adb` (4), `test_repeat.adb` (8), `test_escape.adb`
+`test_unbounded.adb` (4), `test_repeat.adb` (12), `test_escape.adb`
 (5), `test_overwrite.adb` (6), `test_head_tail.adb` (10),
 `test_contains.adb` (9), `test_split_visitor.adb` (16), and
 `test_text_io.adb` (17), `test_stream_io.adb` (11), `test_copy_slice.adb` (11), `test_string_overloads.adb` (25), `test_replace_slice.adb` (10),
-`test_index_set.adb` (10), `test_count.adb` (10), `test_search_walk.adb` (31), `test_find_token.adb` (14), `test_translate.adb` (12) — 364 checks total — all pass clean, including under valgrind. Plus a
+`test_index_set.adb` (10), `test_count.adb` (10), `test_search_walk.adb` (31), `test_find_token.adb` (14), `test_translate.adb` (12), `test_replace_element.adb` (9), `test_hash.adb` (15), `test_index_mapping.adb` (15) — 407 checks total — all pass clean, including under valgrind. Plus a
 black-box `rope_tool` test suite, `examples/tests/` (`run-tests.sh` +
-69 `.test` fixtures, mostly ported from
-`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `69 ok, 0 failed`.
+81 `.test` fixtures, mostly ported from
+`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `81 ok, 0 failed`.
 `Balance`/`Max_Depth`/`Min_Length` are internal to `ropes.adb`, not
 public — `src/ropes-test_support.ads`/`.adb` is a small test-only
 child package (`function Depth`) so tests can confirm depth stays
@@ -287,6 +291,51 @@ access type is library-level), so tests use
 TO` demonstrates the `Character_Mapping` form; the function form has no
 command, like `Map`.
 
+**Phase 23 added `"*" (Natural, String)` and `Replace_Element`** —
+the two one-line gaps left from the Phase 16 "what's missing from
+`Ada.Strings.Unbounded`" list. `Replace_Element` is a function (a
+procedure in `Unbounded`), and raises `Index_Error` for `Index >
+Length (Source)`: it never appends, unlike `Overwrite` and
+`Replace_Slice`, which accept `Length + 1`.
+
+**Phase 24 added `Hash`, `Hash_Case_Insensitive`,
+`Equal_Case_Insensitive` and `Less_Case_Insensitive`** (RM A.4.9,
+A.4.10). **They are functions of `Ropes`, not child units as in the
+RM**, because they walk leaves and a child's body can't see
+`ropes.adb`'s `Leaf_Walk`; a call reads `Ropes.Hash (K)` either way.
+`Hash` computes GNAT's own `System.String_Hash` recurrence (sdbm) a
+leaf at a time, so it equals `Ada.Strings.Hash (To_String (K))`
+**under GNAT only** (the RM leaves that value
+implementation-defined); `test_hash.adb` checks that and says so. Case
+folding is `Ada.Characters.Handling.To_Lower`, as GNAT's own
+case-insensitive functions use; the tests check every pair of Latin-1
+characters. The node-to-node `Compare` became `Generic_Compare`, over
+how two runs compare, with an exact and a folded instance; `"="` is no
+slower for it.
+
+**Phase 25 added the `Mapping` parameter to the `Rope`/`String`
+`Index`, `Count` and `Contains`**: a defaulted `Character_Mapping`
+(`Identity`) on the existing overloads, plus a
+`Character_Mapping_Function` overload of each. `Find` became
+`Generic_Find` over `Fold`/`Same_Run`; the exact instance still
+compares whole slices, and `Identity` takes that path, so unmapped
+searches are no slower. **Only `Source` is mapped, never `Pattern`**
+(RM A.4.2(54)); a case-insensitive search needs a lower-case
+`Pattern`. **Every `Character_Mapping_Function` parameter is now `not
+null`**, `Translate`'s included, so null raises `Constraint_Error`
+at the call; the RM says nothing about null, and GNAT's precondition
+is never checked. Three lessons: (1) **the first test missed a planted
+bug that also folded `Pattern`.** No pattern had a character the
+mapping changes, so the test gained a to-and-fro mapping (`abc`↔`xyz`)
+with text containing both. The mapping has to be one that makes
+mapped and unmapped `Pattern` behave differently. (2) **`gnatpp`
+can't format an iterated component association**
+(`[for Ch in Character => ...]` fails with "null template:
+IteratedAssoc", leaving the whole file unformatted), so `Table_Of` is
+a loop. (3) **A test that passes a constant `null` to a `not null`
+formal draws a compile-time warning**; the tests silence it with
+`pragma Warnings (Off, ...)` on those two messages.
+
 **Phase 21 put the `Character`/`Character_Set` `Split`s on the
 leaf-walking `Index`** (they had each kept a per-character `Element`
 loop), and found `PLAN.md` describing a `Split_Generic` that never
@@ -370,8 +419,16 @@ true going forward).
 `triml`/`trimr`/`upper`/`lower`/`capitalize`/`uncapitalize`/`repeat`/
 `make`/`bigcat`/`contains`/`escaped`/`lines`/`readfile`/`copyslice`/
 `replaceslice`/`count`/`countset`/`indexset`/`rindexset`/`nonblank`/
-`rnonblank`/`findtoken`/`translate`, matching all of `Ropes`'s API
-through Phase 22 (`translate S FROM TO` is Phase 22's, with
+`rnonblank`/`findtoken`/`translate`/`replaceelement`/`cmpci`/`hash`/
+`hashci`/`indexci`/`countci`, matching all of `Ropes`'s API
+through Phase 25 (`indexci`/`countci` are Phase 25's, lowering
+PATTERN and searching with a `Character_Mapping_Function`
+(`To_Lower'Access`) and a `Character_Mapping` (`Lower_Case_Map`)
+respectively, one command per form; `cmpci` is built from
+`Equal_Case_Insensitive`/`Less_Case_Insensitive` as `cmp` is from
+`"="`/`"<"`, and `hash`/`hashci` print GNAT-specific values, Phase
+24's; `replaceelement S INDEX CH` is Phase 23's, and `repeat` has
+used Phase 23's `"*" (Natural, String)` since; `translate S FROM TO` is Phase 22's, with
 `To_Mapping (FROM, TO)` — the `Character_Mapping_Function` form has
 no command, like `Map`, since a function can't be given on the
 command line, and `upper`/`lower` already show function-based mapping; Phase 19's are `Index_Non_Blank`/`Find_Token` demos, `findtoken`

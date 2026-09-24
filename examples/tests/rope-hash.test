@@ -1,0 +1,8 @@
+# Hash (Phase 24): GNAT's Ada.Strings.Hash of the text -- the RM
+# leaves the value implementation-defined.
+program rope_tool
+arg hash
+arg Hello, World
+status 0
+output
+3446766348

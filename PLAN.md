@@ -473,6 +473,7 @@ function To_Unbounded_String (Source : Rope) return Ada.Strings.Unbounded.Unboun
 
 function "*" (Left : Natural; Right : Character) return Rope;  -- Rope.Mod's Make
 function "*" (Left : Natural; Right : Rope) return Rope;       -- Rope.Mod's Repeat: O(log Left), binary doubling
+function "*" (Left : Natural; Right : String) return Rope;     -- Phase 23: Left * From_String (Right)
 ```
 
 `"&"` replaces `Cat`/`AppendChar`/`FromChar` together — this is *the*
@@ -550,7 +551,13 @@ function Insert (Source : Rope; Before : Positive; New_Item : String) return Rop
 function Overwrite (Source : Rope; Position : Positive; New_Item : String) return Rope; -- Phase 16
 function Replace_Slice (Source : Rope; Low : Positive; High : Natural; By : Rope) return Rope;   -- Phase 17
 function Replace_Slice (Source : Rope; Low : Positive; High : Natural; By : String) return Rope; -- Phase 17
+function Replace_Element (Source : Rope; Index : Positive; By : Character) return Rope;      -- Phase 23
 ```
+
+`Replace_Element` is `Unbounded`'s procedure as a function. Unlike
+`Replace_Slice` and `Overwrite`, it raises `Index_Error` for `Index =
+Length (Source) + 1`: there is no character there to replace, and the
+RM's rule (`Index > Length (Source)`) says so.
 
 Names and parameter shapes taken directly from
 `Ada.Strings.Unbounded.Insert`/`.Delete`.
@@ -596,6 +603,33 @@ six standard operators instead of a `-1/0/1` function plus a derived
 `Equal`. No `strcmp`-style three-way function — nothing else in
 `Ada.Strings` exposes one, and nothing here needs it.
 
+**[Phase 24, done.]** RM A.4.9 and A.4.10's hashing and
+case-insensitive comparison:
+
+```ada
+function Hash (Key : Rope) return Ada.Containers.Hash_Type;
+function Hash_Case_Insensitive (Key : Rope) return Ada.Containers.Hash_Type;
+function Equal_Case_Insensitive (Left, Right : Rope) return Boolean;
+function Less_Case_Insensitive (Left, Right : Rope) return Boolean;
+```
+
+These make a `Rope` a key in `Ada.Containers`' hashed and ordered
+maps and sets, with or without case. The RM makes each a child unit
+(`Ada.Strings.Unbounded.Hash`, ...); here they are functions of
+`Ropes` itself, since they walk leaves (`Process_Chunks`,
+`Generic_Compare`) and a child's body can't see `ropes.adb`. `Hash`
+runs GNAT's `System.String_Hash` recurrence (sdbm: `H := Ch + H * 2**6
++ H * 2**16 - H`) over the leaves in order. The recurrence carries only
+`H` from one character to the next, so leaf boundaries can't change
+the result, and `Hash (K) = Ada.Strings.Hash (To_String (K))` under
+GNAT. The RM leaves that value implementation-defined, so no other
+compiler promises it. Case folding is
+`Ada.Characters.Handling.To_Lower`, as GNAT's own
+`Equal_Case_Insensitive`, `Less_Case_Insensitive` and
+`Hash_Case_Insensitive` fold. The node-to-node `Compare` is now
+`Generic_Compare`, instantiated with an exact run comparison (whole
+slices, as before) and a folded one.
+
 ### Search
 
 ```ada
@@ -630,7 +664,29 @@ function Index
 function Count (Source : Rope; Pattern : Rope) return Natural;
 function Count (Source : Rope; Pattern : String) return Natural;
 function Count (Source : Rope; Set : Ada.Strings.Maps.Character_Set) return Natural;
+
+--  Phase 25: every Rope and String pattern Index, Count and Contains
+--  gains Mapping : Ada.Strings.Maps.Character_Mapping :=
+--  Ada.Strings.Maps.Identity as its last parameter, and a twin with
+--  Mapping : not null Ada.Strings.Maps.Character_Mapping_Function.
 ```
+
+**Mapping [Phase 25, done]** follows RM A.4.2(54, 64). A stretch of
+`Source` matches `Pattern` when each of its characters, mapped, equals
+`Pattern`'s. `Pattern` itself is never mapped, so a case-insensitive
+search pairs `Lower_Case_Map` (or `To_Lower'Access`) with a lower-case
+`Pattern`. `Find` became `Generic_Find (Fold, Same_Run)`. `Find`, the
+exact instance, keeps comparing whole slices, and `Identity` uses it,
+so unmapped searches are no slower. Each mapped overload instantiates
+`Folded_Search` with a `Fold` for its own `Mapping`: an array lookup
+in a table built once per call for a `Character_Mapping`, or a call of
+the function otherwise. A mapped search costs about 10–50% more than
+an unmapped one on 2 million characters (`Index`: 0.016 s unmapped,
+0.019 s with a table, 0.023 s with a function; `Count`: 0.045 s, and
+0.051 s with a table). A null
+`Character_Mapping_Function` raises `Constraint_Error` at the call,
+since every such parameter is `not null`.
+
 
 Collapses `Rope.Mod`'s four functions (`Find`, `RFind`, `IndexChar`,
 `RIndexChar`) into two, reusing `Ada.Strings.Direction` the same way
@@ -2068,12 +2124,85 @@ parameter's type.
   fixtures from real runs, `rope-help.test`/
   `rope-unknown-command.test` regenerated: `69 ok, 0 failed`.
 
+- **Phase 23, done — `"*" (Natural, String)` and `Replace_Element`.**
+  At explicit user request. These were the two one-line items left on
+  the list of what `Ada.Strings.Fixed`/`Unbounded` has and `Ropes`
+  lacked (first drawn up before Phase 16). `"*" (Natural, String)` is
+  `Left * From_String (Right)`: `Right` is copied once, into one leaf,
+  and the doubling shares it. `Replace_Element` is `Unbounded`'s
+  procedure as a function, `Replace_Slice (Source, Index, Index,
+  From_Character (By))` behind an `Index > Length (Source)` check. The
+  check matters, because without it `Index = Length + 1` would append,
+  as `Replace_Slice` and `Overwrite` allow. Removing the check fails two
+  checks. `test_repeat.adb` 8 → 12 checks (`"*"` against
+  `Ada.Strings.Fixed."*"` for 0 .. 9 copies, `""`, and a million copies
+  staying shallow). New `test_replace_element.adb` (9): every index
+  across leaves against `Ada.Strings.Unbounded.Replace_Element`, the
+  end and `Null_Rope` raising, and a `"*"`-built rope changing only the
+  one character. `rope_tool replaceelement S INDEX CH`, and `repeat`
+  now uses the `String` overload; 4 new fixtures.
+
+- **Phase 24, done — `Hash`, `Hash_Case_Insensitive`,
+  `Equal_Case_Insensitive`, `Less_Case_Insensitive`.** At explicit
+  user request; see "Comparison". They are functions in `Ropes`, not
+  child units, and `Hash` matches GNAT's `Ada.Strings.Hash` (not
+  promised by the RM). `test_hash.adb` (15 checks) uses GNAT's
+  `Ada.Strings` functions as oracles for:
+  - two leaf chunkings, and every prefix of a mixed-case Latin-1 text
+  - every pair of prefixes, for the comparisons
+  - every pair of Latin-1 characters, for all three case-insensitive
+    functions
+  - a `"*"`-built rope
+  - `Hashed_Maps` and `Ordered_Sets` keyed by `Rope`, exact and
+    case-insensitive
+
+  Planting two bugs, one at a time, fails the tests each time: `H`
+  reset per leaf, and `Folded_Runs` not folding its right side. `"="`
+  still takes 0.085 s on two 20-million-character ropes;
+  `Equal_Case_Insensitive` takes 0.15 s and `Hash` 0.04 s.
+  `rope_tool cmpci A B`, `hash S` and `hashci S`; 4 new fixtures.
+
+- **Phase 25, done — the `Mapping` parameter of `Index`, `Count` and
+  `Contains`.** At explicit user request; see "Search". It covers the
+  `Rope` and `String` pattern overloads only. The `Character` and
+  `Character_Set` ones have no `Mapping` in `Ada.Strings` either, and
+  `Contains` gets one because it wraps `Index`. `test_index_mapping.adb`
+  (15 checks) compares against `Ada.Strings.Fixed.Index`/`Count` with
+  the same mapping: three `Character_Mapping`s (`Lower_Case_Map`, a
+  to-and-fro `abc`↔`xyz`, and `Identity`) and `To_Lower'Access`.
+  Every `From` in both directions is checked, over two leaf chunkings
+  and ten patterns, with `String` and multi-leaf `Rope` patterns. The
+  RM's `From` check is added to the oracle as in Phase 19, and each
+  exception is compared as an outcome. The test also checks null
+  mappings (`Constraint_Error`, even for `Null_Rope`) and an empty
+  `Pattern` (`Pattern_Error`).
+
+  The test first caught only two of three planted bugs. The one it
+  missed folded `Pattern` as well as `Source`, which changes a result
+  only when `Pattern` has a character the mapping changes and the
+  text has what it changes to, and no test case had both. The
+  test gained the `abc`↔`xyz` text and patterns, and now catches all
+  three. `Translate`'s `Character_Mapping_Function` parameter became
+  `not null` too, for consistency (no change in behavior).
+  `rope_tool indexci S PATTERN` (function form) and `countci S
+  PATTERN` (table form), each lowering `PATTERN`; 4 new fixtures,
+  `rope-help.test`/`rope-unknown-command.test` regenerated each phase:
+  `81 ok, 0 failed`. `make test`: 407 + 81 = 488 ok, 0 failed.
+
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds
 the matching `rope_tool` subcommand(s) — see "Command-line tool
 (rope_tool)" above for the current/planned mapping.
 
 ## Remaining scope, as of Phase 11
+
+(Phases 16–25 worked through a separate list: what
+`Ada.Strings.Fixed`/`Unbounded` has that `Ropes` lacked. As of Phase
+25 everything on it is done except what was left out on purpose: the
+`in out` procedure forms, `Trim (Source, Side)`, a `String`-returning
+`Slice`, `Move`, `Drop`/`Justify`/`Pad`, `To_Unbounded_String
+(Length)`, and `String_Access`/`Free`. The list below is the older,
+cord-and-paper one.)
 
 Everything in "Deferred / stretch" above is now done — Phase 7 closed
 out the rest of "Construction and concatenation" plus `Escape`, and

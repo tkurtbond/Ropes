@@ -56,6 +56,11 @@ procedure Test_Translate is
    --  function (its access type is library-level), such as this one.
    Upper_Function : constant Character_Mapping_Function := Ada.Characters.Handling.To_Upper'Access;
 
+   --  A constant null actual for a not null formal draws a
+   --  compile-time warning; this call is meant to raise.
+   pragma Warnings (Off, "*null-excluding formal*");
+   pragma Warnings (Off, "Constraint_Error will be raised at run time");
+
    function Null_Function_Raises return Boolean is
       No_Function : constant Character_Mapping_Function := null;
       Unused      : Rope;

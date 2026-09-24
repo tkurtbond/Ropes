@@ -1,0 +1,9 @@
+# CH must be exactly one character.
+program rope_tool
+arg replaceelement
+arg hello
+arg 1
+arg JJ
+status 1
+output
+Error: CH must be exactly one character: "JJ"

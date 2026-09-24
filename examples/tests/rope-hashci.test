@@ -1,0 +1,8 @@
+# Hash_Case_Insensitive (Phase 24): the same for any case of the
+# same text.
+program rope_tool
+arg hashci
+arg hELLO, wORLD
+status 0
+output
+4000297740

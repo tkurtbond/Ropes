@@ -10,6 +10,7 @@
 --  CheckOverflowGuard translates to Natural'Last here.
 
 with Ada.Command_Line;   use Ada.Command_Line;
+with Ada.Strings.Fixed;
 with Ada.Text_IO;        use Ada.Text_IO;
 with Ropes;              use Ropes;
 with Ropes.Test_Support; use Ropes.Test_Support;
@@ -37,6 +38,24 @@ begin
 
    Check (To_String (5 * 'z') = "zzzzz", """*"" (Natural, Character): content");
    Check (Is_Empty (0 * 'z'), """*"" (Natural, Character) 0 times is Null_Rope");
+
+   --  Phase 23: "*" (Natural, String), Ada.Strings.Unbounded's own
+   --  third "*", against Ada.Strings.Fixed's "*" (Natural, String).
+   declare
+      All_Agree : Boolean := True;
+   begin
+      for N in 0 .. 9 loop
+         if To_String (N * "abc") /= Ada.Strings.Fixed."*" (N, "abc") then
+            All_Agree := False;
+         end if;
+      end loop;
+      Check (All_Agree, """*"" (Natural, String): 0 .. 9 times agree with Ada.Strings.Fixed");
+   end;
+   Check (To_String (3 * "abc") = "abcabcabc", """*"" (Natural, String): content");
+   Check (Is_Empty (5 * "") and then Is_Empty (0 * "abc"), """*"" (Natural, String): of """" or 0 times is Null_Rope");
+   Check
+     (Length (1_000_000 * "abcdefghij") = 10_000_000 and then Depth (1_000_000 * "abcdefghij") < 40,
+      """*"" (Natural, String): a million times is cheap, shared by doubling");
 
    --  A rope built by balanced binary doubling should come out with a
    --  close-to-minimal Depth -- Ropes has no public Balance/Depth to

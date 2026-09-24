@@ -1,0 +1,9 @@
+# Less_Case_Insensitive (Phase 24): "apple" sorts before "Banana"
+# ignoring case, though cmp puts it after ('a' > 'B').
+program rope_tool
+arg cmpci
+arg apple
+arg Banana
+status 0
+output
+-1

@@ -1,0 +1,10 @@
+# Index with a Character_Mapping_Function (Phase 25):
+# Ada.Characters.Handling.To_Lower maps S, and PATTERN is lowered, so
+# the search ignores case.
+program rope_tool
+arg indexci
+arg The Quick BROWN Fox
+arg brown FOX
+status 0
+output
+11

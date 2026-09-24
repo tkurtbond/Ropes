@@ -1,0 +1,9 @@
+# Replace_Element (Phase 23): the character at INDEX becomes CH.
+program rope_tool
+arg replaceelement
+arg hello, world
+arg 8
+arg W
+status 0
+output
+hello, World

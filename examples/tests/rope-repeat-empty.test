@@ -1,0 +1,9 @@
+# "*" (Natural, String) (Phase 23) of the empty string is the empty
+# rope, however many times.
+program rope_tool
+arg repeat
+arg 
+arg 5
+status 0
+output
+

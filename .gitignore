@@ -31,6 +31,9 @@ test/test_count
 test/test_search_walk
 test/test_find_token
 test/test_translate
+test/test_replace_element
+test/test_hash
+test/test_index_mapping
 examples/obj/
 examples/rope_tool
 

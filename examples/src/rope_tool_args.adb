@@ -1,7 +1,9 @@
+with Ada.Characters.Handling;
 with Ada.Command_Line; use Ada.Command_Line;
 with Ada.Strings;
 with Ada.Strings.Fixed;
 with Ada.Strings.Maps;
+with Ada.Strings.Maps.Constants;
 with Ada.Strings.Unbounded;
 with Ada.Text_IO;      use Ada.Text_IO;
 with Ropes;            use Ropes;
@@ -545,15 +547,16 @@ package body Rope_Tool_Args is
    --  --- repeat S N ---
 
    Repeat_Count : Natural := 0;
-   Repeat_S     : Rope;
+   Repeat_S     : Ada.Strings.Unbounded.Unbounded_String;
 
    function Repeat_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
       pragma Unreferenced (Start_With);
    begin
       if Repeat_Count = 0 then
-         Repeat_S := From_String (Arg);
+         Repeat_S := Ada.Strings.Unbounded.To_Unbounded_String (Arg);
       elsif Repeat_Count = 1 then
-         Ropes.Text_IO.Put_Line (Natural'Value (Arg) * Repeat_S);
+         --  "*" (Natural, String), Phase 23's.
+         Ropes.Text_IO.Put_Line (Natural'Value (Arg) * Ada.Strings.Unbounded.To_String (Repeat_S));
       end if;
       Repeat_Count := Repeat_Count + 1;
       return True;
@@ -1110,5 +1113,150 @@ package body Rope_Tool_Args is
          Set_Exit_Status (Failure);
          return False;
    end Translate_Argument_Handler;
+
+   --  --- replaceelement S INDEX CH ---
+
+   Replaceelement_Count : Natural := 0;
+   Replaceelement_S     : Rope;
+   Replaceelement_Index : Positive;
+
+   function Replaceelement_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Replaceelement_Count is
+         when 0 =>
+            Replaceelement_S := From_String (Arg);
+
+         when 1 =>
+            Replaceelement_Index := Positive'Value (Arg);
+
+         when 2 =>
+            if Arg'Length /= 1 then
+               Put_Line (Standard_Error, "Error: CH must be exactly one character: """ & Arg & """");
+               Set_Exit_Status (Failure);
+               return False;
+            end if;
+            Ropes.Text_IO.Put_Line (Replace_Element (Replaceelement_S, Replaceelement_Index, Arg (Arg'First)));
+
+         when others =>
+            null;
+      end case;
+      Replaceelement_Count := Replaceelement_Count + 1;
+      return True;
+   exception
+      when Constraint_Error        =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Index_Error =>
+         --  INDEX, set on an earlier call, is the one out of range.
+         Put_Line (Standard_Error, "Error: INDEX out of range");
+         Set_Exit_Status (Failure);
+         return False;
+   end Replaceelement_Argument_Handler;
+
+   --  --- cmpci A B ---
+   --  cmp's case-insensitive twin, built the same way, from
+   --  Equal_Case_Insensitive/Less_Case_Insensitive (Rope operands only,
+   --  as Ada.Strings.Unbounded's own have).
+
+   Cmpci_Count : Natural := 0;
+   Cmpci_A     : Rope;
+
+   function Cmpci_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      if Cmpci_Count = 0 then
+         Cmpci_A := From_String (Arg);
+      elsif Cmpci_Count = 1 then
+         if Equal_Case_Insensitive (Cmpci_A, From_String (Arg)) then
+            Put_Line ("0");
+         elsif Less_Case_Insensitive (Cmpci_A, From_String (Arg)) then
+            Put_Line ("-1");
+         else
+            Put_Line ("1");
+         end if;
+      end if;
+      Cmpci_Count := Cmpci_Count + 1;
+      return True;
+   end Cmpci_Argument_Handler;
+
+   --  --- hash S / hashci S ---
+   --  The value is GNAT's Ada.Strings.Hash (or Hash_Case_Insensitive)
+   --  of S -- implementation-defined by the RM, so another compiler's
+   --  would differ.
+
+   function Hash_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      Put_Line (Ada.Strings.Fixed.Trim (Hash (From_String (Arg))'Image, Ada.Strings.Both));
+      return True;
+   end Hash_Argument_Handler;
+
+   function Hashci_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      Put_Line (Ada.Strings.Fixed.Trim (Hash_Case_Insensitive (From_String (Arg))'Image, Ada.Strings.Both));
+      return True;
+   end Hashci_Argument_Handler;
+
+   --  --- indexci S PATTERN / countci S PATTERN ---
+   --
+   --  Case-insensitive search the Ada.Strings way (Phase 25): only
+   --  Source is mapped, so PATTERN is lowered here and Source mapped to
+   --  lower case by the search. indexci passes a
+   --  Character_Mapping_Function (Ada.Characters.Handling.To_Lower),
+   --  countci a Character_Mapping (Constants.Lower_Case_Map), so that
+   --  each form of Mapping has a command.
+
+   Indexci_Count : Natural := 0;
+   Indexci_S     : Rope;
+
+   function Indexci_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      if Indexci_Count = 0 then
+         Indexci_S := From_String (Arg);
+      elsif Indexci_Count = 1 then
+         Put_Line
+           (Ada.Strings.Fixed.Trim
+              (Natural'Image
+                 (Index
+                    (Indexci_S, Ada.Characters.Handling.To_Lower (Arg), Ada.Strings.Forward,
+                     Ada.Characters.Handling.To_Lower'Access)),
+               Ada.Strings.Both));
+      end if;
+      Indexci_Count := Indexci_Count + 1;
+      return True;
+   exception
+      when Ada.Strings.Pattern_Error =>
+         Put_Line (Standard_Error, "Error: PATTERN must not be empty");
+         Set_Exit_Status (Failure);
+         return False;
+   end Indexci_Argument_Handler;
+
+   Countci_Count : Natural := 0;
+   Countci_S     : Rope;
+
+   function Countci_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      if Countci_Count = 0 then
+         Countci_S := From_String (Arg);
+      elsif Countci_Count = 1 then
+         Put_Line
+           (Ada.Strings.Fixed.Trim
+              (Natural'Image
+                 (Ropes.Count (Countci_S, Ada.Characters.Handling.To_Lower (Arg), Ada.Strings.Maps.Constants.Lower_Case_Map)),
+               Ada.Strings.Both));
+      end if;
+      Countci_Count := Countci_Count + 1;
+      return True;
+   exception
+      when Ada.Strings.Pattern_Error =>
+         Put_Line (Standard_Error, "Error: PATTERN must not be empty");
+         Set_Exit_Status (Failure);
+         return False;
+   end Countci_Argument_Handler;
 
 end Rope_Tool_Args;

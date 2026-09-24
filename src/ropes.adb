@@ -511,19 +511,47 @@ package body Ropes is
       Leaf := N;
    end Next_Leaf;
 
+   --  Exact_Runs and Folded_Runs: Generic_Compare's two ways of
+   --  comparing a pair of equal-length runs, -1, 0 or 1. Exact_Runs
+   --  is predefined String "=" and "<" -- exactly character-by-character
+   --  lexicographic order. Folded_Runs does the same with each
+   --  character passed through Ada.Characters.Handling.To_Lower first,
+   --  as GNAT's Ada.Strings.Less_Case_Insensitive does.
+   function Exact_Runs (L, R : String) return Integer is (if L = R then 0 elsif L < R then -1 else 1);
+
+   function Folded_Runs (L, R : String) return Integer is
+      use Ada.Characters.Handling;
+   begin
+      for I in 0 .. L'Length - 1 loop
+         declare
+            L_Ch : constant Character := To_Lower (L (L'First + I));
+            R_Ch : constant Character := To_Lower (R (R'First + I));
+         begin
+            if L_Ch /= R_Ch then
+               return (if L_Ch < R_Ch then -1 else 1);
+            end if;
+         end;
+      end loop;
+      return 0;
+   end Folded_Runs;
+
    --  Rope.Mod's Compare: <0, 0 or >0, like strcmp -- lexicographic by
    --  character, then by length. Left and Right are borrowed
-   --  (possibly null).
+   --  (possibly null). Compare_Runs says how two runs (below) compare:
+   --  Compare, the one "=" and "<" use, is the instance with
+   --  Exact_Runs; Compare_Case_Insensitive (Phase 24) has Folded_Runs.
    --
    --  Linear in the common prefix (since Phase 11): walks both ropes'
    --  leaves in step, a run at a time, where a run is the longest
    --  stretch lying within one leaf of each, and compares each run as a
-   --  single String slice (predefined String "=" and "<" are exactly
-   --  this character-by-character lexicographic order) -- not a Fetch
-   --  from the root per character, which was O(n log n). Identical
-   --  trees (one rope copied from the other, sharing its root) compare
-   --  equal in O(1).
-   function Compare (Left, Right : Node_Access) return Integer is
+   --  single String slice -- not a Fetch from the root per character,
+   --  which was O(n log n). Identical trees (one rope copied from the
+   --  other, sharing its root) compare equal in O(1).
+   generic
+      with function Compare_Runs (L, R : String) return Integer;
+   function Generic_Compare (Left, Right : Node_Access) return Integer;
+
+   function Generic_Compare (Left, Right : Node_Access) return Integer is
       L_Len  : constant Natural := (if Left = null then 0 else Left.Len);
       R_Len  : constant Natural := (if Right = null then 0 else Right.Len);
       Common : constant Natural := Natural'Min (L_Len, R_Len);
@@ -556,9 +584,10 @@ package body Ropes is
                   Run : constant Positive := Natural'Min (Natural'Min (L_Leaf.Len - L_Pos + 1, R_Leaf.Len - R_Pos + 1), Remaining);
                   L_Run : String renames L_Leaf.Chars (L_Pos .. L_Pos + Run - 1);
                   R_Run : String renames R_Leaf.Chars (R_Pos .. R_Pos + Run - 1);
+                  Order : constant Integer  := Compare_Runs (L_Run, R_Run);
                begin
-                  if L_Run /= R_Run then
-                     return (if L_Run < R_Run then -1 else 1);
+                  if Order /= 0 then
+                     return Order;
                   end if;
                   L_Pos     := L_Pos + Run;
                   R_Pos     := R_Pos + Run;
@@ -574,7 +603,10 @@ package body Ropes is
       else
          return 1;
       end if;
-   end Compare;
+   end Generic_Compare;
+
+   function Compare is new Generic_Compare (Exact_Runs);
+   function Compare_Case_Insensitive is new Generic_Compare (Folded_Runs);
 
    --  Compare above, with a String for Right: the same run-at-a-time
    --  walk, over Left's leaves only, each run compared with the next
@@ -793,6 +825,8 @@ package body Ropes is
 
    function "*" (Left : Natural; Right : Character) return Rope is (Left * From_Character (Right));
 
+   function "*" (Left : Natural; Right : String) return Rope is (Left * From_String (Right));
+
    --  Rope.Mod's Repeat: O(log Left) by binary doubling -- Piece :=
    --  Piece & Piece repeatedly, accumulating Result & Piece on each odd
    --  bit of Left (the standard binary-exponentiation shape). Every
@@ -923,6 +957,14 @@ package body Ropes is
    function Replace_Slice (Source : Rope; Low : Positive; High : Natural; By : String) return Rope is
      (Replace_Slice (Source, Low, High, From_String (By)));
 
+   function Replace_Element (Source : Rope; Index : Positive; By : Character) return Rope is
+   begin
+      if Index > Length (Source) then
+         raise Ada.Strings.Index_Error;
+      end if;
+      return Replace_Slice (Source, Index, Index, From_Character (By));
+   end Replace_Element;
+
    function Head (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope is
    begin
       if Count <= Length (Source) then
@@ -973,6 +1015,45 @@ package body Ropes is
    function ">=" (Left : Rope; Right : String) return Boolean is (Compare (Data_Of (Left), Right) >= 0);
 
    function ">=" (Left : String; Right : Rope) return Boolean is (Compare (Data_Of (Right), Left) <= 0);
+
+   --  Hash and Hash_Case_Insensitive: GNAT's System.String_Hash, the
+   --  sdbm recurrence H := Ch + H * 2**6 + H * 2**16 - H (mod 2**32),
+   --  run over Key's leaves in order, each character passed through
+   --  Fold first. Since it only ever carries H from one character to
+   --  the next, splitting the text into leaves can't change the result.
+   generic
+      with function Fold (Ch : Character) return Character;
+   function Generic_Hash (Key : Rope) return Ada.Containers.Hash_Type;
+
+   function Generic_Hash (Key : Rope) return Ada.Containers.Hash_Type is
+      use type Ada.Containers.Hash_Type;
+      H : Ada.Containers.Hash_Type := 0;
+
+      procedure Add (Chunk : String) is
+      begin
+         for Ch of Chunk loop
+            H := Character'Pos (Fold (Ch)) + H * 2**6 + H * 2**16 - H;
+         end loop;
+      end Add;
+   begin
+      Process_Chunks (Key, Add'Access);
+      return H;
+   end Generic_Hash;
+
+   function Same (Ch : Character) return Character is (Ch);
+
+   function Hash_Exact is new Generic_Hash (Same);
+   function Hash_Folded is new Generic_Hash (Ada.Characters.Handling.To_Lower);
+
+   function Hash (Key : Rope) return Ada.Containers.Hash_Type renames Hash_Exact;
+
+   function Hash_Case_Insensitive (Key : Rope) return Ada.Containers.Hash_Type renames Hash_Folded;
+
+   function Equal_Case_Insensitive (Left, Right : Rope) return Boolean is
+     (Length (Left) = Length (Right) and then Compare_Case_Insensitive (Data_Of (Left), Data_Of (Right)) = 0);
+
+   function Less_Case_Insensitive (Left, Right : Rope) return Boolean is
+     (Compare_Case_Insensitive (Data_Of (Left), Data_Of (Right)) < 0);
 
    ------------------------------------------------------------------
    --  Search.
@@ -1042,7 +1123,20 @@ package body Ropes is
    --  From (Forward), or of the last one lying wholly within 1 .. From
    --  (Backward), or 0. Precondition: S_D /= null, Pattern /= "", and
    --  From <= S_D.Len.
-   function Find (S_D : Node_Access; Pattern : String; From : Positive; Going : Ada.Strings.Direction) return Natural is
+   --
+   --  An occurrence is a stretch of S_D whose characters, each passed
+   --  through Fold, are Pattern's -- the RM's "matches with respect to
+   --  a mapping" (A.4.2(54, 64)); Pattern itself is never folded.
+   --  Same_Run (Source_Run, Pattern_Run) says whether two equal-length
+   --  runs match in just that sense, so that Find, the exact instance,
+   --  can compare them as whole String slices; Folded_Search's
+   --  instance (Phase 25) folds a character at a time.
+   generic
+      with function Fold (Ch : Character) return Character;
+      with function Same_Run (Source_Run, Pattern_Run : String) return Boolean;
+   function Generic_Find (S_D : Node_Access; Pattern : String; From : Positive; Going : Ada.Strings.Direction) return Natural;
+
+   function Generic_Find (S_D : Node_Access; Pattern : String; From : Positive; Going : Ada.Strings.Direction) return Natural is
       S_Len : constant Positive := S_D.Len;
       P_Len : constant Positive := Pattern'Length;
       W     : Leaf_Walk (S_D.Depth + 1);
@@ -1056,7 +1150,7 @@ package body Ropes is
       function Matches_Forward (I : Positive) return Boolean is
       begin
          if P_Len <= Leaf.Len - I + 1 then
-            return Leaf.Chars (I .. I + (P_Len - 1)) = Pattern;
+            return Same_Run (Leaf.Chars (I .. I + (P_Len - 1)), Pattern);
          end if;
          declare
             V_Walk : Leaf_Walk   := W;
@@ -1069,7 +1163,7 @@ package body Ropes is
                declare
                   Run : constant Positive := Natural'Min (V_Leaf.Len - V_Off + 1, Left);
                begin
-                  if V_Leaf.Chars (V_Off .. V_Off + (Run - 1)) /= Pattern (K .. K + (Run - 1)) then
+                  if not Same_Run (V_Leaf.Chars (V_Off .. V_Off + (Run - 1)), Pattern (K .. K + (Run - 1))) then
                      return False;
                   end if;
                   Left := Left - Run;
@@ -1088,7 +1182,7 @@ package body Ropes is
       function Matches_Backward (I : Positive) return Boolean is
       begin
          if P_Len <= I then
-            return Leaf.Chars (I - (P_Len - 1) .. I) = Pattern;
+            return Same_Run (Leaf.Chars (I - (P_Len - 1) .. I), Pattern);
          end if;
          declare
             V_Walk : Leaf_Walk   := W;
@@ -1101,7 +1195,7 @@ package body Ropes is
                declare
                   Run : constant Positive := Natural'Min (V_Off, Left);
                begin
-                  if V_Leaf.Chars (V_Off - (Run - 1) .. V_Off) /= Pattern (K - (Run - 1) .. K) then
+                  if not Same_Run (V_Leaf.Chars (V_Off - (Run - 1) .. V_Off), Pattern (K - (Run - 1) .. K)) then
                      return False;
                   end if;
                   Left := Left - Run;
@@ -1132,7 +1226,7 @@ package body Ropes is
                      Hi : constant Positive := Natural'Min (Leaf.Len, Last_Start - Base);
                   begin
                      for I in Off .. Hi loop
-                        if Leaf.Chars (I) = First and then Matches_Forward (I) then
+                        if Fold (Leaf.Chars (I)) = First and then Matches_Forward (I) then
                            return Base + I;
                         end if;
                      end loop;
@@ -1159,7 +1253,7 @@ package body Ropes is
                      Lo : constant Positive := Integer'Max (1, P_Len - Base);
                   begin
                      for I in reverse Lo .. Off loop
-                        if Leaf.Chars (I) = Last and then Matches_Backward (I) then
+                        if Fold (Leaf.Chars (I)) = Last and then Matches_Backward (I) then
                            return Base + I - P_Len + 1;
                         end if;
                      end loop;
@@ -1172,7 +1266,90 @@ package body Ropes is
             end;
       end case;
       return 0;
-   end Find;
+   end Generic_Find;
+
+   function Find is new Generic_Find (Same, "=");
+
+   --  The number of nonoverlapping occurrences of Pattern in the rope
+   --  S_D (possibly null), counted left to right with Find, each search
+   --  starting just after the previous match -- Count's loop, for any
+   --  instance of Generic_Find.
+   generic
+      with function Find (S_D : Node_Access; Pattern : String; From : Positive; Going : Ada.Strings.Direction) return Natural;
+   function Generic_Count (S_D : Node_Access; Pattern : String) return Natural;
+
+   function Generic_Count (S_D : Node_Access; Pattern : String) return Natural is
+      P_Len  : constant Natural := Pattern'Length;
+      Result : Natural          := 0;
+      From   : Positive         := 1;
+      Found  : Natural;
+   begin
+      if P_Len = 0 then
+         raise Ada.Strings.Pattern_Error;
+      end if;
+      if S_D = null then
+         return 0;
+      end if;
+      loop
+         Found := Find (S_D, Pattern, From, Ada.Strings.Forward);
+         exit when Found = 0;
+         Result := Result + 1;
+         --  A match reaching the end leaves no room for another; stop
+         --  there rather than compute Found + P_Len, which overflows
+         --  if that end is Natural'Last.
+         exit when Found - 1 + P_Len = S_D.Len;
+         From := Found + P_Len;
+      end loop;
+      return Result;
+   end Generic_Count;
+
+   function Count_Exact is new Generic_Count (Find);
+
+   --  Find and Count for a search with a mapping (Phase 25): each
+   --  character of the rope passes through Fold before it is compared
+   --  with Pattern's. Instantiated inside each Mapping overload, with a
+   --  Fold that applies that call's Mapping.
+   generic
+      with function Fold (Ch : Character) return Character;
+   package Folded_Search is
+      function Find (S_D : Node_Access; Pattern : String; From : Positive; Going : Ada.Strings.Direction) return Natural;
+      function Count (S_D : Node_Access; Pattern : String) return Natural;
+   end Folded_Search;
+
+   package body Folded_Search is
+      function Same_Folded (Source_Run, Pattern_Run : String) return Boolean is
+      begin
+         for I in 0 .. Source_Run'Length - 1 loop
+            if Fold (Source_Run (Source_Run'First + I)) /= Pattern_Run (Pattern_Run'First + I) then
+               return False;
+            end if;
+         end loop;
+         return True;
+      end Same_Folded;
+
+      function Find_Folded is new Generic_Find (Fold, Same_Folded);
+      function Count_Folded is new Generic_Count (Find_Folded);
+
+      function Find (S_D : Node_Access; Pattern : String; From : Positive; Going : Ada.Strings.Direction) return Natural renames
+        Find_Folded;
+      function Count (S_D : Node_Access; Pattern : String) return Natural renames Count_Folded;
+   end Folded_Search;
+
+   --  A Character_Mapping as a plain table, built once per search, so
+   --  that Fold is an array lookup rather than a call to
+   --  Ada.Strings.Maps.Value per character.
+   type Mapping_Table is array (Character) of Character;
+
+   function Table_Of (Mapping : Ada.Strings.Maps.Character_Mapping) return Mapping_Table is
+      --  A loop rather than an iterated component association, which
+      --  gnatpp can't format.
+      Table : Mapping_Table;
+   begin
+      for Ch in Character loop
+         Table (Ch) := Ada.Strings.Maps.Value (Mapping, Ch);
+      end loop;
+      return Table;
+   end Table_Of;
 
    --  A multi-leaf pattern, flattened for Find: onto the heap rather
    --  than the stack, since a pattern can be as long as any rope.
@@ -1189,22 +1366,49 @@ package body Ropes is
       return Result;
    end Flatten;
 
-   function Index
-     (Source : Rope; Pattern : String; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural
-   is
-      S_D : constant Node_Access := Data_Of (Source);
+   --  Search applied to the text of the rope P_D -- a leaf's own
+   --  Chars, or else a copy Flatten makes and frees again: how each
+   --  Rope-pattern Index and Count hands its pattern to the String
+   --  one. Precondition: P_D /= null.
+   generic
+      with function Search (Pattern : String) return Natural;
+   function With_Flat_Pattern (P_D : Node_Access) return Natural;
+
+   function With_Flat_Pattern (P_D : Node_Access) return Natural is
    begin
-      --  Source's emptiness is checked, and short-circuits, before
-      --  Pattern's -- verified against GNAT's a-strsea.adb: the
-      --  From-bounded Ada.Strings.Search.Index returns 0 immediately
-      --  for an empty Source, even when Pattern is also empty (the
-      --  Pattern_Error check lives in the *other*, no-From overload,
-      --  reached only once Source is known non-empty). Then From must
-      --  be in Source's range, in either direction -- the RM's rule
-      --  (A.4.3(56.2/3)), not GNAT's laxer one: see ropes.ads and
-      --  PLAN.md's "Search".
+      if P_D.Kind = Leaf_Kind then
+         return Search (P_D.Chars);
+      end if;
+      declare
+         Flat   : String_Access := Flatten (P_D);
+         Result : Natural;
+      begin
+         Result := Search (Flat.all);
+         Free (Flat);
+         return Result;
+      exception
+         when others =>
+            Free (Flat);
+            raise;
+      end;
+   end With_Flat_Pattern;
+
+   --  The From-bounded String Index's checks, the same for every
+   --  Mapping: False if Index is to return 0 at once (S_D is null),
+   --  True if the search is to go ahead; raises for an empty Pattern or
+   --  a From out of range. Source's emptiness is checked, and
+   --  short-circuits, before Pattern's -- verified against GNAT's
+   --  a-strsea.adb: the From-bounded Ada.Strings.Search.Index returns 0
+   --  immediately for an empty Source, even when Pattern is also empty
+   --  (the Pattern_Error check lives in the *other*, no-From overload,
+   --  reached only once Source is known non-empty). Then From must be
+   --  in Source's range, in either direction -- the RM's rule
+   --  (A.4.3(56.2/3)), not GNAT's laxer one: see ropes.ads and
+   --  PLAN.md's "Search".
+   function Search_From (S_D : Node_Access; Pattern : String; From : Positive) return Boolean is
+   begin
       if S_D = null then
-         return 0;
+         return False;
       end if;
       if Pattern'Length = 0 then
          raise Ada.Strings.Pattern_Error;
@@ -1212,13 +1416,58 @@ package body Ropes is
       if From > S_D.Len then
          raise Ada.Strings.Index_Error;
       end if;
-      return Find (S_D, Pattern, From, Going);
+      return True;
+   end Search_From;
+
+   function Index
+     (Source  : Rope; Pattern : String; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Natural
+   is
+      use type Ada.Strings.Maps.Character_Mapping;
+      S_D : constant Node_Access := Data_Of (Source);
+   begin
+      if not Search_From (S_D, Pattern, From) then
+         return 0;
+      end if;
+      if Mapping = Ada.Strings.Maps.Identity then
+         return Find (S_D, Pattern, From, Going);
+      end if;
+      declare
+         Table : constant Mapping_Table := Table_Of (Mapping);
+
+         function Fold (Ch : Character) return Character is (Table (Ch));
+
+         package Search is new Folded_Search (Fold);
+      begin
+         return Search.Find (S_D, Pattern, From, Going);
+      end;
    end Index;
 
    function Index
-     (Source : Rope; Pattern : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural
+     (Source  : Rope; Pattern : String; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Natural
+   is
+      S_D : constant Node_Access := Data_Of (Source);
+
+      function Fold (Ch : Character) return Character is (Mapping (Ch));
+
+      package Search is new Folded_Search (Fold);
+   begin
+      if not Search_From (S_D, Pattern, From) then
+         return 0;
+      end if;
+      return Search.Find (S_D, Pattern, From, Going);
+   end Index;
+
+   function Index
+     (Source  : Rope; Pattern : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Natural
    is
       P_D : constant Node_Access := Data_Of (Pattern);
+
+      function Search (P : String) return Natural is (Index (Source, P, From, Going, Mapping));
+
+      function Search_Pattern is new With_Flat_Pattern (Search);
    begin
       if Is_Empty (Source) then
          return 0;
@@ -1229,58 +1478,95 @@ package body Ropes is
       if From > Length (Source) then
          raise Ada.Strings.Index_Error;
       end if;
-      if P_D.Kind = Leaf_Kind then
-         return Index (Source, P_D.Chars, From, Going);
-      end if;
-      declare
-         Flat   : String_Access := Flatten (P_D);
-         Result : Natural;
-      begin
-         Result := Index (Source, Flat.all, From, Going);
-         Free (Flat);
-         return Result;
-      exception
-         when others =>
-            Free (Flat);
-            raise;
-      end;
+      return Search_Pattern (P_D);
    end Index;
 
-   function Index (Source : Rope; Pattern : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural is
+   function Index
+     (Source  : Rope; Pattern : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Natural
+   is
+      P_D : constant Node_Access := Data_Of (Pattern);
+
+      function Search (P : String) return Natural is (Index (Source, P, From, Going, Mapping));
+
+      function Search_Pattern is new With_Flat_Pattern (Search);
    begin
-      --  Pattern's emptiness is checked first here -- the mirror image
-      --  of the From-bounded overload above, matching the real
-      --  no-From Ada.Strings.Search.Index, whose Pattern_Error check
-      --  runs unconditionally, before it ever looks at Source.
+      if Is_Empty (Source) then
+         return 0;
+      end if;
+      if P_D = null then
+         raise Ada.Strings.Pattern_Error;
+      end if;
+      if From > Length (Source) then
+         raise Ada.Strings.Index_Error;
+      end if;
+      return Search_Pattern (P_D);
+   end Index;
+
+   --  The no-From overloads. Pattern's emptiness is checked first here
+   --  -- the mirror image of the From-bounded overloads above, matching
+   --  the real no-From Ada.Strings.Search.Index, whose Pattern_Error
+   --  check runs unconditionally, before it ever looks at Source.
+
+   --  Where a no-From search of a non-empty Source starts: its first
+   --  character going Forward, its last going Backward.
+   function Search_Start (Source : Rope; Going : Ada.Strings.Direction) return Positive is
+     (case Going is when Ada.Strings.Forward => 1, when Ada.Strings.Backward => Length (Source));
+
+   function Index
+     (Source  : Rope; Pattern : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Natural
+   is
+   begin
       if Is_Empty (Pattern) then
          raise Ada.Strings.Pattern_Error;
       end if;
       if Is_Empty (Source) then
          return 0;
       end if;
-      case Going is
-         when Ada.Strings.Forward =>
-            return Index (Source, Pattern, 1, Going);
-         when Ada.Strings.Backward =>
-            return Index (Source, Pattern, Length (Source), Going);
-      end case;
+      return Index (Source, Pattern, Search_Start (Source, Going), Going, Mapping);
    end Index;
 
-   function Index (Source : Rope; Pattern : String; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural is
+   function Index
+     (Source  : Rope; Pattern : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Natural
+   is
    begin
-      --  As the Rope overload just above.
+      if Is_Empty (Pattern) then
+         raise Ada.Strings.Pattern_Error;
+      end if;
+      if Is_Empty (Source) then
+         return 0;
+      end if;
+      return Index (Source, Pattern, Search_Start (Source, Going), Going, Mapping);
+   end Index;
+
+   function Index
+     (Source  : Rope; Pattern : String; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Natural
+   is
+   begin
       if Pattern'Length = 0 then
          raise Ada.Strings.Pattern_Error;
       end if;
       if Is_Empty (Source) then
          return 0;
       end if;
-      case Going is
-         when Ada.Strings.Forward =>
-            return Index (Source, Pattern, 1, Going);
-         when Ada.Strings.Backward =>
-            return Index (Source, Pattern, Length (Source), Going);
-      end case;
+      return Index (Source, Pattern, Search_Start (Source, Going), Going, Mapping);
+   end Index;
+
+   function Index
+     (Source  : Rope; Pattern : String; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Natural
+   is
+   begin
+      if Pattern'Length = 0 then
+         raise Ada.Strings.Pattern_Error;
+      end if;
+      if Is_Empty (Source) then
+         return 0;
+      end if;
+      return Index (Source, Pattern, Search_Start (Source, Going), Going, Mapping);
    end Index;
 
    function Index
@@ -1396,53 +1682,60 @@ package body Ropes is
       Find_Token (Source, Set, 1, Test, First, Last);
    end Find_Token;
 
-   function Count (Source : Rope; Pattern : String) return Natural is
-      S_D    : constant Node_Access := Data_Of (Source);
-      P_Len  : constant Natural     := Pattern'Length;
-      Result : Natural              := 0;
-      From   : Positive             := 1;
-      Found  : Natural;
+   function Count
+     (Source : Rope; Pattern : String; Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Natural
+   is
+      use type Ada.Strings.Maps.Character_Mapping;
    begin
-      if P_Len = 0 then
-         raise Ada.Strings.Pattern_Error;
+      if Mapping = Ada.Strings.Maps.Identity then
+         return Count_Exact (Data_Of (Source), Pattern);
       end if;
-      if S_D = null then
-         return 0;
-      end if;
-      loop
-         Found := Find (S_D, Pattern, From, Ada.Strings.Forward);
-         exit when Found = 0;
-         Result := Result + 1;
-         --  A match reaching the end leaves no room for another; stop
-         --  there rather than compute Found + P_Len, which overflows
-         --  if that end is Natural'Last.
-         exit when Found - 1 + P_Len = S_D.Len;
-         From := Found + P_Len;
-      end loop;
-      return Result;
+      declare
+         Table : constant Mapping_Table := Table_Of (Mapping);
+
+         function Fold (Ch : Character) return Character is (Table (Ch));
+
+         package Search is new Folded_Search (Fold);
+      begin
+         return Search.Count (Data_Of (Source), Pattern);
+      end;
    end Count;
 
-   function Count (Source : Rope; Pattern : Rope) return Natural is
+   function Count (Source : Rope; Pattern : String; Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Natural
+   is
+      function Fold (Ch : Character) return Character is (Mapping (Ch));
+
+      package Search is new Folded_Search (Fold);
+   begin
+      return Search.Count (Data_Of (Source), Pattern);
+   end Count;
+
+   function Count
+     (Source : Rope; Pattern : Rope; Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Natural
+   is
       P_D : constant Node_Access := Data_Of (Pattern);
+
+      function Search (P : String) return Natural is (Count (Source, P, Mapping));
+
+      function Count_Pattern is new With_Flat_Pattern (Search);
    begin
       if P_D = null then
          raise Ada.Strings.Pattern_Error;
       end if;
-      if P_D.Kind = Leaf_Kind then
-         return Count (Source, P_D.Chars);
+      return Count_Pattern (P_D);
+   end Count;
+
+   function Count (Source : Rope; Pattern : Rope; Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Natural is
+      P_D : constant Node_Access := Data_Of (Pattern);
+
+      function Search (P : String) return Natural is (Count (Source, P, Mapping));
+
+      function Count_Pattern is new With_Flat_Pattern (Search);
+   begin
+      if P_D = null then
+         raise Ada.Strings.Pattern_Error;
       end if;
-      declare
-         Flat   : String_Access := Flatten (P_D);
-         Result : Natural;
-      begin
-         Result := Count (Source, Flat.all);
-         Free (Flat);
-         return Result;
-      exception
-         when others =>
-            Free (Flat);
-            raise;
-      end;
+      return Count_Pattern (P_D);
    end Count;
 
    function Count (Source : Rope; Set : Ada.Strings.Maps.Character_Set) return Natural is
@@ -1461,20 +1754,44 @@ package body Ropes is
       return Result;
    end Count;
 
-   function Contains (Source, Pattern : Rope) return Boolean is (Index (Source, Pattern) /= 0);
+   function Contains
+     (Source, Pattern : Rope; Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Boolean is
+     (Index (Source, Pattern, Ada.Strings.Forward, Mapping) /= 0);
 
-   function Contains (Source, Pattern : Rope; From : Positive) return Boolean is
-     (Index (Source, Pattern, From, Ada.Strings.Forward) /= 0);
+   function Contains (Source, Pattern : Rope; Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Boolean is
+     (Index (Source, Pattern, Ada.Strings.Forward, Mapping) /= 0);
+
+   function Contains
+     (Source, Pattern : Rope; From : Positive; Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity)
+      return Boolean is
+     (Index (Source, Pattern, From, Ada.Strings.Forward, Mapping) /= 0);
+
+   function Contains
+     (Source, Pattern : Rope; From : Positive; Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Boolean is
+     (Index (Source, Pattern, From, Ada.Strings.Forward, Mapping) /= 0);
 
    function Contains (Source : Rope; Pattern : Character) return Boolean is (Index (Source, Pattern) /= 0);
 
    function Contains (Source : Rope; Pattern : Character; From : Positive) return Boolean is
      (Index (Source, Pattern, From, Ada.Strings.Forward) /= 0);
 
-   function Contains (Source : Rope; Pattern : String) return Boolean is (Index (Source, Pattern) /= 0);
+   function Contains
+     (Source : Rope; Pattern : String; Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Boolean is
+     (Index (Source, Pattern, Ada.Strings.Forward, Mapping) /= 0);
 
-   function Contains (Source : Rope; Pattern : String; From : Positive) return Boolean is
-     (Index (Source, Pattern, From, Ada.Strings.Forward) /= 0);
+   function Contains
+     (Source : Rope; Pattern : String; Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Boolean is
+     (Index (Source, Pattern, Ada.Strings.Forward, Mapping) /= 0);
+
+   function Contains
+     (Source : Rope; Pattern : String; From : Positive; Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity)
+      return Boolean is
+     (Index (Source, Pattern, From, Ada.Strings.Forward, Mapping) /= 0);
+
+   function Contains
+     (Source : Rope; Pattern : String; From : Positive; Mapping : not null Ada.Strings.Maps.Character_Mapping_Function)
+      return Boolean is
+     (Index (Source, Pattern, From, Ada.Strings.Forward, Mapping) /= 0);
 
    ------------------------------------------------------------------
    --  Splitting.
@@ -1814,7 +2131,8 @@ package body Ropes is
       return Map (Source, Convert'Access);
    end Translate;
 
-   function Translate (Source : Rope; Mapping : Ada.Strings.Maps.Character_Mapping_Function) return Rope is (Map (Source, Mapping));
+   function Translate (Source : Rope; Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Rope is
+     (Map (Source, Mapping));
 
    function To_Upper (Source : Rope) return Rope is (Map (Source, Ada.Characters.Handling.To_Upper'Access));
 

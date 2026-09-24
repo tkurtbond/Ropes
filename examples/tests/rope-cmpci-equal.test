@@ -1,0 +1,9 @@
+# Equal_Case_Insensitive (Phase 24): the same letters in different
+# case compare equal.
+program rope_tool
+arg cmpci
+arg Hello, World
+arg hELLO, wORLD
+status 0
+output
+0

@@ -1,0 +1,10 @@
+# Count with a Character_Mapping (Phase 25):
+# Constants.Lower_Case_Map maps S, and PATTERN is lowered, so every
+# case of "the" counts -- five, the last inside "other".
+program rope_tool
+arg countci
+arg The the THE tHe other
+arg THE
+status 0
+output
+5

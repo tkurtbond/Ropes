@@ -128,3 +128,21 @@ findtoken S CHARS FROM  Print FIRST LAST: the first run of characters that are a
 
 translate S FROM TO  Print S with each character in FROM replaced by the one at the same place in TO.
 
+
+replaceelement S INDEX CH  Print S with its character at INDEX (1-based) replaced by CH.
+
+
+cmpci A B  Print -1, 0 or 1: how A compares to B, ignoring case.
+
+
+hash S  Print the hash of S.
+
+
+hashci S  Print the case-insensitive hash of S.
+
+
+indexci S PATTERN  Print the index of the first occurrence of PATTERN in S, ignoring case, or 0.
+
+
+countci S PATTERN  Print the number of nonoverlapping occurrences of PATTERN in S, ignoring case.
+

@@ -29,6 +29,7 @@
 --  empty rope, not an uninitialized one.
 
 with Ada.Characters.Latin_1;
+with Ada.Containers;
 with Ada.Finalization;
 with Ada.Strings;
 with Ada.Strings.Maps;
@@ -132,6 +133,12 @@ package Ropes is
    --  overload is Rope.Mod's Make, implemented as Left * From_Character
    --  (Right).
 
+   function "*" (Left : Natural; Right : String) return Rope;
+   --  As above, with a String Right -- Ada.Strings.Unbounded's own "*"
+   --  (Natural, String), the one of its three "*"s the two above
+   --  don't cover. Same as Left * From_String (Right): Right is copied
+   --  once, into one leaf, and the repeats share it.
+
    function Element (Source : Rope; Index : Positive) return Character;
    --  Raises Ada.Strings.Index_Error if Index > Length (Source).
 
@@ -218,6 +225,14 @@ package Ropes is
    --  Ada.Strings.Index_Error if Low - 1 > Length (Source), in either
    --  case. No Rope.Mod counterpart.
 
+   function Replace_Element (Source : Rope; Index : Positive; By : Character) return Rope;
+   --  Source with the character at Index replaced by By --
+   --  Ada.Strings.Unbounded.Replace_Element, as a function (it is a
+   --  procedure there, and Rope is immutable; see Overwrite above).
+   --  Raises Ada.Strings.Index_Error if Index > Length (Source), as
+   --  Element does -- unlike Overwrite or Replace_Slice, it never
+   --  appends. No Rope.Mod counterpart.
+
    function Head (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope;
    function Tail (Source : Rope; Count : Natural; Pad : Character := Ada.Strings.Space) return Rope;
    --  The first (Head) or last (Tail) Count characters of Source,
@@ -257,9 +272,39 @@ package Ropes is
    --  compared a leaf at a time, in time linear in the common prefix.
    --  The String need not start at index 1.
 
-   function Index (Source : Rope; Pattern : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+   function Hash (Key : Rope) return Ada.Containers.Hash_Type;
+   function Hash_Case_Insensitive (Key : Rope) return Ada.Containers.Hash_Type;
+   function Equal_Case_Insensitive (Left, Right : Rope) return Boolean;
+   function Less_Case_Insensitive (Left, Right : Rope) return Boolean;
+   --  Ada.Strings.Unbounded's Hash (RM A.4.9) and case-insensitive
+   --  comparisons (RM A.4.10), for a Rope key in Ada.Containers' hashed
+   --  or ordered maps and sets -- Hash with "=", or
+   --  Hash_Case_Insensitive with Equal_Case_Insensitive, as a hashed
+   --  container's Hash and Equivalent_Keys; Less_Case_Insensitive as an
+   --  ordered one's "<". The RM makes each of these its own child unit
+   --  (Ada.Strings.Unbounded.Hash, ...); here they are functions of
+   --  Ropes itself, since they walk a rope's leaves directly, which a
+   --  child unit's body can't -- a call reads the same, Ropes.Hash
+   --  (Key), either way.
+   --
+   --  Each is "the same as the Ada.Strings function on To_String", as
+   --  the RM defines Unbounded's, without the To_String: Hash is GNAT's
+   --  own Ada.Strings.Hash (the sdbm recurrence of System.String_Hash)
+   --  computed a leaf at a time, so Hash (Key) = Ada.Strings.Hash
+   --  (To_String (Key)) under GNAT -- the RM leaves Ada.Strings.Hash's
+   --  value implementation-defined, so no other compiler promises it.
+   --  Case is folded with Ada.Characters.Handling.To_Lower, as GNAT's
+   --  Ada.Strings.Equal_Case_Insensitive, Less_Case_Insensitive and
+   --  Hash_Case_Insensitive fold it. All four are linear in the length
+   --  compared or hashed, and the two comparisons take O(1) for two
+   --  ropes sharing a root, as "=" does. No Rope.Mod counterpart.
+
    function Index
-     (Source : Rope; Pattern : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+     (Source  : Rope; Pattern : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Natural;
+   function Index
+     (Source  : Rope; Pattern : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Natural;
    --  The 1-based starting index of Pattern's first (Going => Forward)
    --  or last (Going => Backward) occurrence in Source, or 0 if
    --  Pattern does not occur. Raises Ada.Strings.Pattern_Error if
@@ -301,15 +346,52 @@ package Ropes is
    --  pattern's first character is uncommon. A Rope Pattern of more
    --  than one leaf is first copied into a String on the heap.
 
-   function Index (Source : Rope; Pattern : String; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
    function Index
-     (Source : Rope; Pattern : String; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+     (Source  : Rope; Pattern : String; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Natural;
+   function Index
+     (Source  : Rope; Pattern : String; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Natural;
    --  As above, with a String Pattern -- the form Ada.Strings.Fixed
    --  and Ada.Strings.Unbounded's own Index take. Same as Index
    --  (Source, From_String (Pattern), ...), including every boundary
    --  rule above: Ada.Strings.Pattern_Error for an empty Pattern ("",
    --  like Null_Rope), with Source's emptiness checked first in the
    --  From overload only.
+
+   function Index
+     (Source  : Rope; Pattern : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Natural;
+   function Index
+     (Source  : Rope; Pattern : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Natural;
+   function Index
+     (Source  : Rope; Pattern : String; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Natural;
+   function Index
+     (Source  : Rope; Pattern : String; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward;
+      Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Natural;
+   --  Mapping, on these and on the Rope and String Index overloads
+   --  above (where it defaults to Ada.Strings.Maps.Identity), is
+   --  Ada.Strings.Unbounded.Index's own (Phase 25): a stretch of Source
+   --  is an occurrence of Pattern when each of its characters, mapped
+   --  by Mapping (Ada.Strings.Maps.Value, or a call of the
+   --  Character_Mapping_Function), is Pattern's character in that
+   --  place -- RM A.4.2(54, 64). Pattern itself is not mapped. So a
+   --  case-insensitive search maps Source to lower case and gives a
+   --  lower-case Pattern: Index (Source, "fox", Mapping =>
+   --  Ada.Strings.Maps.Constants.Lower_Case_Map), or Mapping =>
+   --  Ada.Characters.Handling.To_Lower'Access; an upper-case letter in
+   --  Pattern then never matches. Every boundary rule above is
+   --  unchanged. A search with Identity takes the unmapped path, whose
+   --  time is as above; any other Mapping compares a character at a
+   --  time rather than a slice at a time, but in the same order.
+   --
+   --  A null Character_Mapping_Function raises Constraint_Error (the
+   --  parameter is not null), even where the search would not call it
+   --  -- the RM says nothing of null here, and GNAT's
+   --  Ada.Strings.Fixed.Index states Mapping /= null only as a
+   --  precondition that its Assertion_Policy ignores.
 
    function Index (Source : Rope; Pattern : Character; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
    function Index
@@ -364,26 +446,33 @@ package Ropes is
    --  raise.) A Null_Rope Source never raises: First is From and Last
    --  is 0.
 
-   function Count (Source : Rope; Pattern : Rope) return Natural;
-   function Count (Source : Rope; Pattern : String) return Natural;
+   function Count (Source : Rope; Pattern : Rope; Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Natural;
+   function Count (Source : Rope; Pattern : String; Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Natural;
+   function Count (Source : Rope; Pattern : Rope; Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Natural;
+   function Count (Source : Rope; Pattern : String; Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Natural;
    --  The number of nonoverlapping occurrences of Pattern in Source,
    --  counted left to right, each search starting just after the
    --  previous match -- Ada.Strings.Unbounded.Count. Raises
    --  Ada.Strings.Pattern_Error if Pattern is empty (Null_Rope or
    --  ""), even when Source is also empty, as GNAT's Count does. Time
-   --  as for Index, plus O(depth) per occurrence found.
+   --  as for Index, plus O(depth) per occurrence found. Mapping, and a
+   --  null Character_Mapping_Function, as for Index above (Phase 25).
 
    function Count (Source : Rope; Set : Ada.Strings.Maps.Character_Set) return Natural;
    --  The number of characters of Source that are in Set --
    --  Ada.Strings.Unbounded.Count's Character_Set overload. Linear in
    --  Length (Source).
 
-   function Contains (Source, Pattern : Rope) return Boolean;
-   function Contains (Source, Pattern : Rope; From : Positive) return Boolean;
+   function Contains (Source, Pattern : Rope; Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Boolean;
+   function Contains (Source, Pattern : Rope; From : Positive; Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Boolean;
    function Contains (Source : Rope; Pattern : Character) return Boolean;
    function Contains (Source : Rope; Pattern : Character; From : Positive) return Boolean;
-   function Contains (Source : Rope; Pattern : String) return Boolean;
-   function Contains (Source : Rope; Pattern : String; From : Positive) return Boolean;
+   function Contains (Source : Rope; Pattern : String; Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Boolean;
+   function Contains (Source : Rope; Pattern : String; From : Positive; Mapping : Ada.Strings.Maps.Character_Mapping := Ada.Strings.Maps.Identity) return Boolean;
+   function Contains (Source, Pattern : Rope; Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Boolean;
+   function Contains (Source, Pattern : Rope; From : Positive; Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Boolean;
+   function Contains (Source : Rope; Pattern : String; Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Boolean;
+   function Contains (Source : Rope; Pattern : String; From : Positive; Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Boolean;
    --  Whether Pattern occurs anywhere in Source (or at/after From, for
    --  the From overloads) -- a thin wrapper over Index (...) /= 0,
    --  always Going => Forward (there is no Going parameter here:
@@ -495,7 +584,7 @@ package Ropes is
    --  Mapi's 0-based LONGINT.
 
    function Translate (Source : Rope; Mapping : Ada.Strings.Maps.Character_Mapping) return Rope;
-   function Translate (Source : Rope; Mapping : Ada.Strings.Maps.Character_Mapping_Function) return Rope;
+   function Translate (Source : Rope; Mapping : not null Ada.Strings.Maps.Character_Mapping_Function) return Rope;
    --  Source with every character replaced by the one Mapping maps it
    --  to -- Ada.Strings.Unbounded.Translate's two function forms: with
    --  a Character_Mapping such as To_Mapping ("abc", "xyz") or
@@ -505,8 +594,10 @@ package Ropes is
    --  increasing index order. Both are Map underneath, so the result
    --  has Source's tree shape, as Map's does; the second is exactly Map
    --  (Source, Mapping), in Ada.Strings' vocabulary. A null
-   --  Character_Mapping_Function raises Constraint_Error (Map's Convert
-   --  is not null), where the RM leaves the null case unsaid and GNAT's
+   --  Character_Mapping_Function raises Constraint_Error (the
+   --  parameter is not null, as Map's Convert is, and as every
+   --  Character_Mapping_Function parameter here is since Phase 25),
+   --  where the RM leaves the null case unsaid and GNAT's
    --  Ada.Strings.Fixed.Translate has an (unchecked) Mapping /= null
    --  precondition. No Rope.Mod counterpart.
 

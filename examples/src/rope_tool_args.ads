@@ -84,7 +84,7 @@ package Rope_Tool_Args is
    --  --- uncapitalize S --- (Ropes.Uncapitalize)
    function Uncapitalize_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
-   --  --- repeat S N --- (Ropes."*", N * S)
+   --  --- repeat S N --- (Ropes."*", N * S, String S since Phase 23)
    function Repeat_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
    --  --- make LEN CH --- (Ropes."*", LEN * CH)
@@ -140,6 +140,20 @@ package Rope_Tool_Args is
 
    --  --- translate S FROM TO --- (Ropes.Translate, Ada.Strings.Maps.To_Mapping (FROM, TO); Phase 22)
    function Translate_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- replaceelement S INDEX CH --- (Ropes.Replace_Element; Phase 23)
+   function Replaceelement_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- cmpci A B --- (built from Equal_Case_Insensitive/Less_Case_Insensitive, as cmp is from "="/"<"; Phase 24)
+   function Cmpci_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- hash S / hashci S --- (Ropes.Hash / Ropes.Hash_Case_Insensitive; Phase 24)
+   function Hash_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+   function Hashci_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- indexci S PATTERN / countci S PATTERN --- (Ropes.Index/Count with a Mapping, function and table forms; Phase 25)
+   function Indexci_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+   function Countci_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
    Commands : aliased Command_Array :=
      [Make_Command
@@ -345,7 +359,35 @@ package Rope_Tool_Args is
        ("translate",
         Make_Parser
           (Description => "translate S FROM TO  Print S with each character in FROM replaced by the one at the same place in TO.",
-           Handler     => Translate_Argument_Handler'Access, Options => null))];
+           Handler     => Translate_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("replaceelement",
+        Make_Parser
+          (Description => "replaceelement S INDEX CH  Print S with its character at INDEX (1-based) replaced by CH.",
+           Handler     => Replaceelement_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("cmpci",
+        Make_Parser
+          (Description => "cmpci A B  Print -1, 0 or 1: how A compares to B, ignoring case.",
+           Handler     => Cmpci_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("hash",
+        Make_Parser (Description => "hash S  Print the hash of S.", Handler => Hash_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("hashci",
+        Make_Parser
+          (Description => "hashci S  Print the case-insensitive hash of S.", Handler => Hashci_Argument_Handler'Access,
+           Options     => null)),
+     Make_Command
+       ("indexci",
+        Make_Parser
+          (Description => "indexci S PATTERN  Print the index of the first occurrence of PATTERN in S, ignoring case, or 0.",
+           Handler     => Indexci_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("countci",
+        Make_Parser
+          (Description => "countci S PATTERN  Print the number of nonoverlapping occurrences of PATTERN in S, ignoring case.",
+           Handler     => Countci_Argument_Handler'Access, Options => null))];
 
    Main_Parser : Parser :=
      Make_Parser

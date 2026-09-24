@@ -1,0 +1,10 @@
+# INDEX one past the end raises Ada.Strings.Index_Error: unlike
+# overwrite, replaceelement never appends.
+program rope_tool
+arg replaceelement
+arg hello
+arg 6
+arg J
+status 1
+output
+Error: INDEX out of range
