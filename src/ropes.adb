@@ -1808,6 +1808,14 @@ package body Ropes is
       return Wrap (Map_Indexed_Node (Data_Of (Source), Convert, Next_Index));
    end Map_Indexed;
 
+   function Translate (Source : Rope; Mapping : Ada.Strings.Maps.Character_Mapping) return Rope is
+      function Convert (Ch : Character) return Character is (Ada.Strings.Maps.Value (Mapping, Ch));
+   begin
+      return Map (Source, Convert'Access);
+   end Translate;
+
+   function Translate (Source : Rope; Mapping : Ada.Strings.Maps.Character_Mapping_Function) return Rope is (Map (Source, Mapping));
+
    function To_Upper (Source : Rope) return Rope is (Map (Source, Ada.Characters.Handling.To_Upper'Access));
 
    function To_Lower (Source : Rope) return Rope is (Map (Source, Ada.Characters.Handling.To_Lower'Access));

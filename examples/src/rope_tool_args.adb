@@ -1077,4 +1077,38 @@ package body Rope_Tool_Args is
          return False;
    end Findtoken_Argument_Handler;
 
+   --  --- translate S FROM TO ---
+
+   Translate_Count : Natural := 0;
+   Translate_S     : Rope;
+   Translate_From  : Ada.Strings.Unbounded.Unbounded_String;
+
+   function Translate_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Translate_Count is
+         when 0 =>
+            Translate_S := From_String (Arg);
+
+         when 1 =>
+            Translate_From := Ada.Strings.Unbounded.To_Unbounded_String (Arg);
+
+         when 2 =>
+            Ropes.Text_IO.Put_Line
+              (Translate (Translate_S, Ada.Strings.Maps.To_Mapping (Ada.Strings.Unbounded.To_String (Translate_From), Arg)));
+
+         when others =>
+            null;
+      end case;
+      Translate_Count := Translate_Count + 1;
+      return True;
+   exception
+      when Ada.Strings.Translation_Error =>
+         --  From To_Mapping: FROM and TO differ in length, or FROM
+         --  repeats a character.
+         Put_Line (Standard_Error, "Error: FROM and TO must be the same length, with no character repeated in FROM");
+         Set_Exit_Status (Failure);
+         return False;
+   end Translate_Argument_Handler;
+
 end Rope_Tool_Args;

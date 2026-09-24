@@ -138,6 +138,9 @@ package Rope_Tool_Args is
    --  --- findtoken S CHARS FROM --- (Ropes.Find_Token, Character_Set To_Set (CHARS), Test => Inside; Phase 19)
    function Findtoken_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
+   --  --- translate S FROM TO --- (Ropes.Translate, Ada.Strings.Maps.To_Mapping (FROM, TO); Phase 22)
+   function Translate_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
    Commands : aliased Command_Array :=
      [Make_Command
        ("cat",
@@ -337,7 +340,12 @@ package Rope_Tool_Args is
         Make_Parser
           (Description =>
              "findtoken S CHARS FROM  Print FIRST LAST: the first run of characters that are any of CHARS, at or after FROM in S.",
-           Handler     => Findtoken_Argument_Handler'Access, Options => null))];
+           Handler     => Findtoken_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("translate",
+        Make_Parser
+          (Description => "translate S FROM TO  Print S with each character in FROM replaced by the one at the same place in TO.",
+           Handler     => Translate_Argument_Handler'Access, Options => null))];
 
    Main_Parser : Parser :=
      Make_Parser

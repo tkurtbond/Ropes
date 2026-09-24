@@ -288,7 +288,7 @@ later phase to add). Same
 than hand-derived wherever the translation was non-mechanical — see
 "Testing approach" below for the two real divergences that caught
 (`bigcat`'s overflow behavior and `slice`'s past-the-end boundary).
-Currently `66 ok, 0 failed`; run via `cd examples &&
+Currently `69 ok, 0 failed`; run via `cd examples &&
 ./tests/run-tests.sh`.
 
 ## Core design
@@ -2015,6 +2015,45 @@ parameter's type.
   `Character_Set` (17 and 16 checks), and now fail without the guards.
   No new operation, so no `rope_tool` change.
 
+- **Phase 22, done — `Translate` with a `Character_Mapping` or a
+  `Character_Mapping_Function`.** At explicit user request;
+  `Ada.Strings.Unbounded.Translate`'s two function forms, `function
+  Translate (Source : Rope; Mapping : Ada.Strings.Maps.
+  Character_Mapping) return Rope` and the same with `Mapping :
+  Ada.Strings.Maps.Character_Mapping_Function`. No `Rope.Mod`
+  counterpart (it has `Map`, but nothing table-driven). It is `Map`
+  with a nested `Convert` returning `Ada.Strings.Maps.Value (Mapping,
+  Ch)` — `Map` accepts a local function's `'Access` since its
+  parameter is an anonymous access-to-subprogram — so it keeps
+  `Source`'s tree shape, as `Map` does, and needs no `Translation_Error`
+  handling of its own (only `To_Mapping` raises that, building the
+  mapping). The `Character_Mapping_Function` form is `Map (Source,
+  Mapping)` exactly: such a value passes as `Map`'s `Convert`
+  directly. It first shipped as a comment saying so ("call `Map`
+  itself"), then became a real overload at user request, so calls
+  read in `Ada.Strings`' vocabulary. A null mapping raises
+  `Constraint_Error` (`Map`'s `Convert` is `not null`); the RM says
+  nothing about null here, and GNAT's `Ada.Strings.Fixed.Translate`
+  states `Mapping /= null` only as a precondition that is never
+  checked. The tests use `Ada.Characters.Handling.To_Upper'Access`,
+  since a `Character_Mapping_Function` (a library-level access type)
+  can't designate a function nested in the test, a rule the first
+  draft of the test ran into.
+
+  `test_translate.adb` (12 checks): `To_Mapping`, `Constants.
+  Upper_Case_Map` and a many-to-one mapping against
+  `Ada.Strings.Fixed.Translate` over a 9-character-leaf rope;
+  `Identity`; `Null_Rope`; the depth kept; a `"*"`-built rope, whose
+  subtrees are shared; the `Character_Mapping_Function` form against
+  `Ada.Strings.Fixed.Translate`, against the `Character_Mapping` form
+  and `Map`, for depth and `Null_Rope`, and for a null mapping raising
+  `Constraint_Error`. Clean under valgrind. No `rope_tool` command for
+  the function form, like `Map`: a function can't be given on the
+  command line. `rope_tool translate S FROM TO` (with
+  `To_Mapping (FROM, TO)`, reporting its `Translation_Error`); 3 new
+  fixtures from real runs, `rope-help.test`/
+  `rope-unknown-command.test` regenerated: `69 ok, 0 failed`.
+
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds
 the matching `rope_tool` subcommand(s) — see "Command-line tool
@@ -2142,5 +2181,5 @@ Oberon original: `rope-chars.test`, `rope-overwrite.test`,
 `rope-lines-stdin.test`, `rope-lines-missing.test`, for commands
 `RopeTool.Mod` never had to begin with. Run via `cd examples && ./tests/run-tests.sh`
 (`-v` per-test, `-o` also showing captured output, or name specific
-fixtures — see the script's own header comment); currently `66 ok, 0
+fixtures — see the script's own header comment); currently `69 ok, 0
 failed`.

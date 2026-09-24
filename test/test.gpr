@@ -20,7 +20,8 @@ project Test is
       "test_index_set.adb",
       "test_count.adb",
       "test_search_walk.adb",
-      "test_find_token.adb");
+      "test_find_token.adb",
+      "test_translate.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use

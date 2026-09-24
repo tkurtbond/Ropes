@@ -8,7 +8,7 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-21, Phases
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-22, Phases
 7-8, 11 and 13 stretch phases and Phases 9-10, 12 and 14 not really
 `Ada`-side changes — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
@@ -20,7 +20,8 @@ depth-triggered auto-rebalance — `Balance`/`Balance_Insert`/
 (Phase 16: `String` overloads of `Index`/`Contains`/`Insert`/`Overwrite` and of
 all five comparison operators, both operand orders; Phase 17:
 `Replace_Slice`, `Index` with a `Character_Set`, and `Count`; Phase 19:
-`Index_Non_Blank` and `Find_Token`),
+`Index_Non_Blank` and `Find_Token`; Phase 22: `Translate` with a
+`Character_Mapping` or a `Character_Mapping_Function`),
 `Delete`, `Overwrite`/`Head`/`Tail`, the five
 comparison operators (`"="`/`"<"`/`"<="`/`">"`/`">="`), `Index`
 (`Rope`/`Character` patterns, each with a no-`From` and a
@@ -47,10 +48,10 @@ the `Ropes.Text_IO` child package (`Put`/`Put_Line`/`Get_Line`).
 (5), `test_overwrite.adb` (6), `test_head_tail.adb` (10),
 `test_contains.adb` (9), `test_split_visitor.adb` (16), and
 `test_text_io.adb` (17), `test_stream_io.adb` (11), `test_copy_slice.adb` (11), `test_string_overloads.adb` (25), `test_replace_slice.adb` (10),
-`test_index_set.adb` (10), `test_count.adb` (10), `test_search_walk.adb` (31), `test_find_token.adb` (14) — 352 checks total — all pass clean, including under valgrind. Plus a
+`test_index_set.adb` (10), `test_count.adb` (10), `test_search_walk.adb` (31), `test_find_token.adb` (14), `test_translate.adb` (12) — 364 checks total — all pass clean, including under valgrind. Plus a
 black-box `rope_tool` test suite, `examples/tests/` (`run-tests.sh` +
-66 `.test` fixtures, mostly ported from
-`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `66 ok, 0 failed`.
+69 `.test` fixtures, mostly ported from
+`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `69 ok, 0 failed`.
 `Balance`/`Max_Depth`/`Min_Length` are internal to `ropes.adb`, not
 public — `src/ropes-test_support.ads`/`.adb` is a small test-only
 child package (`function Depth`) so tests can confirm depth stays
@@ -354,8 +355,11 @@ true going forward).
 `triml`/`trimr`/`upper`/`lower`/`capitalize`/`uncapitalize`/`repeat`/
 `make`/`bigcat`/`contains`/`escaped`/`lines`/`readfile`/`copyslice`/
 `replaceslice`/`count`/`countset`/`indexset`/`rindexset`/`nonblank`/
-`rnonblank`/`findtoken`, matching all of `Ropes`'s API through Phase 19
-(Phase 19's are `Index_Non_Blank`/`Find_Token` demos, `findtoken`
+`rnonblank`/`findtoken`/`translate`, matching all of `Ropes`'s API
+through Phase 22 (`translate S FROM TO` is Phase 22's, with
+`To_Mapping (FROM, TO)` — the `Character_Mapping_Function` form has
+no command, like `Map`, since a function can't be given on the
+command line, and `upper`/`lower` already show function-based mapping; Phase 19's are `Index_Non_Blank`/`Find_Token` demos, `findtoken`
 printing `FIRST LAST`; Phase 17's five are
 `Replace_Slice`/`Count`/`Index`-with-a-`Character_Set` demos, each set
 given as a string of its members, `indexset`/`rindexset` split by

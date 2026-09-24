@@ -30,6 +30,7 @@ test/test_index_set
 test/test_count
 test/test_search_walk
 test/test_find_token
+test/test_translate
 examples/obj/
 examples/rope_tool
 

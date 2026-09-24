@@ -494,6 +494,22 @@ package Ropes is
    --  (matching this package's indexing convention) instead of
    --  Mapi's 0-based LONGINT.
 
+   function Translate (Source : Rope; Mapping : Ada.Strings.Maps.Character_Mapping) return Rope;
+   function Translate (Source : Rope; Mapping : Ada.Strings.Maps.Character_Mapping_Function) return Rope;
+   --  Source with every character replaced by the one Mapping maps it
+   --  to -- Ada.Strings.Unbounded.Translate's two function forms: with
+   --  a Character_Mapping such as To_Mapping ("abc", "xyz") or
+   --  Ada.Strings.Maps.Constants.Upper_Case_Map (Ada.Strings.Maps.Value
+   --  gives each character's image), or with a
+   --  Character_Mapping_Function, called on each character in
+   --  increasing index order. Both are Map underneath, so the result
+   --  has Source's tree shape, as Map's does; the second is exactly Map
+   --  (Source, Mapping), in Ada.Strings' vocabulary. A null
+   --  Character_Mapping_Function raises Constraint_Error (Map's Convert
+   --  is not null), where the RM leaves the null case unsaid and GNAT's
+   --  Ada.Strings.Fixed.Translate has an (unchecked) Mapping /= null
+   --  precondition. No Rope.Mod counterpart.
+
    function To_Upper (Source : Rope) return Rope;
    function To_Lower (Source : Rope) return Rope;
    --  Source with every ASCII letter (respectively) uppercased or

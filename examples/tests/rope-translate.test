@@ -1,0 +1,10 @@
+# Each of a, b, c becomes x, y, z, and the reverse; everything else is
+# left alone.
+program rope_tool
+arg translate
+arg abc xyz cab
+arg abcxyz
+arg xyzabc
+status 0
+output
+xyz abc zxy

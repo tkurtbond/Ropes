@@ -1,0 +1,10 @@
+# FROM and TO of different lengths: To_Mapping raises
+# Ada.Strings.Translation_Error.
+program rope_tool
+arg translate
+arg abc
+arg ab
+arg x
+status 1
+output
+Error: FROM and TO must be the same length, with no character repeated in FROM

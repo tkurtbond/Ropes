@@ -125,3 +125,6 @@ rnonblank S FROM  Print the index of the last non-space character at or before F
 
 findtoken S CHARS FROM  Print FIRST LAST: the first run of characters that are any of CHARS, at or after FROM in S.
 
+
+translate S FROM TO  Print S with each character in FROM replaced by the one at the same place in TO.
+
