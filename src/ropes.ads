@@ -287,6 +287,12 @@ package Ropes is
    --    From is Positive and a rope starts at 1, so for a rope
    --    Forward never raises.
    --
+   --  GNAT's own Ada.Strings.Unbounded does state the RM's rule, as a
+   --  precondition (From <= Length (Source) when Source isn't empty,
+   --  either direction), but that file sets pragma Assertion_Policy
+   --  (Pre => Ignore), so it is never checked and a caller gets the
+   --  Fixed bodies' behavior above.
+   --
    --  So here, as with GNAT, Forward with From > Length (Source)
    --  returns 0, where the RM says Index_Error; Backward with From >
    --  Length (Source) raises Ada.Strings.Index_Error, as both say.
@@ -340,6 +346,37 @@ package Ropes is
    --  Null_Rope Source; Forward returns 0 for From > Length (Source),
    --  where the RM (A.4.3(58.5/3)) says Index_Error; Backward raises
    --  Ada.Strings.Index_Error if From > Length (Source).
+
+   function Index_Non_Blank (Source : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+   function Index_Non_Blank (Source : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+   --  The index of the first (Forward) or last (Backward) character of
+   --  Source that is not Ada.Strings.Space, or 0 --
+   --  Ada.Strings.Unbounded.Index_Non_Blank, which the RM defines as
+   --  Index (Source, To_Set (Space), [From,] Outside, Going), and which
+   --  this is. So the From overload has the same boundary rules as
+   --  Index's (GNAT's, not the RM's; see Index above). Only a space
+   --  counts as blank, not Whitespace's other characters.
+
+   procedure Find_Token
+     (Source :     Rope; Set : Ada.Strings.Maps.Character_Set; From : Positive; Test : Ada.Strings.Membership; First : out Positive;
+      Last   : out Natural);
+   procedure Find_Token
+     (Source : Rope; Set : Ada.Strings.Maps.Character_Set; Test : Ada.Strings.Membership; First : out Positive; Last : out Natural);
+   --  The first token of Source at or after From (1, for the second
+   --  overload): First is the index of the first character from From
+   --  on that is in Set (Test => Inside) or not in Set (Test =>
+   --  Outside), and Last the index of the last character of the run of
+   --  such characters starting there. If there is no such character,
+   --  First is From and Last is 0 -- Ada.Strings.Unbounded.Find_Token.
+   --
+   --  Raises Ada.Strings.Index_Error if Source is not Null_Rope and
+   --  From > Length (Source). Unlike Index's From rule, this is the
+   --  RM's (A.4.3(66.2/3), from AI05-0031), and GNAT's
+   --  Ada.Strings.Fixed.Find_Token checks it exactly so. (GNAT's
+   --  Ada.Strings.Unbounded.Find_Token states it only as a
+   --  precondition, which its Assertion_Policy ignores, and so doesn't
+   --  raise; Ropes follows Fixed and the RM.) A Null_Rope Source never
+   --  raises: First is From and Last is 0.
 
    function Count (Source : Rope; Pattern : Rope) return Natural;
    function Count (Source : Rope; Pattern : String) return Natural;

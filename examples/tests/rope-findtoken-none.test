@@ -1,0 +1,9 @@
+# No digits at or after 2: FIRST is FROM and LAST is 0.
+program rope_tool
+arg findtoken
+arg abc
+arg 0123456789
+arg 2
+status 0
+output
+2 0

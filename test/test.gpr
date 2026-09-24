@@ -19,7 +19,8 @@ project Test is
       "test_replace_slice.adb",
       "test_index_set.adb",
       "test_count.adb",
-      "test_search_walk.adb");
+      "test_search_walk.adb",
+      "test_find_token.adb");
 
    package Compiler is
       for Default_Switches ("Ada") use

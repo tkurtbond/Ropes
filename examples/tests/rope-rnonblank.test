@@ -1,0 +1,8 @@
+# The last non-space character at or before 7: the b of ab.
+program rope_tool
+arg rnonblank
+arg    ab  
+arg 7
+status 0
+output
+5

@@ -116,3 +116,12 @@ indexset S CHARS FROM  Print the index of the first character at or after FROM i
 
 rindexset S CHARS FROM  Print the index of the last character at or before FROM in S that is any of CHARS, or 0.
 
+
+nonblank S FROM  Print the index of the first non-space character at or after FROM in S, or 0.
+
+
+rnonblank S FROM  Print the index of the last non-space character at or before FROM in S, or 0.
+
+
+findtoken S CHARS FROM  Print FIRST LAST: the first run of characters that are any of CHARS, at or after FROM in S.
+

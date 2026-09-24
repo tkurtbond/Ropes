@@ -1359,6 +1359,50 @@ package body Ropes is
       end case;
    end Index;
 
+   Blank : constant Ada.Strings.Maps.Character_Set := Ada.Strings.Maps.To_Set (Ada.Strings.Space);
+
+   function Index_Non_Blank (Source : Rope; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural is
+     (Index (Source, Blank, Ada.Strings.Outside, Going));
+
+   function Index_Non_Blank (Source : Rope; From : Positive; Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural is
+     (Index (Source, Blank, From, Ada.Strings.Outside, Going));
+
+   --  Two forward scans: one for the token's first character, one for
+   --  the first character after it that isn't in the token.
+   procedure Find_Token
+     (Source :     Rope; Set : Ada.Strings.Maps.Character_Set; From : Positive; Test : Ada.Strings.Membership; First : out Positive;
+      Last   : out Natural)
+   is
+      use type Ada.Strings.Membership;
+
+      Len   : constant Natural := Length (Source);
+      Start : Natural;
+      After : Natural;
+   begin
+      if Len /= 0 and then From > Len then
+         raise Ada.Strings.Index_Error;
+      end if;
+      Start := Index (Source, Set, From, Test, Ada.Strings.Forward);
+      if Start = 0 then
+         First := From;
+         Last  := 0;
+         return;
+      end if;
+      After :=
+        Index
+          (Source, Set, Start, (if Test = Ada.Strings.Inside then Ada.Strings.Outside else Ada.Strings.Inside),
+           Ada.Strings.Forward);
+      First := Start;
+      Last  := (if After = 0 then Len else After - 1);
+   end Find_Token;
+
+   procedure Find_Token
+     (Source : Rope; Set : Ada.Strings.Maps.Character_Set; Test : Ada.Strings.Membership; First : out Positive; Last : out Natural)
+   is
+   begin
+      Find_Token (Source, Set, 1, Test, First, Last);
+   end Find_Token;
+
    function Count (Source : Rope; Pattern : String) return Natural is
       S_D    : constant Node_Access := Data_Of (Source);
       P_Len  : constant Natural     := Pattern'Length;

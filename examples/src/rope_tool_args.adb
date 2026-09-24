@@ -993,4 +993,88 @@ package body Rope_Tool_Args is
       return Indexset_Handler (Arg, Ada.Strings.Backward);
    end Rindexset_Argument_Handler;
 
+   --  --- nonblank / rnonblank S FROM ---
+   --
+   --  One Ropes.Index_Non_Blank overload with a fixed Going, split into
+   --  two commands like index/rindex.
+
+   Nonblank_Count : Natural := 0;
+   Nonblank_S     : Rope;
+
+   function Nonblank_Handler (Arg : String; Going : Ada.Strings.Direction) return Boolean is
+   begin
+      if Nonblank_Count = 0 then
+         Nonblank_S := From_String (Arg);
+      elsif Nonblank_Count = 1 then
+         Put_Line
+           (Ada.Strings.Fixed.Trim (Natural'Image (Index_Non_Blank (Nonblank_S, Positive'Value (Arg), Going)), Ada.Strings.Both));
+      end if;
+      Nonblank_Count := Nonblank_Count + 1;
+      return True;
+   exception
+      when Constraint_Error        =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Index_Error =>
+         Put_Line (Standard_Error, "Error: FROM out of range");
+         Set_Exit_Status (Failure);
+         return False;
+   end Nonblank_Handler;
+
+   function Nonblank_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      return Nonblank_Handler (Arg, Ada.Strings.Forward);
+   end Nonblank_Argument_Handler;
+
+   function Rnonblank_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      return Nonblank_Handler (Arg, Ada.Strings.Backward);
+   end Rnonblank_Argument_Handler;
+
+   --  --- findtoken S CHARS FROM ---
+
+   Findtoken_Count : Natural := 0;
+   Findtoken_S     : Rope;
+   Findtoken_Set   : Ada.Strings.Maps.Character_Set;
+
+   function Findtoken_Argument_Handler (Start_With : Positive; Arg : String) return Boolean is
+      pragma Unreferenced (Start_With);
+   begin
+      case Findtoken_Count is
+         when 0 =>
+            Findtoken_S := From_String (Arg);
+
+         when 1 =>
+            Findtoken_Set := Ada.Strings.Maps.To_Set (Arg);
+
+         when 2 =>
+            declare
+               First : Positive;
+               Last  : Natural;
+            begin
+               Find_Token (Findtoken_S, Findtoken_Set, Positive'Value (Arg), Ada.Strings.Inside, First, Last);
+               Put_Line
+                 (Ada.Strings.Fixed.Trim (First'Image, Ada.Strings.Both) & " " &
+                  Ada.Strings.Fixed.Trim (Last'Image, Ada.Strings.Both));
+            end;
+
+         when others =>
+            null;
+      end case;
+      Findtoken_Count := Findtoken_Count + 1;
+      return True;
+   exception
+      when Constraint_Error        =>
+         Put_Line (Standard_Error, "Error: not a valid index: """ & Arg & """");
+         Set_Exit_Status (Failure);
+         return False;
+      when Ada.Strings.Index_Error =>
+         Put_Line (Standard_Error, "Error: FROM out of range");
+         Set_Exit_Status (Failure);
+         return False;
+   end Findtoken_Argument_Handler;
+
 end Rope_Tool_Args;

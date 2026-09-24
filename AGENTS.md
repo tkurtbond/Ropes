@@ -8,7 +8,7 @@ Ada idioms, open questions, and the phased implementation plan.
 
 ## Status
 
-**All phases done** (see `PLAN.md`'s phased plan, Phases 1-18, Phases
+**All phases done** (see `PLAN.md`'s phased plan, Phases 1-19, Phases
 7-8, 11 and 13 stretch phases and Phases 9-10, 12 and 14 not really
 `Ada`-side changes — see below): `Rope`/`Node`/`Rope_Ref` skeleton, refcounting,
 `Null_Rope`, `Length`, `Is_Empty`, `"&"` (short-leaf merge plus
@@ -19,7 +19,8 @@ depth-triggered auto-rebalance — `Balance`/`Balance_Insert`/
 `Slice`, `Copy_Slice` (Phase 15, `Rope.Mod`'s `Blit`), `Insert`,
 (Phase 16: `String` overloads of `Index`/`Contains`/`Insert`/`Overwrite` and of
 all five comparison operators, both operand orders; Phase 17:
-`Replace_Slice`, `Index` with a `Character_Set`, and `Count`),
+`Replace_Slice`, `Index` with a `Character_Set`, and `Count`; Phase 19:
+`Index_Non_Blank` and `Find_Token`),
 `Delete`, `Overwrite`/`Head`/`Tail`, the five
 comparison operators (`"="`/`"<"`/`"<="`/`">"`/`">="`), `Index`
 (`Rope`/`Character` patterns, each with a no-`From` and a
@@ -46,10 +47,10 @@ the `Ropes.Text_IO` child package (`Put`/`Put_Line`/`Get_Line`).
 (5), `test_overwrite.adb` (6), `test_head_tail.adb` (10),
 `test_contains.adb` (9), `test_split_visitor.adb` (13), and
 `test_text_io.adb` (17), `test_stream_io.adb` (11), `test_copy_slice.adb` (11), `test_string_overloads.adb` (25), `test_replace_slice.adb` (10),
-`test_index_set.adb` (10), `test_count.adb` (10), `test_search_walk.adb` (31) — 331 checks total — all pass clean, including under valgrind. Plus a
+`test_index_set.adb` (10), `test_count.adb` (10), `test_search_walk.adb` (31), `test_find_token.adb` (14) — 345 checks total — all pass clean, including under valgrind. Plus a
 black-box `rope_tool` test suite, `examples/tests/` (`run-tests.sh` +
-58 `.test` fixtures, mostly ported from
-`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `58 ok, 0 failed`.
+65 `.test` fixtures, mostly ported from
+`~/Repos/Oberon/oberon-tools/tests/rope-*.test`) — `65 ok, 0 failed`.
 `Balance`/`Max_Depth`/`Min_Length` are internal to `ropes.adb`, not
 public — `src/ropes-test_support.ads`/`.adb` is a small test-only
 child package (`function Depth`) so tests can confirm depth stays
@@ -270,6 +271,17 @@ is the whole trick. **Proving a search test can fail is part of
 writing it**: `test_search_walk.adb` was checked by planting three
 bugs, one at a time, and seeing it fail each.
 
+**Phase 19 added `Index_Non_Blank` and `Find_Token`, and settled the
+`From` rule as "do what GNAT's `Ada.Strings.Fixed` does"** — laxer
+than the RM for `Index`, exactly the RM for `Find_Token`. Checking it
+found that **GNAT's `a-strunb.ads` states the RM's `From` rule as
+preconditions and then ignores them** (`pragma Assertion_Policy (Pre
+=> Ignore)`): read a GNAT runtime spec's contracts *and* its
+`Assertion_Policy` before citing either as GNAT's behavior. **Don't
+generate fixtures through `eval` on an unquoted variable** — it
+collapses runs of spaces inside quoted arguments; build argument lists
+in Python (or an array) instead.
+
 **Phase 14 made `Rope.Mod`'s `Blit` and `Escaped` linear and renamed
 `Escaped` to `Escape`** (`oberon-tools` `a41f0a7`) — the two
 per-character-`Fetch` operations Phase 12 had left alone there. Only
@@ -320,8 +332,10 @@ true going forward).
 `cmp`/`index`/`rindex`/`indexchar`/`rindexchar`/`split`/`chars`/`trim`/
 `triml`/`trimr`/`upper`/`lower`/`capitalize`/`uncapitalize`/`repeat`/
 `make`/`bigcat`/`contains`/`escaped`/`lines`/`readfile`/`copyslice`/
-`replaceslice`/`count`/`countset`/`indexset`/`rindexset`, matching
-all of `Ropes`'s API through Phase 17 (Phase 17's five are
+`replaceslice`/`count`/`countset`/`indexset`/`rindexset`/`nonblank`/
+`rnonblank`/`findtoken`, matching all of `Ropes`'s API through Phase 19
+(Phase 19's are `Index_Non_Blank`/`Find_Token` demos, `findtoken`
+printing `FIRST LAST`; Phase 17's five are
 `Replace_Slice`/`Count`/`Index`-with-a-`Character_Set` demos, each set
 given as a string of its members, `indexset`/`rindexset` split by
 `Going` like `index`/`rindex`; `copyslice S LOW HIGH T POS` is

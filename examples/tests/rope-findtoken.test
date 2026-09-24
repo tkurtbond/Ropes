@@ -1,0 +1,9 @@
+# The first run of digits: 12345, at 5 through 9.
+program rope_tool
+arg findtoken
+arg abc 12345 x
+arg 0123456789
+arg 1
+status 0
+output
+5 9

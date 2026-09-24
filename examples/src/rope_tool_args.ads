@@ -131,6 +131,13 @@ package Rope_Tool_Args is
    function Indexset_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
    function Rindexset_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
 
+   --  --- nonblank / rnonblank S FROM --- (Ropes.Index_Non_Blank, Going => Forward/Backward; Phase 19)
+   function Nonblank_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+   function Rnonblank_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
+   --  --- findtoken S CHARS FROM --- (Ropes.Find_Token, Character_Set To_Set (CHARS), Test => Inside; Phase 19)
+   function Findtoken_Argument_Handler (Start_With : Positive; Arg : String) return Boolean;
+
    Commands : aliased Command_Array :=
      [Make_Command
        ("cat",
@@ -314,7 +321,23 @@ package Rope_Tool_Args is
         Make_Parser
           (Description =>
              "rindexset S CHARS FROM  Print the index of the last character at or before FROM in S that is any of CHARS, or 0.",
-           Handler     => Rindexset_Argument_Handler'Access, Options => null))];
+           Handler     => Rindexset_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("nonblank",
+        Make_Parser
+          (Description => "nonblank S FROM  Print the index of the first non-space character at or after FROM in S, or 0.",
+           Handler     => Nonblank_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("rnonblank",
+        Make_Parser
+          (Description => "rnonblank S FROM  Print the index of the last non-space character at or before FROM in S, or 0.",
+           Handler     => Rnonblank_Argument_Handler'Access, Options => null)),
+     Make_Command
+       ("findtoken",
+        Make_Parser
+          (Description =>
+             "findtoken S CHARS FROM  Print FIRST LAST: the first run of characters that are any of CHARS, at or after FROM in S.",
+           Handler     => Findtoken_Argument_Handler'Access, Options => null))];
 
    Main_Parser : Parser :=
      Make_Parser

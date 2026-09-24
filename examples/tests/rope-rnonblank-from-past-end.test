@@ -1,0 +1,8 @@
+# A backward FROM past the end raises Ada.Strings.Index_Error.
+program rope_tool
+arg rnonblank
+arg ab
+arg 9
+status 1
+output
+Error: FROM out of range

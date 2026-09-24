@@ -1,0 +1,11 @@
+# FROM past the end of a non-empty S raises Ada.Strings.Index_Error:
+# the RM's rule (AI05-0031), which GNAT's Ada.Strings.Fixed.Find_Token
+# follows, though GNAT's Unbounded one doesn't check it.
+program rope_tool
+arg findtoken
+arg abc
+arg 0123456789
+arg 9
+status 1
+output
+Error: FROM out of range

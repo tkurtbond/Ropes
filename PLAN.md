@@ -288,7 +288,7 @@ later phase to add). Same
 than hand-derived wherever the translation was non-mechanical — see
 "Testing approach" below for the two real divergences that caught
 (`bigcat`'s overflow behavior and `slice`'s past-the-end boundary).
-Currently `58 ok, 0 failed`; run via `cd examples &&
+Currently `65 ok, 0 failed`; run via `cd examples &&
 ./tests/run-tests.sh`.
 
 ## Core design
@@ -614,6 +614,12 @@ function Index
 --  Phase 16: Pattern : String, with and without From -- for Index
 --  and for Contains.
 
+--  Phase 19:
+function Index_Non_Blank (Source : Rope; [From : Positive;] Going : Ada.Strings.Direction := Ada.Strings.Forward) return Natural;
+procedure Find_Token
+  (Source : Rope; Set : Ada.Strings.Maps.Character_Set; [From : Positive;] Test : Ada.Strings.Membership;
+   First  : out Positive; Last : out Natural);
+
 --  Phase 17:
 function Index
   (Source : Rope; Set : Ada.Strings.Maps.Character_Set; Test : Ada.Strings.Membership := Ada.Strings.Inside;
@@ -726,6 +732,16 @@ and spelled out at Phase 17's user request:
   Source'First` can't be reached with a `Positive` `From` and a string
   starting at 1.) `Ada.Strings.Unbounded`'s `Index` delegates to
   these, so it behaves the same.
+
+  Found at Phase 19: GNAT's `a-strunb.ads` *does* state the RM's
+  rule, as a precondition on `Index`, `Index_Non_Blank` and
+  `Find_Token` — `Pre => (if Length (Source) /= 0 then From <= Length
+  (Source))`, whichever way `Going` points — but the same file begins
+  `pragma Assertion_Policy (Pre => Ignore, ...)`, so it is never
+  checked, and a caller gets the `Fixed` bodies' behavior. So GNAT's
+  own contract calls a `Forward` search from past the end a caller
+  error; the lax result is what an unchecked precondition happens to
+  give, not something GNAT promises.
 - **`Ropes` follows GNAT** in every `From` overload of `Index`
   (`Rope`, `String`, `Character` and `Character_Set` patterns):
   `Forward` with `From > Length (Source)` returns 0; `Backward` with
@@ -735,7 +751,9 @@ and spelled out at Phase 17's user request:
      can guess `Ropes`'s behavior. Under GNAT, the only Ada compiler
      this project builds with, what they have observed is GNAT's rule,
      and a program that works with `Unbounded_String.Index` should
-     keep working with `Ropes.Index`.
+     keep working with `Ropes.Index` — though, as above, GNAT's own
+     (unchecked) precondition says such a program is relying on
+     something it shouldn't.
   2. **Scan loops rely on it.** "Find, then search again from just
      past the match" reaches `From = Length (Source) + 1` whenever a
      match ends the rope. `Split` does exactly this, as did `Count`
@@ -750,6 +768,15 @@ and spelled out at Phase 17's user request:
   happens, or if strict conformance becomes the goal, the change is
   one rule applied to all the `From` overloads together, plus guards
   in `Split`'s loops — not a change to one overload.
+
+  **The rule, stated once: `Ropes` does what GNAT's
+  `Ada.Strings.Fixed` does on the same text.** For `Index` that is
+  laxer than the RM; for `Find_Token` (Phase 19) it is exactly the RM
+  — `Fixed.Find_Token` checks `From` in both directions, per AI05-0031
+  — even though GNAT's `Unbounded.Find_Token` doesn't check it at all
+  (its precondition ignored, its body a slice of the no-`From`
+  version). `Fixed` is also the tests' oracle, so the rule is checked,
+  not just stated.
 
 `Rope.Mod`'s `RFind`'s own bound convention does **not** carry over
 unchanged: `RFind`'s `before` clamps so that a match's *start*
@@ -1910,6 +1937,36 @@ parameter's type.
   failed it. Every `test_*` clean under valgrind. No `rope_tool`
   change: no new operation to demonstrate.
 
+- **Phase 19, done — `Index_Non_Blank` and `Find_Token`.** At explicit
+  user request, the last two search operations from the
+  `Ada.Strings.Fixed`/`Unbounded` gap list; no `Rope.Mod` counterpart.
+  `Index_Non_Blank (Source, [From,] Going)` is what the RM defines it
+  as, `Index (Source, To_Set (Space), [From,] Outside, Going)`, so it
+  inherits `Index`'s `From` rule and Phase 18's leaf walk; only a
+  space is blank, not `Whitespace`'s other characters.
+  `Find_Token (Source, Set, [From,] Test, First, Last)` is two forward
+  `Index` scans (the token's first character, then the first one after
+  it outside the token); no token gives `First = From`, `Last = 0`.
+  Its `From` check is the RM's and GNAT's `Fixed`'s: `Index_Error` if
+  `Source` isn't empty and `From > Length (Source)`, never for an empty
+  `Source`. Checking GNAT's `Unbounded` version for this turned up its
+  ignored preconditions — see "`From` past the end".
+
+  `test_find_token.adb` (14 checks): hand-picked cases (a token
+  crossing a leaf boundary, `Outside`, no token, `Null_Rope` with an
+  out-of-range `From`), plus `Ada.Strings.Fixed` as the oracle over a
+  9-character-leaf rope for every `From`, `Test` and four sets
+  (`Find_Token`), and every `From` both ways (`Index_Non_Blank`),
+  `Index_Error` included. Planting GNAT `Unbounded`'s missing `From`
+  check, or an off-by-one `Last`, each failed it. Clean under
+  valgrind. `rope_tool` gained `nonblank`/`rnonblank S FROM` and
+  `findtoken S CHARS FROM` (prints `FIRST LAST`), 7 new fixtures from
+  real runs, `rope-help.test`/`rope-unknown-command.test` regenerated:
+  `65 ok, 0 failed`. (Generating the fixtures through a shell `eval`
+  first collapsed an argument's runs of spaces — a harness artifact,
+  not a `rope_tool` bug; they were generated from Python argument
+  lists instead, with no shell.)
+
 Each phase gets its own `test_*.adb`(s) before moving to the next,
 rather than one big test file added at the end. Each phase also adds
 the matching `rope_tool` subcommand(s) — see "Command-line tool
@@ -2037,5 +2094,5 @@ Oberon original: `rope-chars.test`, `rope-overwrite.test`,
 `rope-lines-stdin.test`, `rope-lines-missing.test`, for commands
 `RopeTool.Mod` never had to begin with. Run via `cd examples && ./tests/run-tests.sh`
 (`-v` per-test, `-o` also showing captured output, or name specific
-fixtures — see the script's own header comment); currently `58 ok, 0
+fixtures — see the script's own header comment); currently `65 ok, 0
 failed`.

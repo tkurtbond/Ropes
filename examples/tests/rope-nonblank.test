@@ -1,0 +1,8 @@
+# The first non-space character: the a of ab.
+program rope_tool
+arg nonblank
+arg    ab  
+arg 1
+status 0
+output
+4
