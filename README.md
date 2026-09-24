@@ -20,23 +20,41 @@ reworked with Ada idioms:
 - **Balanced automatically.** `"&"` merges short leaves and rebalances
   when the tree gets too deep, using the paper's Fibonacci-forest
   algorithm.
-- **`Ada.Strings` vocabulary.** Indexing is 1-based. `Element`,
-  `Slice`, `Insert`, `Delete`, `Overwrite`, `Head`, `Tail`, `Index`,
-  `Trim` and `"*"` follow `Ada.Strings.Unbounded`/`Ada.Strings.Fixed`,
-  and they raise `Ada.Strings.Index_Error` on bad bounds.
+- **`Ada.Strings` vocabulary.** Indexing is 1-based. The operations
+  are named and shaped after `Ada.Strings.Unbounded` and
+  `Ada.Strings.Fixed`, as functions returning a new `Rope`. They take
+  `Character_Set`s and `Character_Mapping`s from `Ada.Strings.Maps`,
+  and raise `Ada.Strings.Index_Error` on bad bounds. Where GNAT's
+  runtime is laxer than the RM (the `From` parameter of `Index`, for
+  instance), `Ropes` follows the RM.
 - **Iterable.** `for Ch of Some_Rope loop ... end loop;` works directly.
 
 The full API is in [`src/ropes.ads`](src/ropes.ads). It covers:
-construction (`From_String`, `From_Character`, `"&"`, `"*"`,
-`From_/To_Unbounded_String`, `To_String`), access (`Length`,
-`Is_Empty`, `Element`, `Slice`, `Copy_Slice` into part of an existing
-`String`), editing (`Insert`, `Delete`,
-`Overwrite`, `Head`, `Tail`), comparison (`=`, `<`, `<=`, `>`, `>=`),
-searching (`Index`, `Contains`), `Split` (array-returning or
-callback), `Trim`, `Map`/`Map_Indexed`, case conversion
-(`To_Upper`, `To_Lower`, `Capitalize`, `Uncapitalize`), `Escape`, and
-`Process_Chunks`, which hands each leaf to a callback so a rope can be
-written anywhere without flattening it.
+
+- **Construction:** `From_String`, `From_Character`, `"&"`, `"*"`
+  (repeating a `Character`, `String` or `Rope`),
+  `From_/To_Unbounded_String` and `To_String`.
+- **Access:** `Length`, `Is_Empty`, `Element`, `Slice`, and
+  `Copy_Slice` into part of an existing `String`.
+- **Editing:** `Insert`, `Delete`, `Overwrite`, `Replace_Slice`,
+  `Replace_Element`, `Head` and `Tail`.
+- **Comparison:** `=`, `<`, `<=`, `>` and `>=` between ropes, or
+  between a rope and a `String`, plus `Equal_Case_Insensitive`,
+  `Less_Case_Insensitive`, `Hash` and `Hash_Case_Insensitive` (for
+  hashed containers).
+- **Searching:** `Index` (for a rope, `String`, `Character` or
+  `Character_Set`, in either direction and optionally from a given
+  position), `Index_Non_Blank`, `Contains`, `Count` and `Find_Token`.
+  The pattern searches take an optional `Mapping`, for
+  case-insensitive search among other uses.
+- **Transformation:** `Split` (array-returning or callback), `Trim`,
+  `Translate`, `Map`/`Map_Indexed`, case conversion (`To_Upper`,
+  `To_Lower`, `Capitalize`, `Uncapitalize`) and `Escape`.
+- **`Process_Chunks`**, which hands each leaf to a callback so that a
+  rope can be written anywhere without flattening it.
+
+Searches, comparisons and hashing walk the rope's leaves directly, so
+they take linear time however the rope was built.
 
 [`src/ropes-text_io.ads`](src/ropes-text_io.ads) (`Ropes.Text_IO`)
 adds `Put`, `Put_Line` and `Get_Line`, mirroring
@@ -91,18 +109,25 @@ Build the library (a static library, `lib/libropes.a`):
 gprbuild -P ropes.gpr -p
 ```
 
-Build and run the unit tests (23 standalone programs, one per area,
-each printing `ok   - ...` / `FAIL - ...` per check):
+Build everything and run all the tests: the unit tests in `test/`
+(standalone programs, one per area, each printing `ok   - ...` /
+`FAIL - ...` per check) and the `rope_tool` fixtures in
+`examples/tests/`. It finishes by printing the total:
 
 ```sh
-cd test
-gprbuild -P test.gpr -p
-for t in test_*.adb; do ./"${t%.adb}"; done
+make test
 ```
 
-Build the `rope_tool` command-line demo. Each subcommand runs one
-`Ropes` operation on its arguments. Then run its black-box test
-suite:
+`make build`, `make build-test` and `make build-examples` build the
+parts separately. To run one test program by itself:
+
+```sh
+cd test && ./test_index
+```
+
+The `rope_tool` command-line demo runs one `Ropes` operation per
+subcommand on its arguments. To build it, try it, and run its
+black-box test suite by itself:
 
 ```sh
 cd examples
@@ -111,6 +136,7 @@ gprbuild -P rope_tool.gpr -p
 ./rope_tool split a,b,c ,     # a / b / c, one per line
 ./rope_tool lines tests/data/lines.txt   # each line's length, then the line
 ./rope_tool readfile tests/data/exact.bin  # length, then every byte, escaped
+./rope_tool countci "The cat and the hat" the   # 2
 ./rope_tool --help            # list every subcommand
 ./tests/run-tests.sh
 ```
@@ -120,9 +146,11 @@ gprbuild -P rope_tool.gpr -p
 - [`PLAN.md`](PLAN.md) covers the design rationale, how each
   `Rope.Mod` operation maps to Ada, and the phased implementation
   history.
-- [`AGENTS.md`](AGENTS.md) has operational notes and codebase
-  conventions (valgrind checks, formatting with `gnatpp -M132`, and so
-  on).
+- [`AGENTS.md`](AGENTS.md) has working notes: how to build and test,
+  the codebase's conventions, and the lessons learned along the way.
+- [`oberon-tools`](https://github.com/tkurtbond/oberon-tools)'s
+  `Rope.Mod` is the Oberon-2 original. Many of this port's additions
+  have been ported back to it.
 
 This project began in
 [`ada-experiments`](https://github.com/tkurtbond/ada-experiments) and
